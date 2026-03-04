@@ -1,8 +1,8 @@
+FROM mwader/static-ffmpeg:latest AS ffmpeg
+
 FROM python:3.12-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+COPY --from=ffmpeg /ffmpeg /usr/local/bin/ffmpeg
 
 WORKDIR /app
 
