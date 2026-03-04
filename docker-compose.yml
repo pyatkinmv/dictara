@@ -1,0 +1,14 @@
+services:
+  dictara:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - model-cache:/models
+    environment:
+      HF_HOME: /models
+      WHISPER_MODEL: ${WHISPER_MODEL:-small}
+    restart: unless-stopped
+
+volumes:
+  model-cache:
