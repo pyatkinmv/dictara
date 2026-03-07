@@ -7,7 +7,7 @@ services:
       - model-cache:/models
     environment:
       HF_HOME: /models
-      WHISPER_MODEL: ${WHISPER_MODEL:-small}
+      WHISPER_MODELS: ${WHISPER_MODELS:-small,large-v3}
       HF_TOKEN: ${HF_TOKEN:-}
     restart: unless-stopped
 

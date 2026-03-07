@@ -20,15 +20,15 @@ _executor = ThreadPoolExecutor(max_workers=1)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    model_size = os.environ.get("WHISPER_MODEL", "small")
-    app.state.model_loaded = False
+    app.state.transcribers = {}
     app.state.diarizer = None
-    try:
-        app.state.transcriber = Transcriber(model_size=model_size)
-        app.state.model_loaded = True
-        logger.info("Transcriber ready (model=%s)", model_size)
-    except Exception:
-        logger.exception("Failed to load Whisper model")
+    models_env = os.environ.get("WHISPER_MODELS", "small,large-v3")
+    for model_size in [m.strip() for m in models_env.split(",") if m.strip()]:
+        try:
+            app.state.transcribers[model_size] = Transcriber(model_size=model_size)
+            logger.info("Transcriber ready (model=%s)", model_size)
+        except Exception:
+            logger.exception("Failed to load Whisper model %s", model_size)
 
     if os.environ.get("HF_TOKEN"):
         try:
@@ -45,9 +45,9 @@ app = FastAPI(title="Dictara Transcription API", lifespan=lifespan)
 
 # ── worker ────────────────────────────────────────────────────────────────────
 
-def _run_transcription(job_id: str, tmp_path: str, language: str | None, diarize: bool) -> None:
+def _run_transcription(job_id: str, tmp_path: str, language: str | None, diarize: bool, model: str) -> None:
     """Blocking — always runs inside ThreadPoolExecutor."""
-    transcriber: Transcriber = app.state.transcriber
+    transcriber: Transcriber = app.state.transcribers[model]
     job_store.set_processing(job_id)
     wav_path = None
     try:
@@ -74,9 +74,9 @@ def _run_transcription(job_id: str, tmp_path: str, language: str | None, diarize
                 pass
 
 
-async def _dispatch(job_id: str, tmp_path: str, language: str | None, diarize: bool) -> None:
+async def _dispatch(job_id: str, tmp_path: str, language: str | None, diarize: bool, model: str) -> None:
     loop = asyncio.get_running_loop()
-    await loop.run_in_executor(_executor, _run_transcription, job_id, tmp_path, language, diarize)
+    await loop.run_in_executor(_executor, _run_transcription, job_id, tmp_path, language, diarize, model)
 
 
 # ── routes ────────────────────────────────────────────────────────────────────
@@ -86,7 +86,10 @@ async def transcribe(
     file: UploadFile = File(...),
     language: str | None = Query(default=None),
     diarize: bool = Query(default=False),
+    model: str = Query(default="small"),
 ):
+    if model not in app.state.transcribers:
+        raise HTTPException(status_code=400, detail=f"Model '{model}' not loaded. Available: {list(app.state.transcribers)}")
     if diarize and app.state.diarizer is None:
         raise HTTPException(status_code=503, detail="Diarization unavailable: HF_TOKEN not configured or pipeline failed to load")
 
@@ -96,7 +99,7 @@ async def transcribe(
         tmp_path = tmp.name
 
     job_id = job_store.create(tmp_path)
-    asyncio.create_task(_dispatch(job_id, tmp_path, language, diarize))
+    asyncio.create_task(_dispatch(job_id, tmp_path, language, diarize, model))
     return {"job_id": job_id}
 
 
@@ -113,6 +116,6 @@ async def get_job(job_id: str):
 async def health():
     return {
         "status": "ok",
-        "model_loaded": getattr(app.state, "model_loaded", False),
+        "models_loaded": list(getattr(app.state, "transcribers", {}).keys()),
         "diarization_available": getattr(app.state, "diarizer", None) is not None,
     }

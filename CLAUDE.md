@@ -17,7 +17,7 @@ POST /transcribe  →  saves file to /tmp  →  creates job  →  dispatches to 
 GET /jobs/{id}   ←  job_store (in-memory)  ←  set_done(segments)
 ```
 
-Single-worker executor — WhisperModel is not thread-safe for concurrent inference.
+Single-worker executor — WhisperModel is not thread-safe for concurrent inference. Jobs queue up and run one at a time.
 
 ## Key files
 
@@ -25,7 +25,7 @@ Single-worker executor — WhisperModel is not thread-safe for concurrent infere
 |------|---------|
 | `app.py` | FastAPI routes, lifespan (model loading), job dispatch |
 | `transcriber.py` | `Transcriber` (Whisper), `Diarizer` (pyannote), `merge_diarization()` |
-| `jobs.py` | In-memory job store with status + timing |
+| `jobs.py` | In-memory job store with status + timing (`duration_s`) |
 | `Dockerfile` | Multi-stage: static ffmpeg + python:3.12-slim |
 | `docker-compose.yml` | Single service, `model-cache` volume for HF models |
 | `requirements.txt` | Pinned deps — see constraints below |
@@ -33,86 +33,97 @@ Single-worker executor — WhisperModel is not thread-safe for concurrent infere
 ## API
 
 ```bash
-# Submit job (returns job_id immediately, 202)
-curl -X POST "http://localhost:8000/transcribe?language=ru&diarize=true" \
+# Submit job (returns job_id immediately, HTTP 202)
+curl -X POST "http://localhost:8000/transcribe?language=ru&diarize=true&model=large-v3" \
   -F "file=@audio.m4a"
+# → {"job_id": "abc-123"}
 
 # Poll result
 curl http://localhost:8000/jobs/{job_id}
-# → {"status": "done", "result": {"segments": [...]}, "duration_s": 156.3, "error": null}
+# → {"status": "done", "result": {"segments": [...]}, "duration_s": 168.0, "error": null}
+# status values: pending | processing | done | failed
 
 # Health check
 curl http://localhost:8000/health
-# → {"status": "ok", "model_loaded": true, "diarization_available": true}
+# → {"status": "ok", "models_loaded": ["small", "large-v3"], "diarization_available": true}
 ```
 
-Segment shape (without diarization): `{"start": 0.0, "end": 2.4, "text": "Hello"}`
-Segment shape (with diarization): `{"start": 0.0, "end": 2.4, "text": "Hello", "speaker": "SPEAKER_00"}`
+**Query params for `/transcribe`:**
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `language` | auto-detect | Language code e.g. `ru`, `en`. Explicit is faster and more accurate |
+| `diarize` | `false` | Add speaker labels (SPEAKER_00, SPEAKER_01, ...) |
+| `model` | `small` | Which Whisper model to use: `small` or `large-v3` |
+
+**Segment shape** (without diarization): `{"start": 0.0, "end": 2.4, "text": "Hello"}`
+**Segment shape** (with diarization): `{"start": 0.0, "end": 2.4, "text": "Hello", "speaker": "SPEAKER_00"}`
 
 ## Configuration (env vars)
 
 | Var | Default | Description |
 |-----|---------|-------------|
-| `WHISPER_MODEL` | `small` | Model size: tiny / base / small / medium / large-v3 |
+| `WHISPER_MODELS` | `small,large-v3` | Comma-separated list of models to load at startup |
 | `HF_TOKEN` | — | HuggingFace token. Required for diarization. Set in `.env` |
-| `HF_HOME` | `/models` | Where HF caches models (mapped to Docker volume) |
+| `HF_HOME` | `/models` | Where HF caches models (mapped to `model-cache` Docker volume) |
 
-## Dependency constraints (important)
+## Model caching
 
-- `pyannote.audio>=2.1,<4.0` — v4.x pulls in `torchcodec` which requires system ffmpeg shared libs (we only have the static binary). v3.x works fine.
-- `torch==2.3.1` + `torchaudio==2.3.1` — pyannote 3.x uses `torchaudio.AudioMetaData` which was removed in torchaudio 2.4+. Pin to 2.3.1.
-- `huggingface_hub` resolves to 1.x — pyannote 3.x calls `hf_hub_download(use_auth_token=...)` which was removed in huggingface_hub 1.0. Fixed via monkey-patch in `transcriber.py:_patch_hf_hub_compat()`.
+All models (Whisper + pyannote) download to the `model-cache` Docker volume on first start and are reused on every subsequent start. `docker compose down` keeps the volume intact. Only `docker compose down -v` deletes it.
 
-## Diarization setup
+- `small`: ~500MB, downloads in ~1 min
+- `large-v3`: ~3GB, downloads in ~5 min
+- pyannote diarization models: ~1GB
 
-Two HuggingFace gated models require manual acceptance at:
-- https://huggingface.co/pyannote/speaker-diarization-3.1
-- https://huggingface.co/pyannote/segmentation-3.0
+## Performance (CPU, ~4-minute recording)
 
-Then set `HF_TOKEN` in `.env`. Models download ~1GB on first container start (cached in `model-cache` volume).
+| Model | Whisper only | Whisper + diarization |
+|-------|-------------|----------------------|
+| `small` | ~2.8 min | ~7.8 min |
+| `large-v3` | ~16 min | ~21 min |
 
-## Whisper transcription settings (transcriber.py)
+GPU would be 10-20x faster overall.
+
+**Quality difference (Russian):** large-v3 correctly transcribes words small gets wrong — e.g. "раковина" vs "раквина", "фарфоровая" vs "уфоркоровая", "Дубай" vs "Тубая". Worth the slower speed for final transcripts.
+
+## Whisper transcription settings (`transcriber.py`)
 
 ```python
 self.model.transcribe(
     audio_path,
-    language=language,   # e.g. "ru". None = auto-detect
-    beam_size=10,        # higher = more accurate, slower. 1=greedy, 5=default, 10=current
-    vad_filter=True,     # skip silent chunks before Whisper sees them (prevents hallucination)
+    language=language,   # e.g. "ru". None = auto-detect per chunk (slower, less accurate)
+    beam_size=10,        # 1=greedy (fastest), 5=default, 10=current (better accuracy)
+    vad_filter=True,     # pre-filter silence — prevents hallucination on quiet chunks
 )
 ```
 
-Key parameters to tune:
-- `beam_size` — 5 is default, 10 is current setting (slightly better accuracy, ~10% slower)
-- `vad_filter=True` — prevents Whisper from hallucinating repeated text during silence
-- `condition_on_previous_text=False` — breaks echo loops when Whisper repeats itself across chunks (disabled currently, re-enable if loops appear)
-- `no_speech_threshold` — default 0.6, lower = stricter silence filtering
-- `log_prob_threshold` — default -1.0, raise to -0.5 to drop low-confidence segments
+## Dependency constraints (important)
 
-## Performance (CPU, ~4-minute recording)
+- `pyannote.audio>=2.1,<4.0` — v4.x pulls in `torchcodec` which requires system ffmpeg shared libs (we only have the static binary). v3.x works fine.
+- `torch==2.3.1` + `torchaudio==2.3.1` — pyannote 3.x uses `torchaudio.AudioMetaData` removed in torchaudio 2.4+.
+- `huggingface_hub` 1.x removed `use_auth_token` kwarg that pyannote 3.x still passes. Fixed via monkey-patch in `transcriber.py:_patch_hf_hub_compat()`.
 
-| Mode | Time |
-|------|------|
-| Whisper only (beam_size=10) | ~2.6 min |
-| Whisper + diarization | ~7.8 min |
+## Diarization setup
 
-GPU would be 10-20x faster. Set `WHISPER_MODEL=medium` for better accuracy at ~2x slower.
+Two HuggingFace gated models require manual one-time acceptance:
+- https://huggingface.co/pyannote/speaker-diarization-3.1
+- https://huggingface.co/pyannote/segmentation-3.0
+
+Then set `HF_TOKEN` in `.env`. Models download on first start and cache to the volume.
 
 ## Build & run
 
 ```bash
-# First time (or after requirements.txt change): ~10 min, downloads ~2GB
+# First time (or after requirements.txt change): ~10 min, downloads ~2GB of wheels
 docker compose build --progress=plain
 
-# Start
+# Start (loads both small + large-v3 on startup)
 docker compose up -d
 
-# Rebuild after code changes (fast, pip layer cached)
+# Rebuild after code-only changes (fast — pip layer cached)
 docker compose build && docker compose down && docker compose up -d
 ```
 
-BuildKit pip cache (`--mount=type=cache,target=/root/.cache/pip`) persists wheels across builds — only changed packages re-download.
-
 ## Audio format notes
 
-All uploaded files are converted to WAV (16kHz mono) via ffmpeg before processing. This is required because pyannote uses `soundfile` which only supports WAV/FLAC/OGG natively. Supported input formats: mp3, mp4, m4a, wav, ogg, flac, webm, mkv, avi, mov.
+All uploads are converted to 16kHz mono WAV via ffmpeg before processing (required because pyannote's `soundfile` only reads WAV/FLAC/OGG). Supported input: mp3, mp4, m4a, wav, ogg, flac, webm, mkv, avi, mov.
