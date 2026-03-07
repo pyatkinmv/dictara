@@ -8,6 +8,7 @@ services:
     environment:
       HF_HOME: /models
       WHISPER_MODEL: ${WHISPER_MODEL:-small}
+      HF_TOKEN: ${HF_TOKEN:-}
     restart: unless-stopped
 
 volumes:

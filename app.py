@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import subprocess
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
@@ -8,7 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, UploadFile, File, Query
 
 from jobs import job_store
-from transcriber import Transcriber
+from transcriber import Transcriber, Diarizer, merge_diarization
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -21,12 +22,20 @@ _executor = ThreadPoolExecutor(max_workers=1)
 async def lifespan(app: FastAPI):
     model_size = os.environ.get("WHISPER_MODEL", "small")
     app.state.model_loaded = False
+    app.state.diarizer = None
     try:
         app.state.transcriber = Transcriber(model_size=model_size)
         app.state.model_loaded = True
         logger.info("Transcriber ready (model=%s)", model_size)
     except Exception:
         logger.exception("Failed to load Whisper model")
+
+    if os.environ.get("HF_TOKEN"):
+        try:
+            app.state.diarizer = Diarizer()
+        except Exception:
+            logger.exception("Failed to load diarization pipeline — diarize=true will be unavailable")
+
     yield
     _executor.shutdown(wait=False)
 
@@ -36,26 +45,38 @@ app = FastAPI(title="Dictara Transcription API", lifespan=lifespan)
 
 # ── worker ────────────────────────────────────────────────────────────────────
 
-def _run_transcription(job_id: str, tmp_path: str, language: str | None) -> None:
+def _run_transcription(job_id: str, tmp_path: str, language: str | None, diarize: bool) -> None:
     """Blocking — always runs inside ThreadPoolExecutor."""
     transcriber: Transcriber = app.state.transcriber
     job_store.set_processing(job_id)
+    wav_path = None
     try:
-        segments = transcriber.transcribe(tmp_path, language=language)
+        # Convert to WAV so pyannote (soundfile) can read any input format
+        wav_path = tmp_path + ".wav"
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", tmp_path, "-ar", "16000", "-ac", "1", wav_path],
+            check=True, capture_output=True,
+        )
+        segments = transcriber.transcribe(wav_path, language=language)
+        if diarize and app.state.diarizer is not None:
+            diarization = app.state.diarizer.diarize(wav_path)
+            segments = merge_diarization(segments, diarization)
         job_store.set_done(job_id, segments)
     except Exception as exc:
         logger.exception("Transcription failed for job %s", job_id)
         job_store.set_failed(job_id, str(exc))
     finally:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
+        for path in (tmp_path, wav_path):
+            try:
+                if path:
+                    os.unlink(path)
+            except OSError:
+                pass
 
 
-async def _dispatch(job_id: str, tmp_path: str, language: str | None) -> None:
+async def _dispatch(job_id: str, tmp_path: str, language: str | None, diarize: bool) -> None:
     loop = asyncio.get_running_loop()
-    await loop.run_in_executor(_executor, _run_transcription, job_id, tmp_path, language)
+    await loop.run_in_executor(_executor, _run_transcription, job_id, tmp_path, language, diarize)
 
 
 # ── routes ────────────────────────────────────────────────────────────────────
@@ -64,14 +85,18 @@ async def _dispatch(job_id: str, tmp_path: str, language: str | None) -> None:
 async def transcribe(
     file: UploadFile = File(...),
     language: str | None = Query(default=None),
+    diarize: bool = Query(default=False),
 ):
+    if diarize and app.state.diarizer is None:
+        raise HTTPException(status_code=503, detail="Diarization unavailable: HF_TOKEN not configured or pipeline failed to load")
+
     suffix = os.path.splitext(file.filename or "audio")[1] or ".tmp"
     with tempfile.NamedTemporaryFile(dir="/tmp", suffix=suffix, delete=False) as tmp:
         tmp.write(await file.read())
         tmp_path = tmp.name
 
     job_id = job_store.create(tmp_path)
-    asyncio.create_task(_dispatch(job_id, tmp_path, language))
+    asyncio.create_task(_dispatch(job_id, tmp_path, language, diarize))
     return {"job_id": job_id}
 
 
@@ -80,9 +105,14 @@ async def get_job(job_id: str):
     job = job_store.get(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    return {"status": job.status, "result": job.result, "error": job.error}
+    duration = round(job.finished_at - job.started_at, 1) if job.finished_at and job.started_at else None
+    return {"status": job.status, "result": job.result, "error": job.error, "duration_s": duration}
 
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "model_loaded": getattr(app.state, "model_loaded", False)}
+    return {
+        "status": "ok",
+        "model_loaded": getattr(app.state, "model_loaded", False),
+        "diarization_available": getattr(app.state, "diarizer", None) is not None,
+    }

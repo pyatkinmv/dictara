@@ -7,7 +7,10 @@ COPY --from=ffmpeg /ffmpeg /usr/local/bin/ffmpeg
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements.txt \
+        --index-url https://download.pytorch.org/whl/cpu \
+        --extra-index-url https://pypi.org/simple/
 
 COPY transcriber.py jobs.py app.py ./
 
