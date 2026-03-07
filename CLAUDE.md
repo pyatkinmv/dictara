@@ -84,7 +84,7 @@ All models (Whisper + pyannote) download to the `model-cache` Docker volume on f
 
 GPU would be 10-20x faster overall.
 
-**Quality difference (Russian):** large-v3 correctly transcribes words small gets wrong — e.g. "раковина" vs "раквина", "фарфоровая" vs "уфоркоровая", "Дубай" vs "Тубая". Worth the slower speed for final transcripts.
+**Quality difference:** large-v3 makes significantly fewer word-level errors — proper nouns, technical terms, and unclear speech are handled much better. Worth the slower speed for final transcripts.
 
 ## Whisper transcription settings (`transcriber.py`)
 
