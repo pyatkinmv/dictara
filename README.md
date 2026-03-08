@@ -7,7 +7,8 @@ Local audio transcription service with optional speaker diarization. Runs entire
 - Transcribe audio/video files via REST API or Telegram bot
 - Speaker diarization (who said what)
 - Two Whisper models: `small` (fast) and `large-v3` (accurate)
-- Async job queue — submit and poll
+- Optional AI summarization via Google Gemini (set `GEMINI_API_KEY`)
+- Async job queue with live progress tracking
 - Supports mp3, mp4, m4a, wav, ogg, flac, webm, mkv, avi, mov
 
 ## Quickstart
@@ -22,6 +23,7 @@ Create a `.env` file:
 ```
 HF_TOKEN=your_huggingface_token
 TELEGRAM_TOKEN=your_telegram_bot_token
+GEMINI_API_KEY=your_gemini_api_key   # optional — enables summarization
 ```
 
 > A HuggingFace token is required for diarization. Get one at https://huggingface.co/settings/tokens
@@ -44,7 +46,8 @@ curl -X POST "http://localhost:8000/transcribe?language=en&model=large-v3" \
 
 # Poll for result
 curl http://localhost:8000/jobs/abc-123
-# → {"status": "done", "result": {"segments": [...]}, "duration_s": 42.1}
+# → {"status": "done", "result": {"segments": [...]}, "duration_s": 42.1,
+#    "elapsed_s": null, "progress": {"processed_s": ..., "total_s": ..., "phase": "transcribing", "diarize_progress": null}}
 ```
 
 ## API
@@ -84,9 +87,9 @@ Send an audio file to your bot — it transcribes and returns `transcript.txt`. 
 
 **Setup:**
 1. Create a bot via [@BotFather](https://t.me/BotFather), copy the token
-2. Add `TELEGRAM_TOKEN=...` to `.env`
+2. Add `TELEGRAM_TOKEN=...` (and optionally `GEMINI_API_KEY=...`) to `.env`
 3. `docker compose up -d bot`
 
 **Commands:**
-- Send any audio file → receive transcript
-- `/settings` → change model (fast / accurate) and diarization (on / off)
+- Send any audio/video file → receive `transcript.txt` with live progress updates
+- `/settings` → change model (fast / accurate), diarization (on / off), summarization (on / off)

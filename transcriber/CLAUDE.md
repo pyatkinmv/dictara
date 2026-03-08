@@ -22,7 +22,7 @@ Single-worker executor — WhisperModel is not thread-safe for concurrent infere
 |------|---------|
 | `app.py` | FastAPI routes, lifespan (model loading), job dispatch |
 | `transcriber.py` | `Transcriber` (Whisper), `Diarizer` (pyannote), `merge_diarization()` |
-| `jobs.py` | In-memory job store with status + timing (`duration_s`) |
+| `jobs.py` | In-memory job store with status, timing, and live progress fields |
 | `Dockerfile` | Multi-stage: static ffmpeg + python:3.12-slim |
 | `requirements.txt` | Pinned deps — see constraints below |
 
@@ -34,10 +34,18 @@ curl -X POST "http://localhost:8000/transcribe?language=ru&diarize=true&model=la
   -F "file=@audio.m4a"
 # → {"job_id": "abc-123"}
 
-# Poll result
+# Poll result (while processing)
 curl http://localhost:8000/jobs/{job_id}
-# → {"status": "done", "result": {"segments": [...]}, "duration_s": 168.0, "error": null}
+# → {"status": "processing", "result": null, "error": null, "duration_s": null,
+#    "elapsed_s": 43.2,
+#    "progress": {"processed_s": 87.4, "total_s": 240.0, "phase": "transcribing", "diarize_progress": null}}
+
+# Poll result (done)
+curl http://localhost:8000/jobs/{job_id}
+# → {"status": "done", "result": {"segments": [...]}, "duration_s": 168.0, "error": null,
+#    "elapsed_s": null, "progress": {"processed_s": 240.0, "total_s": 240.0, "phase": "transcribing", "diarize_progress": null}}
 # status values: pending | processing | done | failed
+# phase values: "transcribing" | "diarizing"
 
 # Health check
 curl http://localhost:8000/health

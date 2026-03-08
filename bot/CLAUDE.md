@@ -21,8 +21,9 @@ User sends audio
 | File | Purpose |
 |------|---------|
 | `Main.kt` | Entry point — reads env vars, registers bot |
-| `DictaraBot.kt` | `TelegramLongPollingBot` — audio handler, `/settings` command |
-| `DictaraClient.kt` | HTTP client: submit job, poll until done, format segments |
+| `DictaraBot.kt` | `TelegramLongPollingBot` — audio handler, `/settings` command, summary overflow logic |
+| `DictaraClient.kt` | HTTP client: submit job, poll with live progress callbacks, format segments |
+| `GeminiClient.kt` | Gemini API client — adaptive summarization by audio duration |
 | `UserSettings.kt` | Per-user prefs stored in `ConcurrentHashMap` (in-memory) |
 | `build.gradle.kts` | Kotlin + telegrambots 6.9.7 + shadow JAR plugin |
 | `Dockerfile` | Multi-stage: Gradle build → eclipse-temurin JRE slim |
@@ -41,27 +42,45 @@ Defined in `DictaraClient.kt` as `MODEL_ALIASES`. To add a future model, add one
 ## User settings
 
 Stored in-memory per Telegram user ID (`ConcurrentHashMap<Long, UserPrefs>`).
-Defaults: model=`accurate`, diarize=`true`.
+Defaults: model=`accurate`, diarize=`true`, summarize=`false`.
 Resets on bot restart — acceptable since defaults are the preferred values.
+
+## Environment variables
+
+| Var | Default | Description |
+|-----|---------|-------------|
+| `TELEGRAM_TOKEN` | — | Bot token from @BotFather |
+| `DICTARA_URL` | `http://dictara:8000` | Core service URL |
+| `GEMINI_API_KEY` | — | Google Gemini API key. Summarization is disabled if unset |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model to use for summarization |
 
 ## Bot UX
 
 **Normal flow:**
 ```
 User sends audio file
-Bot: "Transcribing with accurate + diarization..."
-Bot: [transcript.txt]  "Done in 16m 42s."
+Bot: "⏳ Transcribing your audio...
+
+Model: Accurate | Speakers: on | Summary: on"
+  (edited live with progress: "🎙 Transcribing audio... ▓▓▓▓▓░░░░░ 52% (2m 4s / 3m 58s)")
+  (then: "👥 Detecting speakers... ▓▓▓▓░░░░░░ 40%")
+Bot: [transcript.txt]  "Done in 4m 12s."   ← status message deleted, doc sent
+Bot (caption edited): "Done in 4m 12s.
+
+<summary from Gemini>"
 ```
+If summary exceeds the 1024-char Telegram caption limit, caption stays as `"Done in Xm Ys."` and summary is sent as a separate text message.
 
 **`/settings` command:**
 ```
 Bot: Settings
-     [Fast]       [Accurate [x]]
+     [Fast]            [Accurate [x]]
      [Diarize on [x]]  [Diarize off]
+     [Summarize on]    [Summarize off [x]]
 (clicking a button edits the message in place with updated checkmarks)
 ```
 
-Callback data format: `set_model:fast`, `set_model:accurate`, `set_diarize:on`, `set_diarize:off`
+Callback data format: `set_model:fast`, `set_model:accurate`, `set_diarize:on`, `set_diarize:off`, `set_summarize:on`, `set_summarize:off`
 
 ## Telegram setup
 
@@ -69,10 +88,23 @@ Callback data format: `set_model:fast`, `set_model:accurate`, `set_diarize:on`, 
 2. Copy the token
 3. Add `TELEGRAM_TOKEN=...` to root `.env`
 
+## Summarization (GeminiClient)
+
+Invoked after transcription if `summarize=true` and `GEMINI_API_KEY` is set. Prompt scales by audio duration:
+
+| Audio length | Summary format |
+|-------------|---------------|
+| < 2 min | 1–2 sentences, no headers |
+| 2–15 min | Concise paragraph (3–5 sentences) |
+| > 15 min | Structured: 📝 Summary, Key points, Conclusions, ✅ Action items (only if present) |
+
+All text (including headers) is in the transcript's language.
+
 ## Dependencies
 
 - `org.telegram:telegrambots:6.9.7` — stable long-polling bot API
-- `com.fasterxml.jackson.module:jackson-module-kotlin:2.16.1` — JSON parsing for API responses
+- `com.squareup.okhttp3:okhttp:4.12.0` — HTTP client for core service and Gemini API
+- `com.fasterxml.jackson.module:jackson-module-kotlin:2.16.1` — JSON parsing
 
 ## Build
 
