@@ -18,15 +18,16 @@ val MODEL_ALIASES = mapOf("fast" to "small", "accurate" to "large-v3")
 class DictaraClient(private val baseUrl: String) {
     private val http = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(120, TimeUnit.SECONDS)
         .writeTimeout(120, TimeUnit.SECONDS)
         .build()
     private val mapper = ObjectMapper().registerKotlinModule()
 
-    fun transcribe(audioFile: File, modelAlias: String, diarize: Boolean): TranscriptResult {
+    fun transcribe(audioFile: File, modelAlias: String, diarize: Boolean, summarize: Boolean = false,
+                   onProgress: ((String) -> Unit)? = null): TranscriptResult {
         val modelName = MODEL_ALIASES[modelAlias] ?: modelAlias
         val jobId = submitJob(audioFile, modelName, diarize)
-        return pollJob(jobId)
+        return pollJob(jobId, diarize, summarize, onProgress)
     }
 
     private fun submitJob(file: File, model: String, diarize: Boolean): String {
@@ -48,8 +49,8 @@ class DictaraClient(private val baseUrl: String) {
         return mapper.readTree(responseBody)["job_id"].asText()
     }
 
-    private fun pollJob(jobId: String): TranscriptResult {
-        val deadline = System.currentTimeMillis() + 60 * 60 * 1000L
+    private fun pollJob(jobId: String, diarize: Boolean, summarize: Boolean, onProgress: ((String) -> Unit)? = null): TranscriptResult {
+        val deadline = System.currentTimeMillis() + 4 * 60 * 60 * 1000L
         while (System.currentTimeMillis() < deadline) {
             Thread.sleep(5_000)
             val request = Request.Builder()
@@ -59,6 +60,31 @@ class DictaraClient(private val baseUrl: String) {
             val response = http.newCall(request).execute()
             val root = mapper.readTree(response.body?.string() ?: "{}")
             when (root["status"]?.asText()) {
+                "processing" -> {
+                    val elapsed = root["elapsed_s"]?.takeIf { !it.isNull }?.asDouble()
+                    val elapsedStr = if (elapsed != null) " | ${fmtTime(elapsed)} elapsed" else ""
+                    val prog = root["progress"]
+                    if (prog != null && !prog.isNull) {
+                        val phase = prog["phase"]?.asText()
+                        val summarizeNote = if (summarize) "\n✍️ Summarization to follow" else ""
+                        if (phase == "diarizing") {
+                            val diarizeProgress = prog["diarize_progress"]?.takeIf { !it.isNull }?.asDouble()
+                            val bar = if (diarizeProgress != null)
+                                "\n${progressBar(diarizeProgress)} ${(diarizeProgress * 100).toInt()}%"
+                            else ""
+                            onProgress?.invoke("👥 Detecting speakers...$bar$summarizeNote$elapsedStr")
+                        } else {
+                            val processed = prog["processed_s"]?.asDouble()
+                            val total = prog["total_s"]?.asDouble()?.takeIf { it > 0 }
+                            if (processed != null && total != null) {
+                                val pct = (processed / total * 100).toInt()
+                                val bar = progressBar(processed / total)
+                                val diarizeNote = if (diarize) "\n👥 Speaker detection to follow" else ""
+                                onProgress?.invoke("🎙 Transcribing audio...\n$bar $pct% (${fmtTime(processed)} / ${fmtTime(total)})$diarizeNote$summarizeNote$elapsedStr")
+                            }
+                        }
+                    }
+                }
                 "done" -> {
                     val segments = root["result"]["segments"]
                     val duration = root["duration_s"]?.takeIf { !it.isNull }?.asDouble()
@@ -67,7 +93,18 @@ class DictaraClient(private val baseUrl: String) {
                 "failed" -> throw RuntimeException(root["error"]?.asText() ?: "Unknown error")
             }
         }
-        throw RuntimeException("Timeout: transcription did not complete within 60 minutes")
+        throw RuntimeException("Timeout: transcription did not complete within 4 hours")
+    }
+
+    private fun progressBar(fraction: Double, width: Int = 10): String {
+        val filled = (fraction * width).toInt().coerceIn(0, width)
+        return "▓".repeat(filled) + "░".repeat(width - filled)
+    }
+
+    private fun fmtTime(s: Double): String {
+        val min = (s / 60).toInt()
+        val sec = (s % 60).toInt()
+        return if (min > 0) "${min}m ${sec}s" else "${sec}s"
     }
 
     private fun formatTimestamp(seconds: Double): String {

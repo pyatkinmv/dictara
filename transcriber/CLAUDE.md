@@ -1,4 +1,4 @@
-# core — Python Transcription Service
+# transcriber — Python Transcription Service
 
 ## Architecture
 
@@ -107,6 +107,6 @@ All uploads are converted to 16kHz mono WAV via ffmpeg before processing (requir
 
 ```bash
 # From repo root:
-docker compose build dictara
-docker compose up -d dictara
+docker compose build transcriber
+docker compose up -d transcriber
 ```

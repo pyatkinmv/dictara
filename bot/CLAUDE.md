@@ -9,7 +9,7 @@ User sends audio
        ↓
   DictaraBot.kt (long polling)
        ↓
-  DictaraClient.kt  ──HTTP──>  core service :8000
+  DictaraClient.kt  ──HTTP──>  transcriber service :8000
   - POST /transcribe             - processes job
   - polls /jobs/{id} every 5s
        ↓

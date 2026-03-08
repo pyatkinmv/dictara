@@ -17,6 +17,10 @@ class Job:
     created_at: float = field(default_factory=time.time)
     started_at: float | None = None
     finished_at: float | None = None
+    progress_s: float | None = None   # last Whisper-processed audio second
+    total_s: float | None = None      # total audio duration
+    phase: str = "transcribing"       # "transcribing" | "diarizing"
+    diarize_progress: float | None = None  # 0.0–1.0 fraction
 
 
 class JobStore:
@@ -39,6 +43,22 @@ class JobStore:
             job = self._jobs[job_id]
             job.status = "processing"
             job.started_at = time.time()
+
+    def set_progress(self, job_id: str, progress_s: float, total_s: float) -> None:
+        with self._lock:
+            job = self._jobs[job_id]
+            job.progress_s = progress_s
+            job.total_s = total_s
+
+    def set_diarizing(self, job_id: str) -> None:
+        with self._lock:
+            job = self._jobs[job_id]
+            job.phase = "diarizing"
+            job.diarize_progress = 0.0
+
+    def set_diarize_progress(self, job_id: str, completed: int, total: int) -> None:
+        with self._lock:
+            self._jobs[job_id].diarize_progress = completed / total
 
     def set_done(self, job_id: str, segments: list[dict]) -> None:
         with self._lock:

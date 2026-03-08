@@ -41,12 +41,14 @@ class Transcriber:
         self.model = WhisperModel(model_size, device=device, compute_type=compute_type)
         print("Model ready.")
 
-    def transcribe(self, audio_path: str, language: str | None = None) -> list[dict]:
+    def transcribe(self, audio_path: str, language: str | None = None, progress_callback=None) -> list[dict]:
         """
         Transcribe an audio/video file.
 
         Returns a list of segments:
             [{"start": 0.0, "end": 2.4, "text": "Hello world"}, ...]
+
+        progress_callback(processed_s: float, total_s: float) is called after each segment.
         """
         segments, info = self.model.transcribe(
             audio_path,
@@ -56,7 +58,7 @@ class Transcriber:
         )
 
         detected = info.language if language is None else language
-        print(f"Language: {detected} (confidence: {info.language_probability:.0%})")
+        print(f"Language: {detected} (confidence: {info.language_probability:.0%}), duration: {info.duration:.1f}s")
 
         result = []
         for segment in segments:
@@ -65,6 +67,8 @@ class Transcriber:
                 "end": segment.end,
                 "text": segment.text.strip(),
             })
+            if progress_callback:
+                progress_callback(segment.end, info.duration)
         return result
 
 
@@ -85,8 +89,11 @@ class Diarizer:
         self.pipeline.to(torch.device(device))
         print(f"Diarization pipeline ready (device={device}).")
 
-    def diarize(self, audio_path: str):
-        return self.pipeline(audio_path)
+    def diarize(self, audio_path: str, progress_callback=None):
+        def hook(step_name, step_artifact, file=None, total=None, completed=None):
+            if progress_callback and total and completed is not None:
+                progress_callback(completed, total)
+        return self.pipeline(audio_path, hook=hook)
 
 
 def _has_cuda() -> bool:

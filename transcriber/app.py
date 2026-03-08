@@ -3,6 +3,7 @@ import logging
 import os
 import subprocess
 import tempfile
+import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 
@@ -57,9 +58,15 @@ def _run_transcription(job_id: str, tmp_path: str, language: str | None, diarize
             ["ffmpeg", "-y", "-i", tmp_path, "-ar", "16000", "-ac", "1", wav_path],
             check=True, capture_output=True,
         )
-        segments = transcriber.transcribe(wav_path, language=language)
+        def on_segment(processed_s: float, total_s: float):
+            job_store.set_progress(job_id, processed_s, total_s)
+
+        segments = transcriber.transcribe(wav_path, language=language, progress_callback=on_segment)
         if diarize and app.state.diarizer is not None:
-            diarization = app.state.diarizer.diarize(wav_path)
+            job_store.set_diarizing(job_id)
+            def on_diarize(completed: int, total: int):
+                job_store.set_diarize_progress(job_id, completed, total)
+            diarization = app.state.diarizer.diarize(wav_path, progress_callback=on_diarize)
             segments = merge_diarization(segments, diarization)
         job_store.set_done(job_id, segments)
     except Exception as exc:
@@ -109,7 +116,16 @@ async def get_job(job_id: str):
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
     duration = round(job.finished_at - job.started_at, 1) if job.finished_at and job.started_at else None
-    return {"status": job.status, "result": job.result, "error": job.error, "duration_s": duration}
+    elapsed_s = round(time.time() - job.started_at, 1) if job.started_at and job.status == "processing" else None
+    progress = None
+    if job.total_s and job.progress_s is not None:
+        progress = {
+            "processed_s": round(job.progress_s, 1),
+            "total_s": round(job.total_s, 1),
+            "phase": job.phase,
+            "diarize_progress": job.diarize_progress,
+        }
+    return {"status": job.status, "result": job.result, "error": job.error, "duration_s": duration, "elapsed_s": elapsed_s, "progress": progress}
 
 
 @app.get("/health")

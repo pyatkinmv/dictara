@@ -1,11 +1,15 @@
 package com.dictara.bot
 
+import org.telegram.telegrambots.bots.DefaultBotOptions
 import org.telegram.telegrambots.bots.TelegramLongPollingBot
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery
 import org.telegram.telegrambots.meta.api.methods.GetFile
 import org.telegram.telegrambots.meta.api.methods.send.SendDocument
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageCaption
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery
 import org.telegram.telegrambots.meta.api.objects.InputFile
 import org.telegram.telegrambots.meta.api.objects.Message
@@ -15,15 +19,20 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import java.io.File
 import java.net.URL
 import java.nio.file.Files
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.Executors
 
 class DictaraBot(
     private val token: String,
     dictaraUrl: String,
-) : TelegramLongPollingBot(token) {
+    options: DefaultBotOptions = DefaultBotOptions(),
+) : TelegramLongPollingBot(options, token) {
 
     private val client = DictaraClient(dictaraUrl)
+    private val gemini = GeminiClient()
     private val executor = Executors.newCachedThreadPool()
+    private val fileBaseUrl = System.getenv("TELEGRAM_API_URL") ?: "https://api.telegram.org"
 
     override fun getBotUsername() = "DictaraBot"
 
@@ -62,8 +71,11 @@ class DictaraBot(
         }
 
         val prefs = UserSettings.get(userId)
-        val diarizeLabel = if (prefs.diarize) "diarization" else "no diarization"
-        send(chatId, "Transcribing with ${prefs.model} + $diarizeLabel...")
+        val modelLabel = prefs.model.replaceFirstChar { it.uppercase() }
+        val speakersLabel = if (prefs.diarize) "on" else "off"
+        val summaryLabel = if (prefs.summarize && gemini.isAvailable()) "on" else "off"
+        val baseLabel = "⏳ Transcribing your audio...\n\nModel: $modelLabel | Speakers: $speakersLabel | Summary: $summaryLabel"
+        val statusMsg = send(chatId, baseLabel)
 
         executor.submit {
             try {
@@ -71,12 +83,61 @@ class DictaraBot(
                 val ext = tgFile.filePath.substringAfterLast('.', "bin")
                 val audioTmp = Files.createTempFile("dictara-", ".$ext").toFile()
                 try {
-                    URL("https://api.telegram.org/file/bot$token/${tgFile.filePath}")
-                        .openStream().use { input ->
+                    val localPath = tgFile.filePath
+                    if (fileBaseUrl != "https://api.telegram.org" && localPath.startsWith("/")) {
+                        File(localPath).inputStream().use { input ->
                             audioTmp.outputStream().use { input.copyTo(it) }
                         }
-                    val result = client.transcribe(audioTmp, prefs.model, prefs.diarize)
-                    sendTranscript(chatId, result)
+                        File(localPath).delete()
+                    } else {
+                        URL("$fileBaseUrl/file/bot$token/${localPath.trimStart('/')}")
+                            .openStream().use { input ->
+                                audioTmp.outputStream().use { input.copyTo(it) }
+                            }
+                    }
+
+                    // Phase 1: transcribe (with live progress updates)
+                    val result = client.transcribe(audioTmp, prefs.model, prefs.diarize, prefs.summarize && gemini.isAvailable()) { progressText ->
+                        try {
+                            execute(
+                                EditMessageText.builder()
+                                    .chatId(chatId.toString())
+                                    .messageId(statusMsg.messageId)
+                                    .text("$baseLabel\n$progressText")
+                                    .build()
+                            )
+                        } catch (_: Exception) {}
+                    }
+
+                    // Phase 2: send transcript immediately, delete status message
+                    val sentMsg = sendTranscript(chatId, result)
+                    try {
+                        execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build())
+                    } catch (_: Exception) {}
+
+                    // Phase 3: summarize and edit caption
+                    if (prefs.summarize && gemini.isAvailable()) {
+                        try {
+                            val doneText = formatDoneText(result.durationSeconds)
+                            execute(
+                                EditMessageCaption.builder()
+                                    .chatId(chatId.toString())
+                                    .messageId(sentMsg.messageId)
+                                    .caption("$doneText\n✍️ Summarizing...")
+                                    .build()
+                            )
+                            val summary = gemini.summarize(result.text)
+                            execute(
+                                EditMessageCaption.builder()
+                                    .chatId(chatId.toString())
+                                    .messageId(sentMsg.messageId)
+                                    .caption("$doneText\n\nSummary:\n$summary")
+                                    .build()
+                            )
+                        } catch (e: Exception) {
+                            send(chatId, "Summary failed: ${e.message}")
+                        }
+                    }
                 } finally {
                     audioTmp.delete()
                 }
@@ -86,26 +147,29 @@ class DictaraBot(
         }
     }
 
-    private fun sendTranscript(chatId: Long, result: TranscriptResult) {
+    private fun sendTranscript(chatId: Long, result: TranscriptResult): Message {
+        val dateStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"))
         val txtFile = Files.createTempFile("transcript-", ".txt").toFile()
         try {
             txtFile.writeText(result.text)
-            val caption = result.durationSeconds?.let {
-                val min = (it / 60).toInt()
-                val sec = (it % 60).toInt()
-                "Done in ${if (min > 0) "${min}m " else ""}${sec}s."
-            } ?: "Done."
-            execute(
+            return execute(
                 SendDocument.builder()
                     .chatId(chatId.toString())
-                    .document(InputFile(txtFile, "transcript.txt"))
-                    .caption(caption)
+                    .document(InputFile(txtFile, "transcript_$dateStr.txt"))
+                    .caption(formatDoneText(result.durationSeconds))
                     .build()
             )
         } finally {
             txtFile.delete()
         }
     }
+
+    private fun formatDoneText(durationSeconds: Double?): String =
+        durationSeconds?.let {
+            val min = (it / 60).toInt()
+            val sec = (it % 60).toInt()
+            "Done in ${if (min > 0) "${min}m " else ""}${sec}s."
+        } ?: "Done."
 
     private fun handleCallback(cb: CallbackQuery) {
         val userId = cb.from.id
@@ -114,6 +178,8 @@ class DictaraBot(
                 UserSettings.update(userId, model = cb.data.removePrefix("set_model:"))
             cb.data.startsWith("set_diarize:") ->
                 UserSettings.update(userId, diarize = cb.data.removePrefix("set_diarize:") == "on")
+            cb.data.startsWith("set_summarize:") ->
+                UserSettings.update(userId, summarize = cb.data.removePrefix("set_summarize:") == "on")
         }
         val prefs = UserSettings.get(userId)
         execute(
@@ -144,14 +210,16 @@ class DictaraBot(
         val accMark = if (prefs.model == "accurate") " [x]" else ""
         val onMark = if (prefs.diarize) " [x]" else ""
         val offMark = if (!prefs.diarize) " [x]" else ""
+        val sumOnMark = if (prefs.summarize) " [x]" else ""
+        val sumOffMark = if (!prefs.summarize) " [x]" else ""
 
         return InlineKeyboardMarkup.builder()
             .keyboardRow(listOf(btn("Fast$fastMark", "set_model:fast"), btn("Accurate$accMark", "set_model:accurate")))
             .keyboardRow(listOf(btn("Diarize on$onMark", "set_diarize:on"), btn("Diarize off$offMark", "set_diarize:off")))
+            .keyboardRow(listOf(btn("Summarize on$sumOnMark", "set_summarize:on"), btn("Summarize off$sumOffMark", "set_summarize:off")))
             .build()
     }
 
-    private fun send(chatId: Long, text: String) {
+    private fun send(chatId: Long, text: String): Message =
         execute(SendMessage.builder().chatId(chatId.toString()).text(text).build())
-    }
 }
