@@ -19,10 +19,33 @@ class GeminiClient {
 
     fun isAvailable() = apiKey.isNotBlank()
 
-    fun summarize(text: String): String {
-        val prompt = "Summarize the following transcript concisely. " +
-            "Respond in the same language as the transcript. " +
-            "Focus on main topics, key points, and any conclusions.\n\n$text"
+    fun summarize(text: String, audioDurationSeconds: Double? = null): String {
+        val durationHint = audioDurationSeconds?.let {
+            val mins = (it / 60).toInt()
+            val secs = (it % 60).toInt()
+            if (mins > 0) "~$mins minute${if (mins != 1) "s" else ""}" else "~$secs seconds"
+        } ?: "unknown duration"
+
+        val prompt = """
+            You are summarizing an audio transcript ($durationHint).
+            Respond entirely in the same language as the transcript — including all section headers and labels.
+
+            - Under 2 minutes: 1–2 sentences only. No headers, no structure.
+            - 2 to 15 minutes: a concise paragraph (3–5 sentences) covering the main topic, key points, and conclusions.
+            - Over 15 minutes: structured format with these sections (translate all headers to the transcript's language):
+
+              📝 Summary — 2–3 sentence overview
+              Key points:
+              • ...
+              Conclusions:
+              • ...
+              ✅ Action items: — include ONLY if specific tasks or follow-ups were explicitly mentioned
+
+            Be concise and proportional to the content. Do not pad short content.
+
+            Transcript:
+            $text
+        """.trimIndent()
         val requestBody = mapper.writeValueAsString(
             mapOf("contents" to listOf(mapOf("parts" to listOf(mapOf("text" to prompt)))))
         ).toRequestBody("application/json".toMediaType())

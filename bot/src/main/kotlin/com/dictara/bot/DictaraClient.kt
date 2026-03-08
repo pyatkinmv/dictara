@@ -11,7 +11,7 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
 import java.util.concurrent.TimeUnit
 
-data class TranscriptResult(val text: String, val durationSeconds: Double?)
+data class TranscriptResult(val text: String, val durationSeconds: Double?, val audioDurationSeconds: Double? = null)
 
 val MODEL_ALIASES = mapOf("fast" to "small", "accurate" to "large-v3")
 
@@ -88,7 +88,8 @@ class DictaraClient(private val baseUrl: String) {
                 "done" -> {
                     val segments = root["result"]["segments"]
                     val duration = root["duration_s"]?.takeIf { !it.isNull }?.asDouble()
-                    return TranscriptResult(formatSegments(segments), duration)
+                    val audioDuration = root["progress"]?.get("total_s")?.takeIf { !it.isNull }?.asDouble()
+                    return TranscriptResult(formatSegments(segments), duration, audioDuration)
                 }
                 "failed" -> throw RuntimeException(root["error"]?.asText() ?: "Unknown error")
             }

@@ -126,14 +126,26 @@ class DictaraBot(
                                     .caption("$doneText\n✍️ Summarizing...")
                                     .build()
                             )
-                            val summary = gemini.summarize(result.text)
-                            execute(
-                                EditMessageCaption.builder()
-                                    .chatId(chatId.toString())
-                                    .messageId(sentMsg.messageId)
-                                    .caption("$doneText\n\nSummary:\n$summary")
-                                    .build()
-                            )
+                            val summary = gemini.summarize(result.text, result.audioDurationSeconds)
+                            val caption = "$doneText\n\n$summary"
+                            if (caption.length <= 1024) {
+                                execute(
+                                    EditMessageCaption.builder()
+                                        .chatId(chatId.toString())
+                                        .messageId(sentMsg.messageId)
+                                        .caption(caption)
+                                        .build()
+                                )
+                            } else {
+                                execute(
+                                    EditMessageCaption.builder()
+                                        .chatId(chatId.toString())
+                                        .messageId(sentMsg.messageId)
+                                        .caption(doneText)
+                                        .build()
+                                )
+                                send(chatId, summary)
+                            }
                         } catch (e: Exception) {
                             send(chatId, "Summary failed: ${e.message}")
                         }
