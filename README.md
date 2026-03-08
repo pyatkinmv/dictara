@@ -4,9 +4,9 @@ Local audio transcription service with optional speaker diarization. Runs entire
 
 ## Features
 
-- Transcribe audio/video files via REST API
+- Transcribe audio/video files via REST API or Telegram bot
 - Speaker diarization (who said what)
-- Two Whisper models loaded simultaneously: `small` (fast) and `large-v3` (accurate)
+- Two Whisper models: `small` (fast) and `large-v3` (accurate)
 - Async job queue — submit and poll
 - Supports mp3, mp4, m4a, wav, ogg, flac, webm, mkv, avi, mov
 
@@ -21,6 +21,7 @@ cd dictara
 Create a `.env` file:
 ```
 HF_TOKEN=your_huggingface_token
+TELEGRAM_TOKEN=your_telegram_bot_token
 ```
 
 > A HuggingFace token is required for diarization. Get one at https://huggingface.co/settings/tokens
@@ -76,3 +77,16 @@ curl http://localhost:8000/jobs/abc-123
 | `large-v3` | ~16 min | ~21 min |
 
 GPU support is automatic when CUDA is available (10-20x faster).
+
+## Telegram Bot
+
+Send an audio file to your bot — it transcribes and returns `transcript.txt`. Uses accurate model + diarization by default.
+
+**Setup:**
+1. Create a bot via [@BotFather](https://t.me/BotFather), copy the token
+2. Add `TELEGRAM_TOKEN=...` to `.env`
+3. `docker compose up -d bot`
+
+**Commands:**
+- Send any audio file → receive transcript
+- `/settings` → change model (fast / accurate) and diarization (on / off)

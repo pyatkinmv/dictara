@@ -23,6 +23,10 @@ venv/
 # Secrets
 .env
 
+# Gradle
+bot/.gradle/
+bot/build/
+
 # OS
 .DS_Store
 Thumbs.db

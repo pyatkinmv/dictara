@@ -1,6 +1,6 @@
 services:
   dictara:
-    build: .
+    build: ./core
     ports:
       - "8000:8000"
     volumes:
@@ -9,6 +9,17 @@ services:
       HF_HOME: /models
       WHISPER_MODELS: ${WHISPER_MODELS:-small,large-v3}
       HF_TOKEN: ${HF_TOKEN:-}
+    restart: unless-stopped
+
+  bot:
+    build:
+      context: ./bot
+      dockerfile: Dockerfile
+    environment:
+      TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
+      DICTARA_URL: http://dictara:8000
+    depends_on:
+      - dictara
     restart: unless-stopped
 
 volumes:

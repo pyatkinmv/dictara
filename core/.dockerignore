@@ -1,0 +1,12 @@
+*.m4a
+*.mp3
+*.mp4
+*.wav
+*.ogg
+*.flac
+*.webm
+*.mkv
+*.avi
+*.mov
+__pycache__/
+*.pyc
