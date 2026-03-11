@@ -46,7 +46,7 @@ app = FastAPI(title="Dictara Transcription API", lifespan=lifespan)
 
 # ── worker ────────────────────────────────────────────────────────────────────
 
-def _run_transcription(job_id: str, tmp_path: str, language: str | None, diarize: bool, model: str) -> None:
+def _run_transcription(job_id: str, tmp_path: str, language: str | None, diarize: bool, model: str, num_speakers: int | None) -> None:
     """Blocking — always runs inside ThreadPoolExecutor."""
     transcriber: Transcriber = app.state.transcribers[model]
     job_store.set_processing(job_id)
@@ -66,7 +66,7 @@ def _run_transcription(job_id: str, tmp_path: str, language: str | None, diarize
             job_store.set_diarizing(job_id)
             def on_diarize(completed: int, total: int):
                 job_store.set_diarize_progress(job_id, completed, total)
-            diarization = app.state.diarizer.diarize(wav_path, progress_callback=on_diarize)
+            diarization = app.state.diarizer.diarize(wav_path, num_speakers=num_speakers, progress_callback=on_diarize)
             segments = merge_diarization(segments, diarization)
         job_store.set_done(job_id, segments)
     except Exception as exc:
@@ -81,9 +81,9 @@ def _run_transcription(job_id: str, tmp_path: str, language: str | None, diarize
                 pass
 
 
-async def _dispatch(job_id: str, tmp_path: str, language: str | None, diarize: bool, model: str) -> None:
+async def _dispatch(job_id: str, tmp_path: str, language: str | None, diarize: bool, model: str, num_speakers: int | None) -> None:
     loop = asyncio.get_running_loop()
-    await loop.run_in_executor(_executor, _run_transcription, job_id, tmp_path, language, diarize, model)
+    await loop.run_in_executor(_executor, _run_transcription, job_id, tmp_path, language, diarize, model, num_speakers)
 
 
 # ── routes ────────────────────────────────────────────────────────────────────
@@ -94,6 +94,7 @@ async def transcribe(
     language: str | None = Query(default=None),
     diarize: bool = Query(default=False),
     model: str = Query(default="small"),
+    num_speakers: int | None = Query(default=None),
 ):
     if model not in app.state.transcribers:
         raise HTTPException(status_code=400, detail=f"Model '{model}' not loaded. Available: {list(app.state.transcribers)}")
@@ -106,7 +107,7 @@ async def transcribe(
         tmp_path = tmp.name
 
     job_id = job_store.create(tmp_path)
-    asyncio.create_task(_dispatch(job_id, tmp_path, language, diarize, model))
+    asyncio.create_task(_dispatch(job_id, tmp_path, language, diarize, model, num_speakers))
     return {"job_id": job_id}
 
 

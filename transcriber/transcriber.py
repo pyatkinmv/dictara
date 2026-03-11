@@ -89,11 +89,11 @@ class Diarizer:
         self.pipeline.to(torch.device(device))
         print(f"Diarization pipeline ready (device={device}).")
 
-    def diarize(self, audio_path: str, progress_callback=None):
+    def diarize(self, audio_path: str, num_speakers: int | None = None, progress_callback=None):
         def hook(step_name, step_artifact, file=None, total=None, completed=None):
             if progress_callback and total and completed is not None:
                 progress_callback(completed, total)
-        return self.pipeline(audio_path, hook=hook)
+        return self.pipeline(audio_path, num_speakers=num_speakers, hook=hook)
 
 
 def _has_cuda() -> bool:

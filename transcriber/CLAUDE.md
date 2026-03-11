@@ -59,6 +59,7 @@ curl http://localhost:8000/health
 | `language` | auto-detect | Language code e.g. `ru`, `en`. Explicit is faster and more accurate |
 | `diarize` | `false` | Add speaker labels (SPEAKER_00, SPEAKER_01, ...) |
 | `model` | `small` | Which Whisper model to use: `small` or `large-v3` |
+| `num_speakers` | auto | Exact speaker count hint passed to pyannote (omit for auto-detection) |
 
 **Segment shape** (without diarization): `{"start": 0.0, "end": 2.4, "text": "Hello"}`
 **Segment shape** (with diarization): `{"start": 0.0, "end": 2.4, "text": "Hello", "speaker": "SPEAKER_00"}`
