@@ -65,6 +65,7 @@ curl http://localhost:8000/jobs/abc-123
 | `model` | `small` | `small` (fast) or `large-v3` (accurate) |
 | `language` | auto | Language code: `en`, `ru`, `de`, etc. |
 | `diarize` | `false` | Add speaker labels to segments |
+| `num_speakers` | auto | Exact speaker count hint for diarization (e.g. `2`, `3`) |
 
 **Segment format:**
 ```json
@@ -92,4 +93,4 @@ Send an audio file to your bot — it transcribes and returns `transcript.txt`. 
 
 **Commands:**
 - Send any audio/video file → receive `transcript.txt` with live progress updates
-- `/settings` → change model (fast / accurate), diarization (on / off), summarization (on / off)
+- `/settings` → change model (fast / accurate), diarization (on / off), summarization (on / off), language, number of speakers

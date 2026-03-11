@@ -5,7 +5,9 @@ import java.util.concurrent.ConcurrentHashMap
 data class UserPrefs(
     val model: String = "accurate",
     val diarize: Boolean = true,
-    val summarize: Boolean = true,
+    val language: String = "auto",   // "auto" or ISO code like "en", "ru"
+    val numSpeakers: Int? = null,    // null = auto-detect, 1-4 = exact count
+    val summaryMode: SummaryMode = SummaryMode.AUTO,
 )
 
 object UserSettings {
@@ -13,12 +15,22 @@ object UserSettings {
 
     fun get(userId: Long): UserPrefs = store.getOrDefault(userId, UserPrefs())
 
-    fun update(userId: Long, model: String? = null, diarize: Boolean? = null, summarize: Boolean? = null) {
+    fun update(
+        userId: Long,
+        model: String? = null,
+        diarize: Boolean? = null,
+        language: String? = null,
+        numSpeakers: Int? = null,
+        clearNumSpeakers: Boolean = false,
+        summaryMode: SummaryMode? = null,
+    ) {
         val current = get(userId)
         store[userId] = current.copy(
             model = model ?: current.model,
             diarize = diarize ?: current.diarize,
-            summarize = summarize ?: current.summarize,
+            language = language ?: current.language,
+            numSpeakers = if (clearNumSpeakers) null else numSpeakers ?: current.numSpeakers,
+            summaryMode = summaryMode ?: current.summaryMode,
         )
     }
 }

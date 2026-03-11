@@ -28,6 +28,15 @@ dictara/
 | `TELEGRAM_TOKEN` | bot | — | Telegram bot token from @BotFather |
 | `DICTARA_URL` | bot | `http://dictara:8000` | Core service URL (auto-set in Docker) |
 
+## Per-request API params (`/transcribe`)
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `model` | `small` | `small` or `large-v3` |
+| `language` | auto | ISO language code e.g. `en`, `ru` |
+| `diarize` | `false` | Add speaker labels |
+| `num_speakers` | auto | Exact speaker count hint for diarization |
+
 ## Build & run
 
 ```bash

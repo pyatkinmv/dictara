@@ -42,7 +42,7 @@ Defined in `DictaraClient.kt` as `MODEL_ALIASES`. To add a future model, add one
 ## User settings
 
 Stored in-memory per Telegram user ID (`ConcurrentHashMap<Long, UserPrefs>`).
-Defaults: model=`accurate`, diarize=`true`, summarize=`false`.
+Defaults: model=`accurate`, diarize=`true`, summarize=`false`, language=`auto`, numSpeakers=`null` (auto).
 Resets on bot restart — acceptable since defaults are the preferred values.
 
 ## Environment variables
@@ -61,7 +61,7 @@ Resets on bot restart — acceptable since defaults are the preferred values.
 User sends audio file
 Bot: "⏳ Transcribing your audio...
 
-Model: Accurate | Speakers: on | Summary: on"
+Model: Accurate | Speakers: on (2) | Lang: RU | Summary: on"
   (edited live with progress: "🎙 Transcribing audio... ▓▓▓▓▓░░░░░ 52% (2m 4s / 3m 58s)")
   (then: "👥 Detecting speakers... ▓▓▓▓░░░░░░ 40%")
 Bot: [transcript.txt]  "Done in 4m 12s."   ← status message deleted, doc sent
@@ -74,13 +74,23 @@ If summary exceeds the 1024-char Telegram caption limit, caption stays as `"Done
 **`/settings` command:**
 ```
 Bot: Settings
-     [Fast]            [Accurate [x]]
-     [Diarize on [x]]  [Diarize off]
-     [Summarize on]    [Summarize off [x]]
+     [Fast]            [Accurate ✓]
+     [Diarize on ✓]    [Diarize off]
+     [Summarize on]    [Summarize off ✓]
+     [🌐 Language: Auto]
+     [👥 Speakers: Auto]
 (clicking a button edits the message in place with updated checkmarks)
 ```
 
-Callback data format: `set_model:fast`, `set_model:accurate`, `set_diarize:on`, `set_diarize:off`, `set_summarize:on`, `set_summarize:off`
+Language and Speakers open submenus. Language submenu: Auto / EN / RU / DE / ES / FR / Other... / ← Back. Tapping "Other..." replaces the message with a text prompt; the user's next message is captured as the language code and settings are restored. Speakers submenu: Auto / 1 / 2 / 3 / 4 / 5+ / ← Back. "5+" maps to auto-detection.
+
+Callback data format:
+- `set_model:fast`, `set_model:accurate`
+- `set_diarize:on`, `set_diarize:off`
+- `set_summarize:on`, `set_summarize:off`
+- `open_language`, `set_language:<code>`, `lang_custom`
+- `open_speakers`, `set_speakers:<n|auto>`
+- `back_settings`
 
 ## Telegram setup
 

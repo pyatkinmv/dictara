@@ -23,21 +23,34 @@ class DictaraClient(private val baseUrl: String) {
         .build()
     private val mapper = ObjectMapper().registerKotlinModule()
 
-    fun transcribe(audioFile: File, modelAlias: String, diarize: Boolean, summarize: Boolean = false,
-                   onProgress: ((String) -> Unit)? = null): TranscriptResult {
+    fun transcribe(
+        audioFile: File,
+        modelAlias: String,
+        diarize: Boolean,
+        summarize: Boolean = false,
+        language: String = "auto",
+        numSpeakers: Int? = null,
+        onProgress: ((String) -> Unit)? = null,
+    ): TranscriptResult {
         val modelName = MODEL_ALIASES[modelAlias] ?: modelAlias
-        val jobId = submitJob(audioFile, modelName, diarize)
+        val jobId = submitJob(audioFile, modelName, diarize, language, numSpeakers)
         return pollJob(jobId, diarize, summarize, onProgress)
     }
 
-    private fun submitJob(file: File, model: String, diarize: Boolean): String {
+    private fun submitJob(file: File, model: String, diarize: Boolean, language: String, numSpeakers: Int?): String {
         val body = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
             .addFormDataPart("file", file.name, file.asRequestBody("application/octet-stream".toMediaType()))
             .build()
 
+        val url = buildString {
+            append("$baseUrl/transcribe?model=$model&diarize=$diarize")
+            if (language != "auto") append("&language=$language")
+            if (numSpeakers != null) append("&num_speakers=$numSpeakers")
+        }
+
         val request = Request.Builder()
-            .url("$baseUrl/transcribe?model=$model&diarize=$diarize")
+            .url(url)
             .post(body)
             .build()
 
