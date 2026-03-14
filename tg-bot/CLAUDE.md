@@ -1,4 +1,4 @@
-# bot — Kotlin Telegram Bot
+# tg-bot — Kotlin Telegram Bot
 
 Telegram bot that forwards audio files to the core service and returns transcripts. Written in Kotlin, runs as a separate Docker service.
 
@@ -41,8 +41,8 @@ Defined in `DictaraClient.kt` as `MODEL_ALIASES`. To add a future model, add one
 
 ## User settings
 
-Stored in-memory per Telegram user ID (`ConcurrentHashMap<Long, UserPrefs>`).
-Defaults: model=`accurate`, diarize=`true`, summarize=`false`, language=`auto`, numSpeakers=`null` (auto).
+Stored in-memory keyed by **chat ID** (`ConcurrentHashMap<Long, UserPrefs>`). In private chats `chatId == userId`; in groups all members share one config.
+Defaults: model=`accurate`, diarize=`true`, summaryMode=`AUTO`, language=`auto`, numSpeakers=`null` (auto).
 Resets on bot restart — acceptable since defaults are the preferred values.
 
 ## Environment variables
@@ -50,7 +50,7 @@ Resets on bot restart — acceptable since defaults are the preferred values.
 | Var | Default | Description |
 |-----|---------|-------------|
 | `TELEGRAM_TOKEN` | — | Bot token from @BotFather |
-| `DICTARA_URL` | `http://dictara:8000` | Core service URL |
+| `TRANSCRIBER_URL` | `http://transcriber:8000` | Transcriber service URL |
 | `GEMINI_API_KEY` | — | Google Gemini API key. Summarization is disabled if unset |
 | `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model to use for summarization |
 
@@ -76,7 +76,7 @@ If summary exceeds the 1024-char Telegram caption limit, caption stays as `"Done
 Bot: Settings
      [Fast]            [Accurate ✓]
      [Diarize on ✓]    [Diarize off]
-     [Summarize on]    [Summarize off ✓]
+     [📝 Summary: Auto ✓]
      [🌐 Language: Auto]
      [👥 Speakers: Auto]
 (clicking a button edits the message in place with updated checkmarks)
@@ -87,7 +87,7 @@ Language and Speakers open submenus. Language submenu: Auto / EN / RU / DE / ES 
 Callback data format:
 - `set_model:fast`, `set_model:accurate`
 - `set_diarize:on`, `set_diarize:off`
-- `set_summarize:on`, `set_summarize:off`
+- `open_summary_mode`, `set_summary_mode:<OFF|AUTO|BRIEF|CONCISE|FULL>`
 - `open_language`, `set_language:<code>`, `lang_custom`
 - `open_speakers`, `set_speakers:<n|auto>`
 - `back_settings`
@@ -100,7 +100,7 @@ Callback data format:
 
 ## Summarization (GeminiClient)
 
-Invoked after transcription if `summarize=true` and `GEMINI_API_KEY` is set. Prompt scales by audio duration:
+Invoked after transcription if `summaryMode != OFF` and `GEMINI_API_KEY` is set. Mode `AUTO` picks format by audio duration; `BRIEF`/`CONCISE`/`FULL` force a specific format regardless of length:
 
 | Audio length | Summary format |
 |-------------|---------------|
@@ -120,6 +120,6 @@ All text (including headers) is in the transcript's language.
 
 ```bash
 # From repo root:
-docker compose build bot
-docker compose up -d bot
+docker compose build tg-bot
+docker compose up -d tg-bot
 ```
