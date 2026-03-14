@@ -38,6 +38,14 @@ services:
       - telegram-bot-api
     restart: unless-stopped
 
+  web:
+    build: ./web
+    ports:
+      - "3000:80"
+    depends_on:
+      - transcriber
+    restart: unless-stopped
+
 volumes:
   model-cache:
   bot-api-data:
