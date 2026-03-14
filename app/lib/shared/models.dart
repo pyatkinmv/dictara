@@ -1,5 +1,3 @@
-import 'package:dictara_api/api.dart' as gen;
-
 enum JobStatus { pending, processing, summarizing, done, failed }
 
 class ProgressInfo {
@@ -9,6 +7,13 @@ class ProgressInfo {
   final double? diarizeProgress;
 
   const ProgressInfo({this.processedS, this.totalS, this.phase, this.diarizeProgress});
+
+  factory ProgressInfo.fromJson(Map<String, dynamic> json) => ProgressInfo(
+        processedS: (json['processed_s'] as num?)?.toDouble(),
+        totalS: (json['total_s'] as num?)?.toDouble(),
+        phase: json['phase'] as String?,
+        diarizeProgress: (json['diarize_progress'] as num?)?.toDouble(),
+      );
 }
 
 class TranscriptSegment {
@@ -23,6 +28,13 @@ class TranscriptSegment {
     required this.text,
     this.speaker,
   });
+
+  factory TranscriptSegment.fromJson(Map<String, dynamic> json) => TranscriptSegment(
+        start: (json['start'] as num).toDouble(),
+        end: (json['end'] as num).toDouble(),
+        text: json['text'] as String,
+        speaker: json['speaker'] as String?,
+      );
 }
 
 class JobResult {
@@ -46,46 +58,33 @@ class JobResult {
     this.durationS,
   });
 
-  /// Deserializes from the gateway JSON response via generated types.
-  /// If the gateway renames a field, this will fail to compile — not at runtime.
   factory JobResult.fromJson(Map<String, dynamic> json) {
-    final r = gen.JobResponse.fromJson(json)!;
+    final statusStr = json['status'] as String;
+    final status = JobStatus.values.firstWhere(
+      (s) => s.name == statusStr,
+      orElse: () => JobStatus.failed,
+    );
 
-    final status = switch (r.status) {
-      'pending' => JobStatus.pending,
-      'processing' => JobStatus.processing,
-      'summarizing' => JobStatus.summarizing,
-      'done' => JobStatus.done,
-      _ => JobStatus.failed,
-    };
+    final resultMap = json['result'] as Map<String, dynamic>?;
+    List<TranscriptSegment>? segments;
+    if (resultMap != null) {
+      final segs = resultMap['segments'] as List<dynamic>?;
+      segments = segs?.map((s) => TranscriptSegment.fromJson(s as Map<String, dynamic>)).toList();
+    }
 
-    final progress = r.progress == null
-        ? null
-        : ProgressInfo(
-            phase: r.progress!.phase,
-            processedS: r.progress!.processedS,
-            totalS: r.progress!.totalS,
-            diarizeProgress: r.progress!.diarizeProgress,
-          );
-
-    final segments = r.result?.segments
-        .map((s) => TranscriptSegment(
-              start: s.start,
-              end: s.end,
-              text: s.text,
-              speaker: s.speaker,
-            ))
-        .toList();
+    ProgressInfo? progress;
+    final prog = json['progress'] as Map<String, dynamic>?;
+    if (prog != null) progress = ProgressInfo.fromJson(prog);
 
     return JobResult(
       status: status,
       segments: segments,
-      formattedText: r.result?.formattedText,
-      summary: r.result?.summary,
-      audioDurationS: r.result?.audioDurationS,
-      error: r.error,
+      formattedText: resultMap?['formatted_text'] as String?,
+      summary: resultMap?['summary'] as String?,
+      audioDurationS: (resultMap?['audio_duration_s'] as num?)?.toDouble(),
+      error: json['error'] as String?,
       progress: progress,
-      durationS: r.durationS,
+      durationS: (json['duration_s'] as num?)?.toDouble(),
     );
   }
 
