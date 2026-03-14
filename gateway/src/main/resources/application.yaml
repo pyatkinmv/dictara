@@ -10,6 +10,13 @@ spring:
       max-file-size: 2GB
       max-request-size: 2GB
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+  default-produces-media-type: application/json
+
 dictara:
   transcriber:
     url: ${TRANSCRIBER_URL:http://localhost:8000}

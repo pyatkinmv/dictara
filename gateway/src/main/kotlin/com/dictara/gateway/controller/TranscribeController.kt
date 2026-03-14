@@ -6,6 +6,8 @@ import com.dictara.gateway.model.GatewayJobStatus
 import com.dictara.gateway.model.SummaryMode
 import com.dictara.gateway.service.OrchestratorService
 import com.dictara.gateway.store.JobStore
+import com.fasterxml.jackson.databind.PropertyNamingStrategies
+import com.fasterxml.jackson.databind.annotation.JsonNaming
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
@@ -13,8 +15,10 @@ import java.util.UUID
 
 // ── Response DTOs ─────────────────────────────────────────────────────────────
 
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 data class SubmitResponse(val jobId: String)
 
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 data class SegmentResponse(
     val start: Double,
     val end: Double,
@@ -22,6 +26,7 @@ data class SegmentResponse(
     val speaker: String?,
 )
 
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 data class ResultResponse(
     val segments: List<SegmentResponse>,
     val formattedText: String,
@@ -29,6 +34,7 @@ data class ResultResponse(
     val audioDurationS: Double?,
 )
 
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 data class ProgressResponse(
     val phase: String,
     val processedS: Double?,
@@ -36,6 +42,7 @@ data class ProgressResponse(
     val diarizeProgress: Double?,
 )
 
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 data class JobResponse(
     val jobId: String,
     val status: String,
