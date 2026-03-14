@@ -1,0 +1,22 @@
+server:
+  port: 8080
+
+spring:
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: NON_NULL
+  servlet:
+    multipart:
+      max-file-size: 2GB
+      max-request-size: 2GB
+
+dictara:
+  transcriber:
+    url: ${TRANSCRIBER_URL:http://localhost:8000}
+    poll-interval-ms: 5000
+    timeout-hours: 4
+  summarizer:
+    provider: ${SUMMARIZER_PROVIDER:gemini}
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_MODEL:gemini-2.5-flash}
