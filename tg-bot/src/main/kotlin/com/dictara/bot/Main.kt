@@ -7,7 +7,9 @@ import org.telegram.telegrambots.updatesreceivers.DefaultBotSession
 fun main() {
     val token = System.getenv("TELEGRAM_TOKEN")
         ?: error("TELEGRAM_TOKEN env var is required")
-    val dictaraUrl = System.getenv("TRANSCRIBER_URL") ?: "http://localhost:8000"
+    val dictaraUrl = System.getenv("GATEWAY_URL")
+        ?: System.getenv("TRANSCRIBER_URL")
+        ?: "http://localhost:8080"
     val apiUrl = System.getenv("TELEGRAM_API_URL")
 
     val options = DefaultBotOptions()

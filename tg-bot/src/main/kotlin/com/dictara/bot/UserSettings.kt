@@ -3,8 +3,8 @@ package com.dictara.bot
 import java.util.concurrent.ConcurrentHashMap
 
 data class UserPrefs(
-    val model: String = "accurate",
-    val diarize: Boolean = true,
+    val model: String = "fast",
+    val diarize: Boolean = false,
     val language: String = "auto",   // "auto" or ISO code like "en", "ru"
     val numSpeakers: Int? = null,    // null = auto-detect, 1-4 = exact count
     val summaryMode: SummaryMode = SummaryMode.AUTO,

@@ -33,7 +33,6 @@ class DictaraBot(
 ) : TelegramLongPollingBot(options, token) {
 
     private val client = DictaraClient(dictaraUrl)
-    private val gemini = GeminiClient()
     private val executor = Executors.newCachedThreadPool()
 
     /** userId → messageId of the settings message currently awaiting a language code reply */
@@ -122,7 +121,7 @@ class DictaraBot(
         val spkLabel  = if (prefs.numSpeakers != null) " (${prefs.numSpeakers})" else ""
         val speakersLabel = if (prefs.diarize) "on$spkLabel" else "off"
         val summaryLabel = when {
-            prefs.summaryMode == SummaryMode.OFF || !gemini.isAvailable() -> "off"
+            prefs.summaryMode == SummaryMode.OFF -> "off"
             prefs.summaryMode == SummaryMode.AUTO -> "on"
             else -> prefs.summaryMode.label  // "Brief", "Concise", or "Full"
         }
@@ -154,7 +153,7 @@ class DictaraBot(
                     // Phase 1: transcribe (with live progress updates)
                     val result = client.transcribe(
                         audioTmp, prefs.model, prefs.diarize,
-                        prefs.summaryMode != SummaryMode.OFF && gemini.isAvailable(),
+                        prefs.summaryMode,
                         prefs.language, prefs.numSpeakers
                     ) { progressText ->
                         try {
@@ -168,30 +167,17 @@ class DictaraBot(
                         } catch (_: Exception) {}
                     }
 
-                    // Phase 2: send transcript immediately, delete status message
+                    // Phase 2: send transcript, delete status message
                     val sentMsg = sendTranscript(chatId, result, originalMessageId)
                     try {
                         execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build())
                     } catch (_: Exception) {}
 
-                    // Phase 3: summarize and edit caption
-                    if (prefs.summaryMode != SummaryMode.OFF && gemini.isAvailable()) {
+                    // Phase 3: update caption with summary (already computed by gateway)
+                    if (result.summary != null) {
                         try {
                             val doneText = formatDoneText(result.durationSeconds)
-                            execute(
-                                EditMessageCaption.builder()
-                                    .chatId(chatId.toString())
-                                    .messageId(sentMsg.messageId)
-                                    .caption("$doneText\n✍️ Summarizing...")
-                                    .build()
-                            )
-                            val summary = gemini.summarize(
-                                result.text,
-                                result.audioDurationSeconds,
-                                prefs.summaryMode,
-                                prefs.language,
-                            )
-                            val caption = "$doneText\n\n$summary"
+                            val caption = "$doneText\n\n${result.summary}"
                             if (caption.length <= 1024) {
                                 execute(
                                     EditMessageCaption.builder()
@@ -201,14 +187,7 @@ class DictaraBot(
                                         .build()
                                 )
                             } else {
-                                execute(
-                                    EditMessageCaption.builder()
-                                        .chatId(chatId.toString())
-                                        .messageId(sentMsg.messageId)
-                                        .caption(doneText)
-                                        .build()
-                                )
-                                val truncated = if (summary.length > 4096) summary.take(4093) + "…" else summary
+                                val truncated = if (result.summary.length > 4096) result.summary.take(4093) + "…" else result.summary
                                 send(chatId, truncated)
                             }
                         } catch (e: Exception) {
@@ -255,8 +234,6 @@ class DictaraBot(
         when {
             cb.data.startsWith("set_model:") ->
                 UserSettings.update(chatId, model = cb.data.removePrefix("set_model:"))
-            cb.data.startsWith("set_diarize:") ->
-                UserSettings.update(chatId, diarize = cb.data.removePrefix("set_diarize:") == "on")
             cb.data.startsWith("set_language:") -> {
                 val code = cb.data.removePrefix("set_language:")
                 UserSettings.update(chatId, language = code)
@@ -318,10 +295,10 @@ class DictaraBot(
             cb.data == "back_settings" -> { /* fall through to keyboard update below */ }
             cb.data.startsWith("set_speakers:") -> {
                 val raw = cb.data.removePrefix("set_speakers:")
-                if (raw == "auto") {
-                    UserSettings.update(chatId, clearNumSpeakers = true)
-                } else {
-                    UserSettings.update(chatId, numSpeakers = raw.toIntOrNull())
+                when (raw) {
+                    "off"  -> UserSettings.update(chatId, diarize = false, clearNumSpeakers = true)
+                    "auto" -> UserSettings.update(chatId, diarize = true, clearNumSpeakers = true)
+                    else   -> UserSettings.update(chatId, diarize = true, numSpeakers = raw.toIntOrNull())
                 }
             }
         }
@@ -352,15 +329,12 @@ class DictaraBot(
 
         val fastMark = if (prefs.model == "fast")     " ✓" else ""
         val accMark  = if (prefs.model == "accurate")  " ✓" else ""
-        val onMark   = if (prefs.diarize)              " ✓" else ""
-        val offMark  = if (!prefs.diarize)             " ✓" else ""
 
         val langLabel = if (prefs.language == "auto") "Auto" else prefs.language.uppercase()
-        val spkLabel  = if (prefs.numSpeakers == null) "Auto" else prefs.numSpeakers.toString()
+        val spkLabel  = if (!prefs.diarize) "Off" else if (prefs.numSpeakers == null) "Auto" else prefs.numSpeakers.toString()
 
         return InlineKeyboardMarkup.builder()
             .keyboardRow(listOf(btn("Fast$fastMark", "set_model:fast"), btn("Accurate$accMark", "set_model:accurate")))
-            .keyboardRow(listOf(btn("Diarize on$onMark", "set_diarize:on"), btn("Diarize off$offMark", "set_diarize:off")))
             .keyboardRow(listOf(btn("📋 Summary: ${prefs.summaryMode.label}", "open_summary_mode")))
             .keyboardRow(listOf(btn("🌐 Language: $langLabel", "open_language")))
             .keyboardRow(listOf(btn("👥 Speakers: $spkLabel", "open_speakers")))
@@ -385,16 +359,19 @@ class DictaraBot(
 
     private fun buildSpeakersKeyboard(prefs: UserPrefs): InlineKeyboardMarkup {
         fun btn(label: String, value: String): InlineKeyboardButton {
-            val current = if (prefs.numSpeakers == null) "auto" else prefs.numSpeakers.toString()
-            val mark = if (current == value) " ✓" else ""
+            val mark = when {
+                value == "off"  && !prefs.diarize -> " ✓"
+                value != "off"  && prefs.diarize  && (if (prefs.numSpeakers == null) value == "auto" else prefs.numSpeakers.toString() == value) -> " ✓"
+                else -> ""
+            }
             return InlineKeyboardButton.builder().text("$label$mark").callbackData("set_speakers:$value").build()
         }
         fun plain(label: String, data: String) =
             InlineKeyboardButton.builder().text(label).callbackData(data).build()
 
         return InlineKeyboardMarkup.builder()
-            .keyboardRow(listOf(btn("Auto", "auto"), btn("1", "1"), btn("2", "2")))
-            .keyboardRow(listOf(btn("3", "3"), btn("4", "4"), btn("5+", "auto")))
+            .keyboardRow(listOf(btn("Off", "off"), btn("Auto", "auto"), btn("1", "1")))
+            .keyboardRow(listOf(btn("2", "2"), btn("3", "3"), btn("4", "4"), btn("5+", "5")))
             .keyboardRow(listOf(plain("← Back", "back_settings")))
             .build()
     }
