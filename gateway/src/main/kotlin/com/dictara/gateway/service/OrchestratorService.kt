@@ -11,6 +11,7 @@ import java.util.concurrent.Executors
 class OrchestratorService(
     private val transcriberClient: TranscriberClient,
     private val summarizer: SummarizerPort,
+    private val props: com.dictara.gateway.config.DictaraProperties,
 ) {
     private val executor = Executors.newCachedThreadPool()
 
@@ -58,7 +59,7 @@ class OrchestratorService(
         val deadlineMs = System.currentTimeMillis() + 4 * 60 * 60 * 1000L
 
         while (System.currentTimeMillis() < deadlineMs) {
-            Thread.sleep(5_000)
+            Thread.sleep(props.transcriber.pollIntervalMs)
             val snapshot = transcriberClient.getJob(transcriberJobId)
 
             // Forward elapsed time

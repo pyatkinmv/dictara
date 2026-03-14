@@ -26,6 +26,16 @@ venv/
 # Gradle
 bot/.gradle/
 bot/build/
+gateway/.gradle/
+gateway/build/
+gateway/gradle/
+gateway/gradlew
+gateway/gradlew.bat
+tg-bot/.gradle/
+tg-bot/build/
+tg-bot/gradle/
+tg-bot/gradlew
+tg-bot/gradlew.bat
 
 # OS
 .DS_Store
