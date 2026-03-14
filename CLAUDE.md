@@ -7,14 +7,16 @@ Transcribes audio/video files using Whisper with optional speaker diarization. R
 
 | Module | Language | Purpose | Docs |
 |--------|----------|---------|------|
-| `core/` | Python | FastAPI transcription service — Whisper + pyannote | [core/CLAUDE.md](core/CLAUDE.md) |
-| `bot/` | Kotlin | Telegram bot — sends audio, receives transcript.txt | [bot/CLAUDE.md](bot/CLAUDE.md) |
+| `transcriber/` | Python | FastAPI transcription service — Whisper + pyannote | [transcriber/CLAUDE.md](transcriber/CLAUDE.md) |
+| `tg-bot/` | Kotlin | Telegram bot — sends audio, receives transcript.txt | [tg-bot/CLAUDE.md](tg-bot/CLAUDE.md) |
+| `app/` | Dart/Flutter | Web client — file upload, progress, transcript download | |
 
 ```
 dictara/
-  core/               Python service (Whisper + FastAPI)
-  bot/                Kotlin Telegram bot
-  docker-compose.yml  Orchestrates both services
+  transcriber/        Python service (Whisper + FastAPI)
+  tg-bot/             Kotlin Telegram bot
+  app/                Flutter web client
+  docker-compose.yml  Orchestrates all services
   .env                Secrets (HF_TOKEN, TELEGRAM_TOKEN)
 ```
 
@@ -25,8 +27,8 @@ dictara/
 | `WHISPER_MODELS` | core | `small,large-v3` | Comma-separated list of Whisper models to load |
 | `HF_TOKEN` | core | — | HuggingFace token. Required for diarization |
 | `HF_HOME` | core | `/models` | HF model cache path (mapped to `model-cache` volume) |
-| `TELEGRAM_TOKEN` | bot | — | Telegram bot token from @BotFather |
-| `DICTARA_URL` | bot | `http://dictara:8000` | Core service URL (auto-set in Docker) |
+| `TELEGRAM_TOKEN` | tg-bot | — | Telegram bot token from @BotFather |
+| `DICTARA_URL` | tg-bot | `http://transcriber:8000` | Transcriber service URL (auto-set in Docker) |
 
 ## Per-request API params (`/transcribe`)
 
@@ -45,8 +47,9 @@ docker compose build
 docker compose up -d
 
 # Rebuild a single module after code changes
-docker compose build core && docker compose up -d dictara
-docker compose build bot  && docker compose up -d bot
+docker compose build transcriber && docker compose up -d transcriber
+docker compose build tg-bot      && docker compose up -d tg-bot
+docker compose build app         && docker compose up -d app
 
 # Check health
 curl http://localhost:8000/health
@@ -56,7 +59,8 @@ curl http://localhost:8000/health
 
 | Service | Build context | Exposes |
 |---------|--------------|---------|
-| `dictara` | `./core` | `:8000` (HTTP API) |
-| `bot` | `./bot` | — (outbound only, long-polling) |
+| `transcriber` | `./transcriber` | `:8000` (HTTP API) |
+| `tg-bot` | `./tg-bot` | — (outbound only, long-polling) |
+| `app` | `./app` | `:3000` (Flutter web UI) |
 
 Model downloads cache to the `model-cache` Docker volume. `docker compose down` keeps the volume; only `docker compose down -v` deletes it.

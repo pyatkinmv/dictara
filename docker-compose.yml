@@ -21,9 +21,9 @@ services:
       - bot-api-data:/var/lib/telegram-bot-api
     restart: unless-stopped
 
-  bot:
+  tg-bot:
     build:
-      context: ./bot
+      context: ./tg-bot
       dockerfile: Dockerfile
     environment:
       TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
@@ -38,8 +38,8 @@ services:
       - telegram-bot-api
     restart: unless-stopped
 
-  web:
-    build: ./web
+  app:
+    build: ./app
     ports:
       - "3000:80"
     depends_on:
