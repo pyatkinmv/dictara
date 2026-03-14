@@ -1,1 +1,1 @@
-rootProject.name = "dictara-gateway"
+rootProject.name = "gateway"

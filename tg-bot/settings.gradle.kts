@@ -1,1 +1,1 @@
-rootProject.name = "dictara-bot"
+rootProject.name = "tg-bot"
