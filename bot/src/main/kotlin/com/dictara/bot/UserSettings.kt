@@ -13,10 +13,10 @@ data class UserPrefs(
 object UserSettings {
     private val store = ConcurrentHashMap<Long, UserPrefs>()
 
-    fun get(userId: Long): UserPrefs = store.getOrDefault(userId, UserPrefs())
+    fun get(id: Long): UserPrefs = store.getOrDefault(id, UserPrefs())
 
     fun update(
-        userId: Long,
+        id: Long,
         model: String? = null,
         diarize: Boolean? = null,
         language: String? = null,
@@ -24,8 +24,8 @@ object UserSettings {
         clearNumSpeakers: Boolean = false,
         summaryMode: SummaryMode? = null,
     ) {
-        val current = get(userId)
-        store[userId] = current.copy(
+        val current = get(id)
+        store[id] = current.copy(
             model = model ?: current.model,
             diarize = diarize ?: current.diarize,
             language = language ?: current.language,

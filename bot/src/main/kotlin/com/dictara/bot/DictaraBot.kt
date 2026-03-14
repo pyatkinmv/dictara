@@ -63,7 +63,8 @@ class DictaraBot(
 
     private fun handleMessage(message: Message) {
         val chatId = message.chatId
-        val userId = message.from.id
+        val userId = message.from?.id ?: return  // channels have no sender; ignore silently
+        val isGroup = message.chat.type != "private"
 
         // Commands always take priority — cancel any pending awaiting state
         if (message.hasText() && message.text.startsWith("/")) {
@@ -79,8 +80,8 @@ class DictaraBot(
                 return
             }
             val msgId = awaitingLanguage.remove(userId)!!
-            UserSettings.update(userId, language = code)
-            val prefs = UserSettings.get(userId)
+            UserSettings.update(chatId, language = code)
+            val prefs = UserSettings.get(chatId)
             execute(
                 EditMessageText.builder()
                     .chatId(chatId.toString())
@@ -98,7 +99,7 @@ class DictaraBot(
                 return
             }
             message.hasText() && message.text.startsWith("/settings") -> {
-                sendSettings(chatId, userId)
+                sendSettings(chatId)
                 return
             }
         }
@@ -110,12 +111,12 @@ class DictaraBot(
             message.hasVideo() -> message.video.fileId
             message.hasDocument() -> message.document.fileId
             else -> {
-                send(chatId, "Send me an audio or video file. Use /settings to configure preferences.")
+                if (!isGroup) send(chatId, "Send me an audio or video file. Use /settings to configure preferences.")
                 return
             }
         }
 
-        val prefs = UserSettings.get(userId)
+        val prefs = UserSettings.get(chatId)
         val modelLabel = prefs.model.replaceFirstChar { it.uppercase() }
         val langLabel = if (prefs.language == "auto") "Auto" else prefs.language.uppercase()
         val spkLabel  = if (prefs.numSpeakers != null) " (${prefs.numSpeakers})" else ""
@@ -125,7 +126,10 @@ class DictaraBot(
             prefs.summaryMode == SummaryMode.AUTO -> "on"
             else -> prefs.summaryMode.label  // "Brief", "Concise", or "Full"
         }
-        val baseLabel = "⏳ Transcribing your audio...\n\nModel: $modelLabel | Speakers: $speakersLabel | Lang: $langLabel | Summary: $summaryLabel"
+        val senderTag = if (isGroup) message.from?.userName?.let { "@$it" } ?: message.from?.firstName ?: "Someone" else null
+        val who = if (senderTag != null) "$senderTag's" else "your"
+        val baseLabel = "⏳ Transcribing $who audio...\n\nModel: $modelLabel | Speakers: $speakersLabel | Lang: $langLabel | Summary: $summaryLabel"
+        val originalMessageId = if (isGroup) message.messageId else null
         val statusMsg = send(chatId, baseLabel)
 
         executor.submit {
@@ -165,7 +169,7 @@ class DictaraBot(
                     }
 
                     // Phase 2: send transcript immediately, delete status message
-                    val sentMsg = sendTranscript(chatId, result)
+                    val sentMsg = sendTranscript(chatId, result, originalMessageId)
                     try {
                         execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build())
                     } catch (_: Exception) {}
@@ -204,7 +208,8 @@ class DictaraBot(
                                         .caption(doneText)
                                         .build()
                                 )
-                                send(chatId, summary)
+                                val truncated = if (summary.length > 4096) summary.take(4093) + "…" else summary
+                                send(chatId, truncated)
                             }
                         } catch (e: Exception) {
                             send(chatId, "Summary failed: ${e.message}")
@@ -214,12 +219,12 @@ class DictaraBot(
                     audioTmp.delete()
                 }
             } catch (e: Exception) {
-                send(chatId, "Error: ${e.message}")
+                send(chatId, if (senderTag != null) "Error transcribing $senderTag's audio: ${e.message}" else "Error: ${e.message}")
             }
         }
     }
 
-    private fun sendTranscript(chatId: Long, result: TranscriptResult): Message {
+    private fun sendTranscript(chatId: Long, result: TranscriptResult, replyToMessageId: Int? = null): Message {
         val dateStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"))
         val txtFile = Files.createTempFile("transcript-", ".txt").toFile()
         try {
@@ -229,6 +234,7 @@ class DictaraBot(
                     .chatId(chatId.toString())
                     .document(InputFile(txtFile, "transcript_$dateStr.txt"))
                     .caption(formatDoneText(result.durationSeconds))
+                    .apply { if (replyToMessageId != null) replyToMessageId(replyToMessageId) }
                     .build()
             )
         } finally {
@@ -245,20 +251,21 @@ class DictaraBot(
 
     private fun handleCallback(cb: CallbackQuery) {
         val userId = cb.from.id
+        val chatId = cb.message.chatId
         when {
             cb.data.startsWith("set_model:") ->
-                UserSettings.update(userId, model = cb.data.removePrefix("set_model:"))
+                UserSettings.update(chatId, model = cb.data.removePrefix("set_model:"))
             cb.data.startsWith("set_diarize:") ->
-                UserSettings.update(userId, diarize = cb.data.removePrefix("set_diarize:") == "on")
+                UserSettings.update(chatId, diarize = cb.data.removePrefix("set_diarize:") == "on")
             cb.data.startsWith("set_language:") -> {
                 val code = cb.data.removePrefix("set_language:")
-                UserSettings.update(userId, language = code)
+                UserSettings.update(chatId, language = code)
             }
             cb.data == "lang_custom" -> {
                 awaitingLanguage[userId] = cb.message.messageId
                 execute(
                     EditMessageText.builder()
-                        .chatId(cb.message.chatId.toString())
+                        .chatId(chatId.toString())
                         .messageId(cb.message.messageId)
                         .text("Type a 2-letter ISO language code (e.g. `ja`, `zh`, `ar`, `uk`):")
                         .build()
@@ -267,10 +274,10 @@ class DictaraBot(
                 return
             }
             cb.data == "open_language" -> {
-                val prefs = UserSettings.get(userId)
+                val prefs = UserSettings.get(chatId)
                 execute(
                     EditMessageReplyMarkup.builder()
-                        .chatId(cb.message.chatId.toString())
+                        .chatId(chatId.toString())
                         .messageId(cb.message.messageId)
                         .replyMarkup(buildLanguageKeyboard(prefs))
                         .build()
@@ -279,10 +286,10 @@ class DictaraBot(
                 return
             }
             cb.data == "open_speakers" -> {
-                val prefs = UserSettings.get(userId)
+                val prefs = UserSettings.get(chatId)
                 execute(
                     EditMessageReplyMarkup.builder()
-                        .chatId(cb.message.chatId.toString())
+                        .chatId(chatId.toString())
                         .messageId(cb.message.messageId)
                         .replyMarkup(buildSpeakersKeyboard(prefs))
                         .build()
@@ -291,10 +298,10 @@ class DictaraBot(
                 return
             }
             cb.data == "open_summary_mode" -> {
-                val prefs = UserSettings.get(userId)
+                val prefs = UserSettings.get(chatId)
                 execute(
                     EditMessageReplyMarkup.builder()
-                        .chatId(cb.message.chatId.toString())
+                        .chatId(chatId.toString())
                         .messageId(cb.message.messageId)
                         .replyMarkup(buildSummaryModeKeyboard(prefs))
                         .build()
@@ -305,20 +312,20 @@ class DictaraBot(
             cb.data.startsWith("set_summary_mode:") -> {
                 val raw = cb.data.removePrefix("set_summary_mode:")
                 val mode = SummaryMode.entries.find { it.name.lowercase() == raw }
-                if (mode != null) UserSettings.update(userId, summaryMode = mode)
+                if (mode != null) UserSettings.update(chatId, summaryMode = mode)
                 // unknown raw value: silently ignore — enum is closed, can't happen in practice
             }
             cb.data == "back_settings" -> { /* fall through to keyboard update below */ }
             cb.data.startsWith("set_speakers:") -> {
                 val raw = cb.data.removePrefix("set_speakers:")
                 if (raw == "auto") {
-                    UserSettings.update(userId, clearNumSpeakers = true)
+                    UserSettings.update(chatId, clearNumSpeakers = true)
                 } else {
-                    UserSettings.update(userId, numSpeakers = raw.toIntOrNull())
+                    UserSettings.update(chatId, numSpeakers = raw.toIntOrNull())
                 }
             }
         }
-        val prefs = UserSettings.get(userId)
+        val prefs = UserSettings.get(chatId)
         execute(
             EditMessageReplyMarkup.builder()
                 .chatId(cb.message.chatId.toString())
@@ -329,12 +336,12 @@ class DictaraBot(
         execute(AnswerCallbackQuery.builder().callbackQueryId(cb.id).build())
     }
 
-    private fun sendSettings(chatId: Long, userId: Long) {
+    private fun sendSettings(chatId: Long) {
         execute(
             SendMessage.builder()
                 .chatId(chatId.toString())
                 .text("Settings")
-                .replyMarkup(buildSettingsKeyboard(UserSettings.get(userId)))
+                .replyMarkup(buildSettingsKeyboard(UserSettings.get(chatId)))
                 .build()
         )
     }
