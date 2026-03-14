@@ -1,5 +1,7 @@
 package com.dictara.bot
 
+import com.dictara.generated.models.JobResponse
+import com.dictara.generated.models.SubmitResponse
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import okhttp3.MediaType.Companion.toMediaType
@@ -61,7 +63,7 @@ class DictaraClient(private val baseUrl: String) {
         val response = http.newCall(Request.Builder().url(url).post(body).build()).execute()
         val responseBody = response.body?.string() ?: ""
         if (!response.isSuccessful) throw RuntimeException("Submit failed (${response.code}): $responseBody")
-        return mapper.readTree(responseBody)["job_id"].asText()
+        return mapper.readValue(responseBody, SubmitResponse::class.java).jobId
     }
 
     private fun pollJob(
@@ -74,26 +76,24 @@ class DictaraClient(private val baseUrl: String) {
         while (System.currentTimeMillis() < deadline) {
             Thread.sleep(5_000)
             val response = http.newCall(Request.Builder().url("$baseUrl/jobs/$jobId").get().build()).execute()
-            val root = mapper.readTree(response.body?.string() ?: "{}")
-            when (root["status"]?.asText()) {
+            val jobResp = mapper.readValue(response.body?.string() ?: "{}", JobResponse::class.java)
+
+            when (jobResp.status) {
                 "processing" -> {
-                    val elapsed = root["elapsed_s"]?.takeIf { !it.isNull }?.asDouble()
-                    val elapsedStr = if (elapsed != null) " | ${fmtTime(elapsed)} elapsed" else ""
-                    val prog = root["progress"]
-                    if (prog != null && !prog.isNull) {
-                        val phase = prog["phase"]?.asText()
+                    val elapsedStr = jobResp.elapsedS?.let { " | ${fmtTime(it)} elapsed" } ?: ""
+                    val prog = jobResp.progress
+                    if (prog != null) {
                         val summarizeNote = if (summaryMode != SummaryMode.OFF) "\n✍️ Summarization to follow" else ""
-                        when (phase) {
+                        when (prog.phase) {
                             "diarizing" -> {
-                                val diarizeProgress = prog["diarize_progress"]?.takeIf { !it.isNull }?.asDouble()
-                                val bar = if (diarizeProgress != null)
-                                    "\n${progressBar(diarizeProgress)} ${(diarizeProgress * 100).toInt()}%"
-                                else ""
+                                val bar = prog.diarizeProgress?.let {
+                                    "\n${progressBar(it)} ${(it * 100).toInt()}%"
+                                } ?: ""
                                 onProgress?.invoke("👥 Detecting speakers...$bar$summarizeNote$elapsedStr")
                             }
                             else -> {
-                                val processed = prog["processed_s"]?.asDouble()
-                                val total = prog["total_s"]?.asDouble()?.takeIf { it > 0 }
+                                val processed = prog.processedS
+                                val total = prog.totalS?.takeIf { it > 0 }
                                 if (processed != null && total != null) {
                                     val pct = (processed / total * 100).toInt()
                                     val bar = progressBar(processed / total)
@@ -106,14 +106,15 @@ class DictaraClient(private val baseUrl: String) {
                 }
                 "summarizing" -> onProgress?.invoke("✍️ Summarizing...")
                 "done" -> {
-                    val result = root["result"]
-                    val text = result["formatted_text"]?.asText() ?: ""
-                    val summary = result["summary"]?.takeIf { !it.isNull }?.asText()
-                    val duration = root["duration_s"]?.takeIf { !it.isNull }?.asDouble()
-                    val audioDuration = result["audio_duration_s"]?.takeIf { !it.isNull }?.asDouble()
-                    return TranscriptResult(text, duration, audioDuration, summary)
+                    val result = jobResp.result
+                    return TranscriptResult(
+                        text = result?.formattedText ?: "",
+                        durationSeconds = jobResp.durationS,
+                        audioDurationSeconds = result?.audioDurationS,
+                        summary = result?.summary,
+                    )
                 }
-                "failed" -> throw RuntimeException(root["error"]?.asText() ?: "Unknown error")
+                "failed" -> throw RuntimeException(jobResp.error ?: "Unknown error")
             }
         }
         throw RuntimeException("Timeout: transcription did not complete within 4 hours")

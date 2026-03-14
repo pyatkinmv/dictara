@@ -2,6 +2,7 @@
 FROM ghcr.io/cirruslabs/flutter:stable AS builder
 WORKDIR /app
 COPY pubspec.yaml pubspec.lock* ./
+COPY lib/generated/pubspec.yaml ./lib/generated/pubspec.yaml
 RUN flutter pub get
 COPY . .
 ARG FLUTTER_TARGET=lib/material/main_material.dart

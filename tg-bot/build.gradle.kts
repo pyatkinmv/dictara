@@ -23,6 +23,12 @@ tasks.shadowJar {
     }
 }
 
+sourceSets {
+    main {
+        kotlin.srcDirs("src/main/kotlin", "generated/src/main/kotlin")
+    }
+}
+
 kotlin {
     jvmToolchain(21)
 }
