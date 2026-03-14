@@ -38,10 +38,24 @@ services:
       - telegram-bot-api
     restart: unless-stopped
 
-  app:
-    build: ./app
+  app-material:
+    build:
+      context: ./app
+      args:
+        FLUTTER_TARGET: lib/material/main_material.dart
     ports:
       - "3000:80"
+    depends_on:
+      - transcriber
+    restart: unless-stopped
+
+  app-fluent:
+    build:
+      context: ./app
+      args:
+        FLUTTER_TARGET: lib/fluent/main_fluent.dart
+    ports:
+      - "3001:80"
     depends_on:
       - transcriber
     restart: unless-stopped

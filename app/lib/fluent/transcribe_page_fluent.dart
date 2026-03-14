@@ -5,38 +5,34 @@ import 'dart:html' as html;
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:fluent_ui/fluent_ui.dart';
 
-import 'api_client.dart';
-import 'models.dart';
+import '../shared/api_client.dart';
+import '../shared/models.dart';
 
 enum _State { idle, uploading, processing, done, error }
 
-class TranscribePage extends StatefulWidget {
-  const TranscribePage({super.key});
+class TranscribePageFluent extends StatefulWidget {
+  const TranscribePageFluent({super.key});
 
   @override
-  State<TranscribePage> createState() => _TranscribePageState();
+  State<TranscribePageFluent> createState() => _TranscribePageFluentState();
 }
 
-class _TranscribePageState extends State<TranscribePage> {
+class _TranscribePageFluentState extends State<TranscribePageFluent> {
   final _api = ApiClient();
 
-  // Health
   bool _online = false;
   Timer? _healthTimer;
 
-  // Settings
   String _model = 'small';
   String _language = 'auto';
   bool _diarize = false;
   int? _numSpeakers;
 
-  // File
   Uint8List? _fileBytes;
   String? _fileName;
 
-  // Job state
   _State _state = _State.idle;
   JobResult? _jobResult;
   String? _errorMsg;
@@ -85,7 +81,6 @@ class _TranscribePageState extends State<TranscribePage> {
       _jobResult = null;
       _progress = null;
     });
-
     try {
       final jobId = await _api.submitJob(
         fileBytes: _fileBytes!,
@@ -112,7 +107,6 @@ class _TranscribePageState extends State<TranscribePage> {
       final result = await _api.pollJob(_jobId!);
       if (!mounted) return;
       setState(() => _progress = result.progress);
-
       if (result.status == JobStatus.done) {
         _pollTimer?.cancel();
         setState(() {
@@ -128,12 +122,7 @@ class _TranscribePageState extends State<TranscribePage> {
       }
     } catch (e) {
       _pollTimer?.cancel();
-      if (mounted) {
-        setState(() {
-          _state = _State.error;
-          _errorMsg = e.toString();
-        });
-      }
+      if (mounted) setState(() { _state = _State.error; _errorMsg = e.toString(); });
     }
   }
 
@@ -163,25 +152,24 @@ class _TranscribePageState extends State<TranscribePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
+    return ScaffoldPage(
+      header: PageHeader(
         title: const Text('Dictara'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Chip(
-              avatar: Icon(
-                Icons.circle,
-                size: 10,
-                color: _online ? Colors.green : Colors.red,
-              ),
-              label: Text(_online ? 'online' : 'offline'),
-              visualDensity: VisualDensity.compact,
+        commandBar: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              FluentIcons.circle_fill,
+              size: 10,
+              color: _online ? Colors.green : Colors.red,
             ),
-          ),
-        ],
+            const SizedBox(width: 6),
+            Text(_online ? 'online' : 'offline'),
+            const SizedBox(width: 16),
+          ],
+        ),
       ),
-      body: SingleChildScrollView(
+      content: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Center(
           child: ConstrainedBox(
@@ -297,14 +285,14 @@ class _SettingsBar extends StatelessWidget {
       runSpacing: 8,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        _LabeledDropdown<String>(
+        _LabeledComboBox<String>(
           label: 'Model',
           value: model,
           items: _kModels,
           enabled: enabled,
           onChanged: onModelChanged,
         ),
-        _LabeledDropdown<String>(
+        _LabeledComboBox<String>(
           label: 'Language',
           value: language,
           items: _kLanguages,
@@ -315,14 +303,15 @@ class _SettingsBar extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('Diarize'),
-            Switch(
-              value: diarize,
+            const SizedBox(width: 8),
+            ToggleSwitch(
+              checked: diarize,
               onChanged: enabled ? onDiarizeChanged : null,
             ),
           ],
         ),
         if (diarize)
-          _LabeledDropdown<int?>(
+          _LabeledComboBox<int?>(
             label: 'Speakers',
             value: numSpeakers,
             items: {null: 'Auto', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6'},
@@ -334,14 +323,14 @@ class _SettingsBar extends StatelessWidget {
   }
 }
 
-class _LabeledDropdown<T> extends StatelessWidget {
+class _LabeledComboBox<T> extends StatelessWidget {
   final String label;
   final T value;
   final Map<T, String> items;
   final bool enabled;
   final ValueChanged<T> onChanged;
 
-  const _LabeledDropdown({
+  const _LabeledComboBox({
     required this.label,
     required this.value,
     required this.items,
@@ -355,12 +344,11 @@ class _LabeledDropdown<T> extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text('$label: '),
-        DropdownButton<T>(
+        ComboBox<T>(
           value: value,
-          isDense: true,
           onChanged: enabled ? (v) => onChanged(v as T) : null,
           items: items.entries
-              .map((e) => DropdownMenuItem<T>(value: e.key, child: Text(e.value)))
+              .map((e) => ComboBoxItem<T>(value: e.key, child: Text(e.value)))
               .toList(),
         ),
       ],
@@ -379,35 +367,29 @@ class _DropZone extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return InkWell(
+    final theme = FluentTheme.of(context);
+    return GestureDetector(
       onTap: enabled ? onPickFile : null,
-      borderRadius: BorderRadius.circular(12),
       child: Container(
         height: 120,
         decoration: BoxDecoration(
-          border: Border.all(
-            color: theme.colorScheme.outline,
-            width: 1.5,
-            // dashed look via strokeAlign workaround not available in Container,
-            // using solid with low opacity instead
-          ),
-          borderRadius: BorderRadius.circular(12),
-          color: enabled ? theme.colorScheme.surfaceContainerLow : theme.colorScheme.surfaceContainerLowest,
+          border: Border.all(color: theme.accentColor, width: 1.5),
+          borderRadius: BorderRadius.circular(4),
+          color: theme.micaBackgroundColor,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              fileName != null ? Icons.audio_file : Icons.upload_file,
+              fileName != null ? FluentIcons.music_note : FluentIcons.upload,
               size: 32,
-              color: theme.colorScheme.primary,
+              color: theme.accentColor,
             ),
             const SizedBox(height: 8),
             Text(
               fileName ?? 'Click to choose an audio or video file',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: fileName != null ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+              style: TextStyle(
+                color: fileName != null ? theme.accentColor : theme.inactiveColor,
               ),
             ),
           ],
@@ -426,7 +408,7 @@ class _UploadingSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Column(
       children: [
-        LinearProgressIndicator(),
+        ProgressBar(),
         SizedBox(height: 8),
         Text('Uploading…'),
       ],
@@ -449,12 +431,12 @@ class _ProgressSection extends StatelessWidget {
 
     if (p != null) {
       if (p.phase == 'diarizing' && p.diarizeProgress != null) {
-        value = p.diarizeProgress;
-        label = '👥 Detecting speakers… ${(p.diarizeProgress! * 100).toStringAsFixed(0)}%';
+        value = p.diarizeProgress! * 100;
+        label = '👥 Detecting speakers… ${p.diarizeProgress! * 100 ~/ 1}%';
       } else if (p.processedS != null && p.totalS != null && p.totalS! > 0) {
-        value = p.processedS! / p.totalS!;
+        value = (p.processedS! / p.totalS!) * 100;
         label =
-            '🎙 Transcribing… ${p.processedS!.toStringAsFixed(0)} / ${p.totalS!.toStringAsFixed(0)} s  (${(value * 100).toStringAsFixed(0)}%)';
+            '🎙 Transcribing… ${p.processedS!.toStringAsFixed(0)} / ${p.totalS!.toStringAsFixed(0)} s  (${value.toStringAsFixed(0)}%)';
       }
     }
 
@@ -466,7 +448,7 @@ class _ProgressSection extends StatelessWidget {
           children: [
             Text(label),
             const SizedBox(height: 8),
-            LinearProgressIndicator(value: value),
+            ProgressBar(value: value),
           ],
         ),
       ),
@@ -498,27 +480,32 @@ class _ResultSection extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.check_circle, color: Colors.green),
+                Icon(FluentIcons.check_mark, color: Colors.green),
                 const SizedBox(width: 8),
-                Text('Done$durationLabel', style: Theme.of(context).textTheme.titleSmall),
+                Text('Done$durationLabel',
+                    style: FluentTheme.of(context).typography.bodyStrong),
                 const Spacer(),
-                FilledButton.tonal(
+                FilledButton(
                   onPressed: onDownload,
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: [Icon(Icons.download, size: 18), SizedBox(width: 4), Text('Download')],
+                    children: [
+                      Icon(FluentIcons.download, size: 16),
+                      SizedBox(width: 4),
+                      Text('Download'),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 8),
-                OutlinedButton(onPressed: onReset, child: const Text('New')),
+                Button(onPressed: onReset, child: const Text('New')),
               ],
             ),
             const SizedBox(height: 12),
             Container(
               height: 300,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(8),
+                color: FluentTheme.of(context).micaBackgroundColor,
+                borderRadius: BorderRadius.circular(4),
               ),
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(12),
@@ -546,21 +533,16 @@ class _ErrorSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: Theme.of(context).colorScheme.errorContainer,
+      backgroundColor: Colors.red.withValues(alpha: 0.12),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            Icon(Icons.error_outline, color: Theme.of(context).colorScheme.onErrorContainer),
+            Icon(FluentIcons.error_badge, color: Colors.red),
             const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                message,
-                style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
-              ),
-            ),
+            Expanded(child: Text(message)),
             const SizedBox(width: 12),
-            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
+            Button(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
       ),
