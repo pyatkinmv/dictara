@@ -31,6 +31,7 @@ class _TranscribePageState extends State<TranscribePage> {
   String _language = 'auto';
   bool _diarize = false;
   int? _numSpeakers;
+  String _summaryMode = 'auto';
 
   // File
   Uint8List? _fileBytes;
@@ -94,6 +95,7 @@ class _TranscribePageState extends State<TranscribePage> {
         language: _language,
         diarize: _diarize,
         numSpeakers: _numSpeakers,
+        summaryMode: _summaryMode,
       );
       _jobId = jobId;
       setState(() => _state = _State.processing);
@@ -194,6 +196,7 @@ class _TranscribePageState extends State<TranscribePage> {
                   language: _language,
                   diarize: _diarize,
                   numSpeakers: _numSpeakers,
+                  summaryMode: _summaryMode,
                   enabled: _state == _State.idle,
                   onModelChanged: (v) => setState(() => _model = v),
                   onLanguageChanged: (v) => setState(() => _language = v),
@@ -202,6 +205,7 @@ class _TranscribePageState extends State<TranscribePage> {
                     if (!v) _numSpeakers = null;
                   }),
                   onNumSpeakersChanged: (v) => setState(() => _numSpeakers = v),
+                  onSummaryModeChanged: (v) => setState(() => _summaryMode = v),
                 ),
                 const SizedBox(height: 24),
                 _DropZone(
@@ -247,6 +251,14 @@ class _TranscribePageState extends State<TranscribePage> {
 
 const _kModels = {'small': 'Fast (small)', 'large-v3': 'Accurate (large-v3)'};
 
+const _kSummaryModes = {
+  'off': 'Off',
+  'auto': 'Auto',
+  'brief': 'Brief',
+  'concise': 'Concise',
+  'full': 'Full',
+};
+
 const _kLanguages = {
   'auto': 'Auto-detect',
   'en': 'English',
@@ -272,22 +284,26 @@ class _SettingsBar extends StatelessWidget {
   final String language;
   final bool diarize;
   final int? numSpeakers;
+  final String summaryMode;
   final bool enabled;
   final ValueChanged<String> onModelChanged;
   final ValueChanged<String> onLanguageChanged;
   final ValueChanged<bool> onDiarizeChanged;
   final ValueChanged<int?> onNumSpeakersChanged;
+  final ValueChanged<String> onSummaryModeChanged;
 
   const _SettingsBar({
     required this.model,
     required this.language,
     required this.diarize,
     required this.numSpeakers,
+    required this.summaryMode,
     required this.enabled,
     required this.onModelChanged,
     required this.onLanguageChanged,
     required this.onDiarizeChanged,
     required this.onNumSpeakersChanged,
+    required this.onSummaryModeChanged,
   });
 
   @override
@@ -310,6 +326,13 @@ class _SettingsBar extends StatelessWidget {
           items: _kLanguages,
           enabled: enabled,
           onChanged: onLanguageChanged,
+        ),
+        _LabeledDropdown<String>(
+          label: 'Summary',
+          value: summaryMode,
+          items: _kSummaryModes,
+          enabled: enabled,
+          onChanged: onSummaryModeChanged,
         ),
         Row(
           mainAxisSize: MainAxisSize.min,
@@ -448,7 +471,9 @@ class _ProgressSection extends StatelessWidget {
     String label = '⏳ Processing…';
 
     if (p != null) {
-      if (p.phase == 'diarizing' && p.diarizeProgress != null) {
+      if (p.phase == 'summarizing') {
+        label = '✍️ Summarizing…';
+      } else if (p.phase == 'diarizing' && p.diarizeProgress != null) {
         value = p.diarizeProgress;
         label = '👥 Detecting speakers… ${(p.diarizeProgress! * 100).toStringAsFixed(0)}%';
       } else if (p.processedS != null && p.totalS != null && p.totalS! > 0) {
@@ -486,8 +511,8 @@ class _ResultSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = result.toTranscriptText();
-    final durationLabel = result.durationS != null
-        ? ' · ${result.durationS!.toStringAsFixed(0)} s audio'
+    final durationLabel = result.audioDurationS != null
+        ? ' · ${result.audioDurationS!.toStringAsFixed(0)} s audio'
         : '';
 
     return Card(
@@ -528,6 +553,14 @@ class _ResultSection extends StatelessWidget {
                 ),
               ),
             ),
+            if (result.summary != null && result.summary!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Divider(),
+              const SizedBox(height: 8),
+              Text('Summary', style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: 6),
+              SelectableText(result.summary!),
+            ],
           ],
         ),
       ),

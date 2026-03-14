@@ -1,4 +1,4 @@
-enum JobStatus { pending, processing, done, failed }
+enum JobStatus { pending, processing, summarizing, done, failed }
 
 class ProgressInfo {
   final double? processedS;
@@ -35,18 +35,14 @@ class TranscriptSegment {
         text: json['text'] as String,
         speaker: json['speaker'] as String?,
       );
-
-  String toLine() {
-    final mm = (start ~/ 60).toString().padLeft(2, '0');
-    final ss = (start % 60).toStringAsFixed(0).padLeft(2, '0');
-    final prefix = speaker != null ? '[$speaker] ' : '';
-    return '$prefix[$mm:$ss] $text';
-  }
 }
 
 class JobResult {
   final JobStatus status;
   final List<TranscriptSegment>? segments;
+  final String? formattedText;
+  final String? summary;
+  final double? audioDurationS;
   final String? error;
   final ProgressInfo? progress;
   final double? durationS;
@@ -54,6 +50,9 @@ class JobResult {
   const JobResult({
     required this.status,
     this.segments,
+    this.formattedText,
+    this.summary,
+    this.audioDurationS,
     this.error,
     this.progress,
     this.durationS,
@@ -66,10 +65,10 @@ class JobResult {
       orElse: () => JobStatus.failed,
     );
 
+    final resultMap = json['result'] as Map<String, dynamic>?;
     List<TranscriptSegment>? segments;
-    final result = json['result'] as Map<String, dynamic>?;
-    if (result != null) {
-      final segs = result['segments'] as List<dynamic>?;
+    if (resultMap != null) {
+      final segs = resultMap['segments'] as List<dynamic>?;
       segments = segs?.map((s) => TranscriptSegment.fromJson(s as Map<String, dynamic>)).toList();
     }
 
@@ -80,14 +79,14 @@ class JobResult {
     return JobResult(
       status: status,
       segments: segments,
+      formattedText: resultMap?['formatted_text'] as String?,
+      summary: resultMap?['summary'] as String?,
+      audioDurationS: (resultMap?['audio_duration_s'] as num?)?.toDouble(),
       error: json['error'] as String?,
       progress: progress,
       durationS: (json['duration_s'] as num?)?.toDouble(),
     );
   }
 
-  String toTranscriptText() {
-    if (segments == null || segments!.isEmpty) return '';
-    return segments!.map((s) => s.toLine()).join('\n');
-  }
+  String toTranscriptText() => formattedText ?? '';
 }

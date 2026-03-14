@@ -21,20 +21,32 @@ services:
       - bot-api-data:/var/lib/telegram-bot-api
     restart: unless-stopped
 
+  gateway:
+    build:
+      context: ./gateway
+    ports:
+      - "8080:8080"
+    environment:
+      TRANSCRIBER_URL: http://transcriber:8000
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      SUMMARIZER_PROVIDER: ${SUMMARIZER_PROVIDER:-gemini}
+    depends_on:
+      - transcriber
+    restart: unless-stopped
+
   tg-bot:
     build:
       context: ./tg-bot
       dockerfile: Dockerfile
     environment:
       TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
-      TRANSCRIBER_URL: http://transcriber:8000
+      GATEWAY_URL: http://gateway:8080
       TELEGRAM_API_URL: http://telegram-bot-api:8081
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
     volumes:
       - bot-api-data:/var/lib/telegram-bot-api
     depends_on:
-      - transcriber
+      - gateway
       - telegram-bot-api
     restart: unless-stopped
 
@@ -46,7 +58,7 @@ services:
     ports:
       - "3000:80"
     depends_on:
-      - transcriber
+      - gateway
     restart: unless-stopped
 
   app-fluent:
@@ -57,7 +69,7 @@ services:
     ports:
       - "3001:80"
     depends_on:
-      - transcriber
+      - gateway
     restart: unless-stopped
 
 volumes:

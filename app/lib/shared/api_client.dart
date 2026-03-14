@@ -24,12 +24,14 @@ class ApiClient {
     required String language,
     required bool diarize,
     int? numSpeakers,
+    String summaryMode = 'auto',
   }) async {
     final uri = Uri.parse('$_base/transcribe').replace(queryParameters: {
       'model': model,
       if (language != 'auto') 'language': language,
       'diarize': diarize.toString(),
       if (numSpeakers != null) 'num_speakers': numSpeakers.toString(),
+      'summary_mode': summaryMode,
     });
 
     final req = http.MultipartRequest('POST', uri)
