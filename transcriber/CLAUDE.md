@@ -2,16 +2,18 @@
 
 ## Architecture
 
+The transcriber is an internal service — it is not exposed directly to the browser or Telegram. All requests come through the gateway.
+
 ```
-POST /transcribe  →  saves file to /tmp  →  creates job  →  dispatches to ThreadPoolExecutor
-                                                                        ↓
-                                                            _run_transcription()
-                                                            1. ffmpeg: any format → WAV (16kHz mono)
-                                                            2. Whisper: WAV → segments [{start, end, text}]
-                                                            3. pyannote (if diarize=true): WAV → speaker turns
-                                                            4. merge: assigns speaker to each segment
-                                                                        ↓
-GET /jobs/{id}   ←  job_store (in-memory)  ←  set_done(segments)
+gateway  ──HTTP──>  POST /transcribe  →  saves file to /tmp  →  creates job  →  ThreadPoolExecutor
+                                                                                        ↓
+                                                                            _run_transcription()
+                                                                            1. ffmpeg: any format → WAV (16kHz mono)
+                                                                            2. Whisper: WAV → segments [{start, end, text}]
+                                                                            3. pyannote (if diarize=true): WAV → speaker turns
+                                                                            4. merge: assigns speaker to each segment
+                                                                                        ↓
+gateway  ←  GET /jobs/{id}   ←  job_store (in-memory)  ←  set_done(segments)
 ```
 
 Single-worker executor — WhisperModel is not thread-safe for concurrent inference. Jobs queue up and run one at a time.

@@ -1,19 +1,28 @@
 # tg-bot — Kotlin Telegram Bot
 
-Telegram bot that forwards audio files to the core service and returns transcripts. Written in Kotlin, runs as a separate Docker service.
+Telegram bot that forwards audio files to the gateway and returns transcripts. Also handles the Telegram-side of the web login flow.
 
 ## Architecture
 
 ```
 User sends audio
        ↓
-  DictaraBot.kt (long polling)
+  DictaraBot.kt (long polling via local telegram-bot-api)
        ↓
-  DictaraClient.kt  ──HTTP──>  transcriber service :8000
-  - POST /transcribe             - processes job
-  - polls /jobs/{id} every 5s
+  DictaraClient.kt  ──HTTP──>  gateway :8080
+  - POST /transcribe             - persists job, queues to transcriber
+  - polls /jobs/{id} every 5s    - returns progress + result
        ↓
   sends transcript.txt to user
+
+Web login flow:
+  DictaraBot.kt polls /auth/pending-login-notifications every 2s
+       ↓
+  sends confirm/reject keyboard to user
+       ↓
+  DictaraClient.kt  ──HTTP──>  gateway :8080
+  - POST /auth/login-link/confirm-callback
+  - POST /auth/login-link/reject
 ```
 
 ## Key files
@@ -21,55 +30,44 @@ User sends audio
 | File | Purpose |
 |------|---------|
 | `Main.kt` | Entry point — reads env vars, registers bot |
-| `DictaraBot.kt` | `TelegramLongPollingBot` — audio handler, `/settings` command, summary overflow logic |
-| `DictaraClient.kt` | HTTP client: submit job, poll with live progress callbacks, format segments |
+| `DictaraBot.kt` | `TelegramLongPollingBot` — audio handler, login flow, `/settings` command |
+| `DictaraClient.kt` | HTTP client: transcription, login notifications, auth callbacks |
 | `GeminiClient.kt` | Gemini API client — adaptive summarization by audio duration |
 | `UserSettings.kt` | Per-user prefs stored in `ConcurrentHashMap` (in-memory) |
-| `build.gradle.kts` | Kotlin + telegrambots 6.9.7 + shadow JAR plugin |
+| `build.gradle.kts` | Kotlin + telegrambots + shadow JAR plugin |
 | `Dockerfile` | Multi-stage: Gradle build → eclipse-temurin JRE slim |
 
 ## Model aliases
 
-The bot exposes friendly names; the core API uses raw model names:
-
-| Bot alias | Core model |
+| Bot alias | API model |
 |-----------|-----------|
 | `fast` | `small` |
 | `accurate` | `large-v3` |
 
-Defined in `DictaraClient.kt` as `MODEL_ALIASES`. To add a future model, add one entry here.
-
 ## User settings
 
-Stored in-memory keyed by **chat ID** (`ConcurrentHashMap<Long, UserPrefs>`). In private chats `chatId == userId`; in groups all members share one config.
-Defaults: model=`accurate`, diarize=`true`, summaryMode=`AUTO`, language=`auto`, numSpeakers=`null` (auto).
-Resets on bot restart — acceptable since defaults are the preferred values.
+Stored in-memory keyed by **chat ID**. Defaults: model=`accurate`, diarize=`true`, summaryMode=`AUTO`, language=`auto`, numSpeakers=`null`. Resets on bot restart.
 
 ## Environment variables
 
 | Var | Default | Description |
 |-----|---------|-------------|
 | `TELEGRAM_TOKEN` | — | Bot token from @BotFather |
-| `TRANSCRIBER_URL` | `http://transcriber:8000` | Transcriber service URL |
-| `GEMINI_API_KEY` | — | Google Gemini API key. Summarization is disabled if unset |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model to use for summarization |
+| `GATEWAY_URL` | `http://gateway:8080` | Gateway service URL |
+| `TELEGRAM_API_URL` | `https://api.telegram.org` | Local Bot API URL for large files |
+| `GEMINI_API_KEY` | — | Google Gemini API key (summarization disabled if unset) |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model |
 
 ## Bot UX
 
-**Normal flow:**
+**Normal transcription flow:**
 ```
 User sends audio file
 Bot: "⏳ Transcribing your audio...
-
-Model: Accurate | Speakers: on (2) | Lang: RU | Summary: on"
-  (edited live with progress: "🎙 Transcribing audio... ▓▓▓▓▓░░░░░ 52% (2m 4s / 3m 58s)")
-  (then: "👥 Detecting speakers... ▓▓▓▓░░░░░░ 40%")
-Bot: [transcript.txt]  "Done in 4m 12s."   ← status message deleted, doc sent
-Bot (caption edited): "Done in 4m 12s.
-
-<summary from Gemini>"
+     Model: Accurate | Speakers: on (2) | Lang: RU | Summary: on"
+  → edited live with progress percentages
+Bot: [transcript.txt]  caption: "Done in 4m 12s.\n\n<summary>"
 ```
-If summary exceeds the 1024-char Telegram caption limit, caption stays as `"Done in Xm Ys."` and summary is sent as a separate text message.
 
 **`/settings` command:**
 ```
@@ -79,47 +77,39 @@ Bot: Settings
      [📝 Summary: Auto ✓]
      [🌐 Language: Auto]
      [👥 Speakers: Auto]
-(clicking a button edits the message in place with updated checkmarks)
 ```
+Language and Speakers open submenus. "Other..." for language prompts a text reply.
 
-Language and Speakers open submenus. Language submenu: Auto / EN / RU / DE / ES / FR / Other... / ← Back. Tapping "Other..." replaces the message with a text prompt; the user's next message is captured as the language code and settings are restored. Speakers submenu: Auto / 1 / 2 / 3 / 4 / 5+ / ← Back. "5+" maps to auto-detection.
+**Web login flow:**
+- Bot polls `/auth/pending-login-notifications` every 2s
+- Sends "Confirm login to Dictara?" with [✓ Confirm] / [✗ Reject] buttons
+- On `/start`: checks `/auth/pending-login-for-username` and shows confirm prompt if pending
+- On every private message: fires `POST /auth/bot-started` (once per session) so the gateway knows the user can receive messages
 
-Callback data format:
+## Callback data format
+
 - `set_model:fast`, `set_model:accurate`
 - `set_diarize:on`, `set_diarize:off`
 - `open_summary_mode`, `set_summary_mode:<OFF|AUTO|BRIEF|CONCISE|FULL>`
 - `open_language`, `set_language:<code>`, `lang_custom`
 - `open_speakers`, `set_speakers:<n|auto>`
 - `back_settings`
-
-## Telegram setup
-
-1. Create bot via [@BotFather](https://t.me/BotFather)
-2. Copy the token
-3. Add `TELEGRAM_TOKEN=...` to root `.env`
+- `confirm_login:<token>`
+- `reject_login:<token>`
 
 ## Summarization (GeminiClient)
 
-Invoked after transcription if `summaryMode != OFF` and `GEMINI_API_KEY` is set. Mode `AUTO` picks format by audio duration; `BRIEF`/`CONCISE`/`FULL` force a specific format regardless of length:
+Invoked after transcription if `summaryMode != OFF` and `GEMINI_API_KEY` is set. Mode `AUTO` picks format by audio duration:
 
-| Audio length | Summary format |
-|-------------|---------------|
-| < 2 min | 1–2 sentences, no headers |
+| Audio length | Format |
+|-------------|--------|
+| < 2 min | 1–2 sentences |
 | 2–15 min | Concise paragraph (3–5 sentences) |
-| > 15 min | Structured: 📝 Summary, Key points, Conclusions, ✅ Action items (only if present) |
-
-All text (including headers) is in the transcript's language.
-
-## Dependencies
-
-- `org.telegram:telegrambots:6.9.7` — stable long-polling bot API
-- `com.squareup.okhttp3:okhttp:4.12.0` — HTTP client for core service and Gemini API
-- `com.fasterxml.jackson.module:jackson-module-kotlin:2.16.1` — JSON parsing
+| > 15 min | Structured: Summary, Key points, Conclusions, Action items |
 
 ## Build
 
 ```bash
-# From repo root:
 docker compose build tg-bot
 docker compose up -d tg-bot
 ```

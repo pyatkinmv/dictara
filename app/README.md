@@ -1,16 +1,27 @@
-# web
+# app — Flutter Web Client
 
-A new Flutter project.
+Flutter web client for Dictara, served as two separate Docker containers with different UI styles.
 
-## Getting Started
+| Service | Port | Style |
+|---------|------|-------|
+| `app-material` | 3000 | Material 3 (Google) |
+| `app-fluent` | 3001 | Fluent UI (Windows) |
 
-This project is a starting point for a Flutter application.
+## Usage
 
-A few resources to get you started if this is your first Flutter project:
+Open http://localhost:3000 (or `:3001` for Fluent).
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+1. **Login** — click "Login with Telegram", enter your `@username`
+2. **Drop a file** — choose any audio or video file
+3. **Configure** — model (fast/accurate), language, diarization, summarization
+4. **Transcribe** — live progress shown while processing
+5. **History** — all your past transcriptions appear below; click to expand and view transcript + summary; download as `.txt`
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Build
+
+```bash
+docker compose build app-material && docker compose build app-fluent
+docker compose up -d app-material app-fluent
+```
+
+See [CLAUDE.md](CLAUDE.md) for architecture details.
