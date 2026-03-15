@@ -105,17 +105,21 @@ class DictaraBot(
         }
 
         val fileId = when {
+            message.hasAnimation() -> return  // GIFs — silently ignore, no message
             message.hasAudio() -> message.audio.fileId
             message.hasVoice() -> message.voice.fileId
             message.hasVideoNote() -> message.videoNote.fileId
             message.hasVideo() -> message.video.fileId
             message.hasDocument() -> {
-                val ext = message.document.fileName?.substringAfterLast('.', "")?.lowercase() ?: ""
+                val doc = message.document
+                val mime = doc.mimeType ?: ""
+                if (!mime.startsWith("audio/") && !mime.startsWith("video/")) return  // photo, pdf, etc. — silently ignore
+                val ext = doc.fileName?.substringAfterLast('.', "")?.lowercase() ?: ""
                 if (ext !in supportedExtensions) {
-                    if (!isGroup) send(chatId, "Unsupported format: .$ext\nSupported: ${supportedExtensions.sorted().joinToString(", ")}")
+                    send(chatId, "Unsupported format: .$ext\nSupported: ${supportedExtensions.sorted().joinToString(", ")}")
                     return
                 }
-                message.document.fileId
+                doc.fileId
             }
             else -> {
                 if (!isGroup) send(chatId, "Send me an audio or video file. Use /settings to configure preferences.")
