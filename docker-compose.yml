@@ -9,6 +9,12 @@ services:
       HF_HOME: /models
       WHISPER_MODELS: ${WHISPER_MODELS:-small,large-v3}
       HF_TOKEN: ${HF_TOKEN:-}
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
     restart: unless-stopped
 
   telegram-bot-api:
@@ -50,11 +56,17 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       SUMMARIZER_PROVIDER: ${SUMMARIZER_PROVIDER:-gemini}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
       transcriber:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
 
   tg-bot:
@@ -68,8 +80,10 @@ services:
     volumes:
       - bot-api-data:/var/lib/telegram-bot-api
     depends_on:
-      - gateway
-      - telegram-bot-api
+      gateway:
+        condition: service_healthy
+      telegram-bot-api:
+        condition: service_started
     restart: unless-stopped
 
   app-material:

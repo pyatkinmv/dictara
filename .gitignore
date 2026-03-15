@@ -40,6 +40,11 @@ tg-bot/gradlew.bat
 # Worktrees
 .worktrees/
 
+# Claude Code local files
+.claude/settings.local.json
+.claude/worktrees/
+docs/superpowers/
+
 # OS
 .DS_Store
 Thumbs.db

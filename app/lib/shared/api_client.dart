@@ -41,11 +41,30 @@ class ApiClient {
     final res = await http.Response.fromStream(streamed);
 
     if (res.statusCode != 202) {
-      throw Exception('Submit failed: ${res.statusCode} ${res.body}');
+      String msg;
+      try {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        msg = (body['message'] as String?) ?? 'Submit failed: ${res.statusCode}';
+      } catch (_) {
+        msg = 'Submit failed: ${res.statusCode}';
+      }
+      throw Exception(msg);
     }
 
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     return body['job_id'] as String;
+  }
+
+  Future<List<String>> fetchSupportedExtensions() async {
+    try {
+      final res = await http.get(Uri.parse('$_base/formats')).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        return List<String>.from(body['extensions'] as List);
+      }
+    } catch (_) {}
+    // fallback — must match gateway's SUPPORTED_EXTENSIONS
+    return ['avi', 'flac', 'm4a', 'mkv', 'mov', 'mp3', 'mp4', 'oga', 'ogg', 'opus', 'wav', 'webm'];
   }
 
   Future<JobResult> pollJob(String jobId) async {

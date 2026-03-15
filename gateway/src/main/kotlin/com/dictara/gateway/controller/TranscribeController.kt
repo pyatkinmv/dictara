@@ -28,6 +28,32 @@ class TranscribeController(
 ) {
     companion object {
         val SUPPORTED_EXTENSIONS = setOf("mp3", "mp4", "m4a", "wav", "ogg", "oga", "opus", "flac", "webm", "mkv", "avi", "mov")
+
+        // Magic byte signatures for common image formats that must be rejected
+        private val IMAGE_SIGNATURES = listOf(
+            byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte())          to "JPEG",
+            byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47)                      to "PNG",
+            byteArrayOf(0x47, 0x49, 0x46)                                     to "GIF",
+            byteArrayOf(0x42, 0x4D)                                           to "BMP",
+            byteArrayOf(0x52, 0x49, 0x46, 0x46)                               to "WebP/RIFF",  // check WEBP at offset 8 below
+        )
+
+        /** Returns a human-readable image type name if the bytes match a known image signature, null otherwise. */
+        fun detectImageFormat(header: ByteArray): String? {
+            for ((signature, name) in IMAGE_SIGNATURES) {
+                if (header.size >= signature.size && header.take(signature.size).toByteArray().contentEquals(signature)) {
+                    // Extra check: RIFF files are WebP only when bytes 8–11 are "WEBP"
+                    if (name == "WebP/RIFF") {
+                        if (header.size >= 12 &&
+                            header[8] == 0x57.toByte() && header[9] == 0x45.toByte() &&
+                            header[10] == 0x42.toByte() && header[11] == 0x50.toByte()) return "WebP"
+                        continue  // regular RIFF (WAV, AVI) — not an image
+                    }
+                    return name
+                }
+            }
+            return null
+        }
     }
 
     private val mapper = ObjectMapper().registerKotlinModule()
@@ -82,6 +108,12 @@ class TranscribeController(
         if (ext !in SUPPORTED_EXTENSIONS) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Unsupported format: .$ext. Supported: ${SUPPORTED_EXTENSIONS.sorted().joinToString(", ")}")
+        }
+        val header = file.inputStream.readNBytes(16)
+        val imageFormat = detectImageFormat(header)
+        if (imageFormat != null) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "File appears to be a $imageFormat image, not an audio/video file.")
         }
         val user = resolveUser(telegramChatId, displayName)
         val audio = saveAudio(file, user)

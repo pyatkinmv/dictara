@@ -92,6 +92,10 @@ class OrchestratorService(
         } catch (e: Exception) {
             stateService.failAttempt(attempt.id!!, e.message)
             liveProgress.remove(submissionId)
+            if (e is PermanentJobFailureException) {
+                stateService.failSubmission(submissionId)
+                return
+            }
             val totalAttempts = stateService.countAttempts(submissionId, "transcription")
             if (totalAttempts < 3) {
                 Thread.sleep(props.transcriber.pollIntervalMs * 2)
@@ -176,7 +180,11 @@ class OrchestratorService(
             when (snapshot.status) {
                 "processing" -> snapshot.progress?.let { liveProgress[submissionId] = it }
                 "done" -> return snapshot
-                "failed" -> throw RuntimeException(snapshot.error ?: "Transcriber job failed")
+                "failed" -> {
+                    val msg = snapshot.error ?: "Transcriber job failed"
+                    if (!snapshot.retryable) throw PermanentJobFailureException(msg)
+                    throw RuntimeException(msg)
+                }
             }
         }
         throw RuntimeException("Timeout: transcription did not complete within ${props.transcriber.timeoutHours} hours")
@@ -196,3 +204,6 @@ class OrchestratorService(
             if (seg.speaker != null) "$ts [${seg.speaker}] ${seg.text}" else "$ts ${seg.text}"
         }
 }
+
+/** Thrown when the transcriber reports a non-retryable failure (e.g. bad file format). */
+class PermanentJobFailureException(message: String) : RuntimeException(message)

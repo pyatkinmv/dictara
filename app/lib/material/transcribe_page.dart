@@ -36,6 +36,7 @@ class _TranscribePageState extends State<TranscribePage> {
   // File
   Uint8List? _fileBytes;
   String? _fileName;
+  List<String> _supportedExtensions = ['mp3', 'mp4', 'wav', 'ogg', 'm4a', 'flac', 'webm', 'mkv', 'avi', 'mov'];
 
   // Job state
   _State _state = _State.idle;
@@ -50,6 +51,12 @@ class _TranscribePageState extends State<TranscribePage> {
     super.initState();
     _checkHealth();
     _healthTimer = Timer.periodic(const Duration(seconds: 15), (_) => _checkHealth());
+    _loadSupportedExtensions();
+  }
+
+  Future<void> _loadSupportedExtensions() async {
+    final exts = await _api.fetchSupportedExtensions();
+    if (mounted) setState(() => _supportedExtensions = exts);
   }
 
   @override
@@ -67,7 +74,7 @@ class _TranscribePageState extends State<TranscribePage> {
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['mp3', 'mp4', 'wav', 'ogg', 'm4a', 'flac', 'webm', 'mkv', 'avi', 'mov'],
+      allowedExtensions: _supportedExtensions,
       withData: true,
     );
     if (result == null || result.files.isEmpty) return;

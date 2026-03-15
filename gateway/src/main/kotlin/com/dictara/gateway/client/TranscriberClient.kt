@@ -30,6 +30,7 @@ data class TranscriberJobSnapshot(
     val durationS: Double?,
     val elapsedS: Double?,
     val error: String?,
+    val retryable: Boolean = true,
 )
 
 private val MODEL_ALIASES = mapOf("fast" to "small", "accurate" to "large-v3")
@@ -94,7 +95,8 @@ class TranscriberClient(private val props: DictaraProperties) {
         val durationS = root["duration_s"]?.takeIf { !it.isNull }?.asDouble()
         val elapsedS = root["elapsed_s"]?.takeIf { !it.isNull }?.asDouble()
         val error = root["error"]?.takeIf { !it.isNull }?.asText()
+        val retryable = root["retryable"]?.takeIf { !it.isNull }?.asBoolean() ?: true
 
-        return TranscriberJobSnapshot(status, progress, segments, audioDurationS, durationS, elapsedS, error)
+        return TranscriberJobSnapshot(status, progress, segments, audioDurationS, durationS, elapsedS, error, retryable)
     }
 }

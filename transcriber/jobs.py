@@ -13,6 +13,7 @@ class Job:
     status: JobStatus = "pending"
     result: dict | None = None   # {"segments": [...]} when done
     error: str | None = None
+    retryable: bool = True
     tmp_path: str | None = None  # path to uploaded temp file
     created_at: float = field(default_factory=time.time)
     started_at: float | None = None
@@ -67,11 +68,12 @@ class JobStore:
             job.result = {"segments": segments}
             job.finished_at = time.time()
 
-    def set_failed(self, job_id: str, error: str) -> None:
+    def set_failed(self, job_id: str, error: str, retryable: bool = True) -> None:
         with self._lock:
             job = self._jobs[job_id]
             job.status = "failed"
             job.error = error
+            job.retryable = retryable
             job.finished_at = time.time()
 
 

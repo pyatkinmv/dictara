@@ -54,10 +54,18 @@ def _run_transcription(job_id: str, tmp_path: str, language: str | None, diarize
     try:
         # Convert to WAV so pyannote (soundfile) can read any input format
         wav_path = tmp_path + ".wav"
-        subprocess.run(
-            ["ffmpeg", "-y", "-i", tmp_path, "-ar", "16000", "-ac", "1", wav_path],
-            check=True, capture_output=True,
-        )
+        try:
+            result = subprocess.run(
+                ["ffmpeg", "-y", "-i", tmp_path, "-ar", "16000", "-ac", "1", wav_path],
+                check=True, capture_output=True,
+            )
+        except subprocess.CalledProcessError as e:
+            stderr = e.stderr.decode(errors="replace")
+            if "no streams" in stderr or "does not contain" in stderr or "match no streams" in stderr:
+                job_store.set_failed(job_id, "File has no audio track.", retryable=False)
+                return
+            job_store.set_failed(job_id, "Could not decode the file — it may be corrupted or not a valid audio/video file.", retryable=False)
+            return
         def on_segment(processed_s: float, total_s: float):
             job_store.set_progress(job_id, processed_s, total_s)
 
@@ -126,7 +134,7 @@ async def get_job(job_id: str):
             "phase": job.phase,
             "diarize_progress": job.diarize_progress,
         }
-    return {"status": job.status, "result": job.result, "error": job.error, "duration_s": duration, "elapsed_s": elapsed_s, "progress": progress}
+    return {"status": job.status, "result": job.result, "error": job.error, "retryable": job.retryable, "duration_s": duration, "elapsed_s": elapsed_s, "progress": progress}
 
 
 @app.get("/health")

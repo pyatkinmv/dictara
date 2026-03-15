@@ -30,7 +30,7 @@ class DictaraClient(private val baseUrl: String) {
         val root = mapper.readTree(response.body?.string() ?: "{}")
         root["extensions"]?.map { it.asText() }?.toSet() ?: emptySet()
     } catch (_: Exception) {
-        setOf("mp3", "mp4", "m4a", "wav", "ogg", "flac", "webm", "mkv", "avi", "mov")
+        setOf("mp3", "mp4", "m4a", "wav", "ogg", "oga", "opus", "flac", "webm", "mkv", "avi", "mov")
     }
 
     fun transcribe(
@@ -68,7 +68,10 @@ class DictaraClient(private val baseUrl: String) {
 
         val response = http.newCall(Request.Builder().url(url).post(body).build()).execute()
         val responseBody = response.body?.string() ?: ""
-        if (!response.isSuccessful) throw RuntimeException("Submit failed (${response.code}): $responseBody")
+        if (!response.isSuccessful) {
+            val message = runCatching { mapper.readTree(responseBody)["message"]?.asText() }.getOrNull()
+            throw RuntimeException(message ?: "Submit failed (${response.code}): $responseBody")
+        }
         return mapper.readTree(responseBody)["job_id"].asText()
     }
 
