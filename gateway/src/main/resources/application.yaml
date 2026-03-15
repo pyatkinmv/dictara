@@ -9,6 +9,20 @@ spring:
     multipart:
       max-file-size: 2GB
       max-request-size: 2GB
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/dictara}
+    username: ${SPRING_DATASOURCE_USERNAME:dictara}
+    password: ${SPRING_DATASOURCE_PASSWORD:dictara_dev}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
 
 springdoc:
   api-docs:
