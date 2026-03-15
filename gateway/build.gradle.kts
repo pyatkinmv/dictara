@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm") version "1.9.23"
     kotlin("plugin.spring") version "1.9.23"
+    kotlin("plugin.jpa") version "1.9.23"
     id("org.springframework.boot") version "3.3.4"
     id("io.spring.dependency-management") version "1.1.6"
 }
@@ -17,7 +18,6 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.16.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0")
     implementation("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
@@ -33,9 +33,6 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
-    // Docker Desktop on Windows uses a non-default named pipe; tell Testcontainers explicitly.
-    systemProperty("DOCKER_HOST", "npipe:////./pipe/dockerDesktopLinuxEngine")
-    environment("DOCKER_HOST", "npipe:////./pipe/dockerDesktopLinuxEngine")
 }
 
 kotlin {
