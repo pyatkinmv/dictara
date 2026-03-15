@@ -34,6 +34,7 @@ class DictaraBot(
 
     private val client = DictaraClient(dictaraUrl)
     private val executor = Executors.newCachedThreadPool()
+    private val supportedExtensions: Set<String> = client.fetchSupportedExtensions()
 
     /** userId → messageId of the settings message currently awaiting a language code reply */
     private val awaitingLanguage = ConcurrentHashMap<Long, Int>()
@@ -108,7 +109,14 @@ class DictaraBot(
             message.hasVoice() -> message.voice.fileId
             message.hasVideoNote() -> message.videoNote.fileId
             message.hasVideo() -> message.video.fileId
-            message.hasDocument() -> message.document.fileId
+            message.hasDocument() -> {
+                val ext = message.document.fileName?.substringAfterLast('.', "")?.lowercase() ?: ""
+                if (ext !in supportedExtensions) {
+                    if (!isGroup) send(chatId, "Unsupported format: .$ext\nSupported: ${supportedExtensions.sorted().joinToString(", ")}")
+                    return
+                }
+                message.document.fileId
+            }
             else -> {
                 if (!isGroup) send(chatId, "Send me an audio or video file. Use /settings to configure preferences.")
                 return

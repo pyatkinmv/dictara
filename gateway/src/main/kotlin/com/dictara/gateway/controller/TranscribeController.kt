@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
+import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 import java.util.UUID
 
@@ -25,6 +26,10 @@ class TranscribeController(
     private val summaryRepo: SummaryRepository,
     private val stageAttemptRepo: StageAttemptRepository,
 ) {
+    companion object {
+        val SUPPORTED_EXTENSIONS = setOf("mp3", "mp4", "m4a", "wav", "ogg", "flac", "webm", "mkv", "avi", "mov")
+    }
+
     private val mapper = ObjectMapper().registerKotlinModule()
 
     data class SubmitResponse(val jobId: String)
@@ -73,6 +78,11 @@ class TranscribeController(
         @RequestHeader(name = "X-Telegram-Chat-Id", required = false) telegramChatId: String?,
         @RequestHeader(name = "X-Telegram-Display-Name", required = false) displayName: String?,
     ): SubmitResponse {
+        val ext = file.originalFilename?.substringAfterLast('.', "")?.lowercase() ?: ""
+        if (ext !in SUPPORTED_EXTENSIONS) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Unsupported format: .$ext. Supported: ${SUPPORTED_EXTENSIONS.sorted().joinToString(", ")}")
+        }
         val user = resolveUser(telegramChatId, displayName)
         val audio = saveAudio(file, user)
         val submission = submissionRepo.save(SubmissionEntity(
@@ -147,6 +157,9 @@ class TranscribeController(
             error = latestFailedAttempt?.error,
         )
     }
+
+    @GetMapping("/formats")
+    fun formats() = mapOf("extensions" to SUPPORTED_EXTENSIONS.sorted())
 
     @GetMapping("/health")
     fun health() = mapOf("status" to "ok")

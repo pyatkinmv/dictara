@@ -25,6 +25,14 @@ class DictaraClient(private val baseUrl: String) {
         .build()
     private val mapper = ObjectMapper().registerKotlinModule()
 
+    fun fetchSupportedExtensions(): Set<String> = try {
+        val response = http.newCall(Request.Builder().url("$baseUrl/formats").get().build()).execute()
+        val root = mapper.readTree(response.body?.string() ?: "{}")
+        root["extensions"]?.map { it.asText() }?.toSet() ?: emptySet()
+    } catch (_: Exception) {
+        setOf("mp3", "mp4", "m4a", "wav", "ogg", "flac", "webm", "mkv", "avi", "mov")
+    }
+
     fun transcribe(
         audioFile: File,
         model: String,
