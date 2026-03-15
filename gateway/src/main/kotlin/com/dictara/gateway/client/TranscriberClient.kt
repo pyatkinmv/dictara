@@ -1,7 +1,7 @@
 package com.dictara.gateway.client
 
 import com.dictara.gateway.config.DictaraProperties
-import com.dictara.gateway.model.ProgressInfo
+import com.dictara.gateway.dto.ProgressInfo
 import com.dictara.gateway.model.Segment
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
