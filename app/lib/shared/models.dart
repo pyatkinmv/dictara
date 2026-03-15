@@ -90,3 +90,27 @@ class JobResult {
 
   String toTranscriptText() => formattedText ?? '';
 }
+
+class HistoryItem {
+  final String jobId;
+  final String fileName;
+  final DateTime createdAt;
+  JobStatus status;
+
+  HistoryItem({
+    required this.jobId,
+    required this.fileName,
+    required this.createdAt,
+    required this.status,
+  });
+
+  factory HistoryItem.fromJson(Map<String, dynamic> json) => HistoryItem(
+        jobId: json['job_id'] as String,
+        fileName: json['file_name'] as String,
+        createdAt: DateTime.parse(json['created_at'] as String),
+        status: JobStatus.values.firstWhere(
+          (s) => s.name == json['status'] as String,
+          orElse: () => JobStatus.failed,
+        ),
+      );
+}
