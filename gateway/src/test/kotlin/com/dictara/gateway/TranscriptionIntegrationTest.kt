@@ -14,14 +14,21 @@ import org.springframework.http.*
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.util.LinkedMultiValueMap
+import org.testcontainers.containers.PostgreSQLContainer
+import org.testcontainers.junit.jupiter.Container
+import org.testcontainers.junit.jupiter.Testcontainers
 
 @SpringBootTest(webEnvironment = RANDOM_PORT)
+@Testcontainers
 class TranscriptionIntegrationTest {
 
     @Autowired
     lateinit var rest: TestRestTemplate
 
     companion object {
+        @Container @JvmField
+        val postgres = PostgreSQLContainer<Nothing>("postgres:16")
+
         @RegisterExtension
         @JvmField
         val wireMock: WireMockExtension = WireMockExtension.newInstance()
@@ -31,6 +38,9 @@ class TranscriptionIntegrationTest {
         @DynamicPropertySource
         @JvmStatic
         fun props(registry: DynamicPropertyRegistry) {
+            registry.add("spring.datasource.url") { postgres.jdbcUrl }
+            registry.add("spring.datasource.username") { postgres.username }
+            registry.add("spring.datasource.password") { postgres.password }
             registry.add("dictara.transcriber.url") { wireMock.baseUrl() }
             registry.add("dictara.transcriber.poll-interval-ms") { "100" }
         }
@@ -117,7 +127,10 @@ class TranscriptionIntegrationTest {
     private fun submitAudio(diarize: Boolean): String {
         val body = LinkedMultiValueMap<String, Any>()
         body.add("file", ClassPathResource("test-audio.m4a"))
-        val headers = HttpHeaders().apply { contentType = MediaType.MULTIPART_FORM_DATA }
+        val headers = HttpHeaders().apply {
+            contentType = MediaType.MULTIPART_FORM_DATA
+            set("X-Telegram-Chat-Id", "integration-test-user")
+        }
         val response = rest.postForEntity(
             "/transcribe?model=fast&diarize=$diarize&summary_mode=off",
             HttpEntity(body, headers),
