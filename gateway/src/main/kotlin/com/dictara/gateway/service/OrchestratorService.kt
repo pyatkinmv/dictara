@@ -136,10 +136,10 @@ class OrchestratorService(
             stateService.completeSubmission(submission.id!!)
             return
         }
-        runSummarization(submission.id!!, submission.language, formattedText)
+        runSummarization(submission.id!!, submission.language, formattedText, summaryMode)
     }
 
-    private fun runSummarization(submissionId: UUID, language: String, formattedText: String) {
+    private fun runSummarization(submissionId: UUID, language: String, formattedText: String, mode: SummaryMode) {
         val attempt = stateService.createAttempt(submissionId, "summarization")
 
         try {
@@ -147,7 +147,7 @@ class OrchestratorService(
             val summaryText = summarizer.summarize(
                 text = formattedText,
                 audioDurationSeconds = transcript?.audioDurationS,
-                mode = SummaryMode.AUTO,
+                mode = mode,
                 language = language,
             )
             stateService.saveSummaryAndCompleteAttempt(submissionId, attempt.id!!, summaryText)
@@ -158,7 +158,7 @@ class OrchestratorService(
             val totalAttempts = stateService.countAttempts(submissionId, "summarization")
             if (totalAttempts < 3) {
                 Thread.sleep(2000)
-                runSummarization(submissionId, language, formattedText)
+                runSummarization(submissionId, language, formattedText, mode)
             } else {
                 // Summarization failed — submission is still done (transcript is usable)
                 stateService.completeSubmission(submissionId)

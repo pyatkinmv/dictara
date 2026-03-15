@@ -104,17 +104,15 @@ class TranscribeController(
         val segmentsJson = diarization?.segments ?: transcript?.segments
         val formattedText = diarization?.formattedText ?: transcript?.formattedText
 
-        val latestFailedAttempt = stageAttemptRepo
+        val transcriptionAttempts = stageAttemptRepo
             .findBySubmissionIdAndStageOrderByAttemptNumDesc(id, "transcription")
-            .firstOrNull { it.status == "failed" }
+        val latestFailedAttempt = transcriptionAttempts.firstOrNull { it.status == "failed" }
 
         val durationS = if (submission.status in listOf("done", "failed")) {
             (submission.updatedAt.toEpochMilli() - submission.createdAt.toEpochMilli()) / 1000.0
         } else null
 
-        val latestAttempt = stageAttemptRepo
-            .findBySubmissionIdAndStageOrderByAttemptNumDesc(id, "transcription")
-            .firstOrNull()
+        val latestAttempt = transcriptionAttempts.firstOrNull()
 
         val elapsedS = if (submission.status == "processing" && latestAttempt != null) {
             (Instant.now().toEpochMilli() - latestAttempt.startedAt!!.toEpochMilli()) / 1000.0

@@ -28,8 +28,12 @@ class SubmissionStateService(
 
     /** Picks up in-flight stage_attempts for crash recovery. */
     @Transactional
-    fun claimInFlightAttempts(): List<StageAttemptEntity> =
-        stageAttemptRepo.findInFlightForUpdate()
+    fun claimInFlightAttempts(): List<StageAttemptEntity> {
+        val inFlight = stageAttemptRepo.findInFlightForUpdate()
+        inFlight.forEach { it.status = "resuming" }
+        stageAttemptRepo.saveAll(inFlight)
+        return inFlight
+    }
 
     /** Creates a new stage_attempt row for the given stage. */
     @Transactional
