@@ -15,5 +15,6 @@ class AuthIdentityEntity(
     @Column(nullable = false) val provider: String,
     @Column(name = "provider_uid", nullable = false) val providerUid: String,
     @Column(columnDefinition = "jsonb") @JdbcTypeCode(SqlTypes.JSON) val credentials: String? = null,
+    @Column(columnDefinition = "jsonb") @JdbcTypeCode(SqlTypes.JSON) val metadata: String? = null,
     @Column(name = "created_at", nullable = false, updatable = false) val createdAt: Instant = Instant.now(),
 )

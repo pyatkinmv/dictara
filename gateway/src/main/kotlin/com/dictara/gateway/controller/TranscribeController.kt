@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 import org.springframework.web.server.ResponseStatusException
+import java.net.URLDecoder
 import java.time.Instant
 import java.util.UUID
 
@@ -117,7 +118,8 @@ class TranscribeController(
             throw ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "File appears to be a $imageFormat image, not an audio/video file.")
         }
-        val user = resolveUser(telegramUserId, telegramUsername, telegramFirstName, telegramLastName)
+        fun dec(v: String?) = v?.let { URLDecoder.decode(it, "UTF-8") }
+        val user = resolveUser(telegramUserId, dec(telegramUsername), dec(telegramFirstName), dec(telegramLastName))
         val audio = saveAudio(file, user)
         val submission = submissionRepo.save(SubmissionEntity(
             user = user, audio = audio, model = model, language = language,
@@ -212,7 +214,7 @@ class TranscribeController(
             !telegramFirstName.isNullOrBlank() -> telegramFirstName
             else -> uid
         }
-        val credentials = mapper.writeValueAsString(
+        val metadata = mapper.writeValueAsString(
             mapOf("firstName" to telegramFirstName, "lastName" to telegramLastName, "username" to telegramUsername)
                 .filterValues { it != null }
         )
@@ -224,12 +226,12 @@ class TranscribeController(
             authIdentityRepo.save(AuthIdentityEntity(
                 id = existing.id, user = existing.user,
                 provider = "telegram", providerUid = uid,
-                credentials = credentials, createdAt = existing.createdAt,
+                credentials = existing.credentials, metadata = metadata, createdAt = existing.createdAt,
             ))
             return existing.user
         }
         val user = userRepo.save(UserEntity(displayName = displayName))
-        authIdentityRepo.save(AuthIdentityEntity(user = user, provider = "telegram", providerUid = uid, credentials = credentials))
+        authIdentityRepo.save(AuthIdentityEntity(user = user, provider = "telegram", providerUid = uid, metadata = metadata))
         return user
     }
 

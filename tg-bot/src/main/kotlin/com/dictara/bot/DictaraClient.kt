@@ -8,6 +8,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 data class TranscriptResult(
@@ -79,9 +80,10 @@ class DictaraClient(private val baseUrl: String) {
             Request.Builder().url(url).post(body)
                 .header("X-Telegram-User-Id", telegramUserId.toString())
                 .apply {
-                    telegramUsername?.let { header("X-Telegram-Username", it) }
-                    telegramFirstName?.let { header("X-Telegram-First-Name", it) }
-                    telegramLastName?.let { header("X-Telegram-Last-Name", it) }
+                    fun enc(v: String) = URLEncoder.encode(v, "UTF-8")
+                    telegramUsername?.let { header("X-Telegram-Username", enc(it)) }
+                    telegramFirstName?.let { header("X-Telegram-First-Name", enc(it)) }
+                    telegramLastName?.let { header("X-Telegram-Last-Name", enc(it)) }
                 }
                 .build()
         ).execute()
