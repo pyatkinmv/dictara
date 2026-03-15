@@ -37,6 +37,9 @@ tg-bot/gradle/
 tg-bot/gradlew
 tg-bot/gradlew.bat
 
+# Worktrees
+.worktrees/
+
 # OS
 .DS_Store
 Thumbs.db
