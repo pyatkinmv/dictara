@@ -21,6 +21,22 @@ services:
       - bot-api-data:/var/lib/telegram-bot-api
     restart: unless-stopped
 
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: dictara
+      POSTGRES_USER: dictara
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dictara"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   gateway:
     build:
       context: ./gateway
@@ -32,7 +48,10 @@ services:
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       SUMMARIZER_PROVIDER: ${SUMMARIZER_PROVIDER:-gemini}
     depends_on:
-      - transcriber
+      postgres:
+        condition: service_healthy
+      transcriber:
+        condition: service_started
     restart: unless-stopped
 
   tg-bot:
@@ -75,3 +94,4 @@ services:
 volumes:
   model-cache:
   bot-api-data:
+  postgres-data:
