@@ -1,10 +1,21 @@
 import 'package:fluent_ui/fluent_ui.dart';
+import '../shared/api_client.dart';
+import '../shared/auth_service.dart';
 import 'transcribe_page_fluent.dart';
 
-void main() => runApp(const DictaraFluentApp());
+void main() {
+  final authService = AuthService();
+  final api = ApiClient();
+  authService.addListener(() => api.setToken(authService.token));
+  api.setToken(authService.token); // restore persisted token on startup
+  runApp(DictaraFluentApp(authService: authService, api: api));
+}
 
 class DictaraFluentApp extends StatelessWidget {
-  const DictaraFluentApp({super.key});
+  final AuthService authService;
+  final ApiClient api;
+
+  const DictaraFluentApp({super.key, required this.authService, required this.api});
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +31,7 @@ class DictaraFluentApp extends StatelessWidget {
         brightness: Brightness.dark,
       ),
       themeMode: ThemeMode.system,
-      home: const TranscribePageFluent(),
+      home: TranscribePageFluent(authService: authService, api: api),
     );
   }
 }

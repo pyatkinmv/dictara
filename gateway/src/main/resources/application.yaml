@@ -33,6 +33,13 @@ springdoc:
     path: /swagger-ui.html
   default-produces-media-type: application/json
 
+telegram:
+  bot-username: ${TELEGRAM_BOT_USERNAME:}
+
+jwt:
+  secret: ${JWT_SECRET:changeme-set-in-env}
+  expiry-days: 30
+
 dictara:
   transcriber:
     url: ${TRANSCRIBER_URL:http://localhost:8000}

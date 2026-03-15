@@ -8,19 +8,26 @@ import 'package:file_picker/file_picker.dart';
 import 'package:fluent_ui/fluent_ui.dart';
 
 import '../shared/api_client.dart';
+import '../shared/auth_service.dart';
+import '../shared/history_section.dart';
 import '../shared/models.dart';
 
 enum _State { idle, uploading, processing, done, error }
 
 class TranscribePageFluent extends StatefulWidget {
-  const TranscribePageFluent({super.key});
+  final AuthService authService;
+  final ApiClient api;
+
+  const TranscribePageFluent({super.key, required this.authService, required this.api});
 
   @override
   State<TranscribePageFluent> createState() => _TranscribePageFluentState();
 }
 
 class _TranscribePageFluentState extends State<TranscribePageFluent> {
-  final _api = ApiClient();
+  ApiClient get _api => widget.api;
+
+  final _historyKey = GlobalKey<HistorySectionState>();
 
   bool _online = false;
   Timer? _healthTimer;
@@ -122,6 +129,12 @@ class _TranscribePageFluentState extends State<TranscribePageFluent> {
           _state = _State.done;
           _jobResult = result;
         });
+        _historyKey.currentState?.addItem(HistoryItem(
+          jobId: _jobId!,
+          fileName: _fileName!,
+          createdAt: DateTime.now(),
+          status: JobStatus.done,
+        ));
       } else if (result.status == JobStatus.failed) {
         _pollTimer?.cancel();
         setState(() {
@@ -167,6 +180,35 @@ class _TranscribePageFluentState extends State<TranscribePageFluent> {
         commandBar: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            ListenableBuilder(
+              listenable: widget.authService,
+              builder: (context, _) {
+                if (widget.authService.isLoggedIn) {
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(widget.authService.displayName ?? 'Logged in'),
+                      const SizedBox(width: 8),
+                      Button(
+                        onPressed: widget.authService.logout,
+                        child: const Text('Logout'),
+                      ),
+                      const SizedBox(width: 16),
+                    ],
+                  );
+                }
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Button(
+                      onPressed: () => widget.authService.triggerLogin(context, widget.api),
+                      child: const Text('Login with Telegram'),
+                    ),
+                    const SizedBox(width: 16),
+                  ],
+                );
+              },
+            ),
             Icon(
               FluentIcons.circle_fill,
               size: 10,
@@ -233,6 +275,12 @@ class _TranscribePageFluentState extends State<TranscribePageFluent> {
                   const SizedBox(height: 24),
                   _ErrorSection(message: _errorMsg ?? 'Unknown error', onRetry: _reset),
                 ],
+                const SizedBox(height: 24),
+                HistorySection(
+                  key: _historyKey,
+                  api: _api,
+                  authService: widget.authService,
+                ),
               ],
             ),
           ),

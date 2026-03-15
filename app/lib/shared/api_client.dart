@@ -6,6 +6,13 @@ import 'models.dart';
 class ApiClient {
   static const _base = '/api';
 
+  String? _token;
+
+  void setToken(String? token) => _token = token;
+
+  Map<String, String> get _authHeaders =>
+      _token != null ? {'Authorization': 'Bearer $_token'} : {};
+
   Future<bool> checkHealth() async {
     try {
       final res = await http.get(Uri.parse('$_base/health')).timeout(const Duration(seconds: 5));
@@ -35,6 +42,7 @@ class ApiClient {
     });
 
     final req = http.MultipartRequest('POST', uri)
+      ..headers.addAll(_authHeaders)
       ..files.add(http.MultipartFile.fromBytes('file', fileBytes, filename: fileName));
 
     final streamed = await req.send();
@@ -68,10 +76,46 @@ class ApiClient {
   }
 
   Future<JobResult> pollJob(String jobId) async {
-    final res = await http.get(Uri.parse('$_base/jobs/$jobId'));
+    final res = await http.get(Uri.parse('$_base/jobs/$jobId'), headers: _authHeaders);
     if (res.statusCode != 200) {
       throw Exception('Poll failed: ${res.statusCode}');
     }
     return JobResult.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  Future<List<HistoryItem>> fetchTranscriptions() async {
+    final res = await http.get(Uri.parse('$_base/transcriptions'), headers: _authHeaders);
+    if (res.statusCode == 401) return [];
+    if (res.statusCode != 200) throw Exception('Failed to load history: ${res.statusCode}');
+    final list = jsonDecode(res.body) as List;
+    return list.map((e) => HistoryItem.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<Map<String, dynamic>> loginByUsername(String username) async {
+    final res = await http.post(
+      Uri.parse('$_base/auth/login-by-username'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'telegram_username': username}),
+    );
+    if (res.statusCode != 200) {
+      throw Exception('Failed to start login: ${res.statusCode}');
+    }
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> pollLoginLink(String token) async {
+    final res = await http.get(Uri.parse('$_base/auth/login-link/$token'));
+    if (res.statusCode == 410) {
+      String reason = 'expired';
+      try {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        if ((body['message'] as String?)?.toLowerCase().contains('reject') == true) {
+          reason = 'rejected';
+        }
+      } catch (_) {}
+      throw Exception('gone:$reason');
+    }
+    if (res.statusCode != 200) throw Exception('Poll failed: ${res.statusCode}');
+    return jsonDecode(res.body) as Map<String, dynamic>;
   }
 }

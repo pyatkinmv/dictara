@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
+import '../shared/api_client.dart';
+import '../shared/auth_service.dart';
 import 'transcribe_page.dart';
 
 void main() {
-  runApp(const DictaraApp());
+  final authService = AuthService();
+  final api = ApiClient();
+  authService.addListener(() => api.setToken(authService.token));
+  api.setToken(authService.token); // restore persisted token on startup
+  runApp(DictaraApp(authService: authService, api: api));
 }
 
 class DictaraApp extends StatelessWidget {
-  const DictaraApp({super.key});
+  final AuthService authService;
+  final ApiClient api;
+
+  const DictaraApp({super.key, required this.authService, required this.api});
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +33,7 @@ class DictaraApp extends StatelessWidget {
         useMaterial3: true,
       ),
       themeMode: ThemeMode.system,
-      home: const TranscribePage(),
+      home: TranscribePage(authService: authService, api: api),
     );
   }
 }

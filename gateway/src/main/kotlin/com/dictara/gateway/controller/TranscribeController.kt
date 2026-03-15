@@ -3,8 +3,10 @@ package com.dictara.gateway.controller
 import com.dictara.gateway.entity.*
 import com.dictara.gateway.repository.*
 import com.dictara.gateway.service.OrchestratorService
+import com.dictara.gateway.service.UserService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.*
@@ -17,8 +19,8 @@ import java.util.UUID
 @RestController
 class TranscribeController(
     private val orchestrator: OrchestratorService,
+    private val userService: UserService,
     private val userRepo: UserRepository,
-    private val authIdentityRepo: AuthIdentityRepository,
     private val audioMetaRepo: AudioMetaRepository,
     private val audioContentRepo: AudioContentRepository,
     private val submissionRepo: SubmissionRepository,
@@ -106,6 +108,7 @@ class TranscribeController(
         @RequestHeader(name = "X-Telegram-Username", required = false) telegramUsername: String?,
         @RequestHeader(name = "X-Telegram-First-Name", required = false) telegramFirstName: String?,
         @RequestHeader(name = "X-Telegram-Last-Name", required = false) telegramLastName: String?,
+        servletRequest: HttpServletRequest,
     ): SubmitResponse {
         val ext = file.originalFilename?.substringAfterLast('.', "")?.lowercase() ?: ""
         if (ext !in SUPPORTED_EXTENSIONS) {
@@ -118,8 +121,13 @@ class TranscribeController(
             throw ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "File appears to be a $imageFormat image, not an audio/video file.")
         }
+        val authenticatedUserId = servletRequest.getAttribute("authenticatedUserId") as UUID?
         fun dec(v: String?) = v?.let { URLDecoder.decode(it, "UTF-8") }
-        val user = resolveUser(telegramUserId, dec(telegramUsername), dec(telegramFirstName), dec(telegramLastName))
+        val user = when {
+            authenticatedUserId != null -> userRepo.findById(authenticatedUserId).orElseThrow()
+            telegramUserId != null -> userService.resolveByTelegramId(telegramUserId, dec(telegramUsername), dec(telegramFirstName), dec(telegramLastName))
+            else -> userService.resolveAnonymous()
+        }
         val audio = saveAudio(file, user)
         val submission = submissionRepo.save(SubmissionEntity(
             user = user, audio = audio, model = model, language = language,
@@ -194,46 +202,32 @@ class TranscribeController(
         )
     }
 
+    data class TranscriptionSummary(
+        val jobId: String,
+        val fileName: String,
+        val createdAt: String,
+        val status: String,
+    )
+
+    @GetMapping("/transcriptions")
+    fun listTranscriptions(servletRequest: HttpServletRequest): List<TranscriptionSummary> {
+        val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
+            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
+        return submissionRepo.findByUser_IdOrderByCreatedAtDesc(userId).map {
+            TranscriptionSummary(
+                jobId = it.id.toString(),
+                fileName = it.audio.originalName,
+                createdAt = it.createdAt.toString(),
+                status = it.status,
+            )
+        }
+    }
+
     @GetMapping("/formats")
     fun formats() = mapOf("extensions" to SUPPORTED_EXTENSIONS.sorted())
 
     @GetMapping("/health")
     fun health() = mapOf("status" to "ok")
-
-    private fun resolveUser(
-        telegramUserId: String?,
-        telegramUsername: String?,
-        telegramFirstName: String?,
-        telegramLastName: String?,
-    ): UserEntity {
-        val uid = telegramUserId ?: "anonymous"
-        val displayName = when {
-            !telegramUsername.isNullOrBlank() -> "@$telegramUsername"
-            !telegramFirstName.isNullOrBlank() && !telegramLastName.isNullOrBlank() ->
-                "$telegramFirstName $telegramLastName".trim()
-            !telegramFirstName.isNullOrBlank() -> telegramFirstName
-            else -> uid
-        }
-        val metadata = mapper.writeValueAsString(
-            mapOf("firstName" to telegramFirstName, "lastName" to telegramLastName, "username" to telegramUsername)
-                .filterValues { it != null }
-        )
-
-        val existing = authIdentityRepo.findByProviderAndProviderUid("telegram", uid)
-        if (existing != null) {
-            existing.user.displayName = displayName
-            userRepo.save(existing.user)
-            authIdentityRepo.save(AuthIdentityEntity(
-                id = existing.id, user = existing.user,
-                provider = "telegram", providerUid = uid,
-                credentials = existing.credentials, metadata = metadata, createdAt = existing.createdAt,
-            ))
-            return existing.user
-        }
-        val user = userRepo.save(UserEntity(displayName = displayName))
-        authIdentityRepo.save(AuthIdentityEntity(user = user, provider = "telegram", providerUid = uid, metadata = metadata))
-        return user
-    }
 
     private fun saveAudio(file: MultipartFile, user: UserEntity): AudioMetaEntity {
         val meta = audioMetaRepo.save(AudioMetaEntity(

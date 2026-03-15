@@ -39,6 +39,9 @@ class DictaraBot(
     /** userId → messageId of the settings message currently awaiting a language code reply */
     private val awaitingLanguage = ConcurrentHashMap<Long, Int>()
 
+    /** userIds already reported as having a private bot chat this session — avoids redundant gateway calls */
+    private val knownBotStarted = ConcurrentHashMap.newKeySet<Long>()
+
     init {
         try {
             execute(SetMyCommands.builder()
@@ -48,6 +51,25 @@ class DictaraBot(
                 ))
                 .build())
         } catch (_: Exception) {}
+
+        executor.submit {
+            while (true) {
+                Thread.sleep(2_000)
+                try {
+                    val notifications = client.fetchPendingLoginNotifications()
+                    for (n in notifications) {
+                        try {
+                            execute(SendMessage.builder()
+                                .chatId(n.chatId)
+                                .text("Confirm login to Dictara on the web?")
+                                .replyMarkup(loginKeyboard(n.token))
+                                .build())
+                            client.ackLoginNotification(n.id)
+                        } catch (_: Exception) {}
+                    }
+                } catch (_: Exception) {}
+            }
+        }
     }
 
     private val fileBaseUrl = System.getenv("TELEGRAM_API_URL") ?: "https://api.telegram.org"
@@ -65,6 +87,10 @@ class DictaraBot(
         val chatId = message.chatId
         val userId = message.from?.id ?: return  // channels have no sender; ignore silently
         val isGroup = message.chat.type != "private"
+
+        if (!isGroup && knownBotStarted.add(userId)) {
+            executor.submit { try { client.markBotStarted(userId) } catch (_: Exception) {} }
+        }
 
         // Commands always take priority — cancel any pending awaiting state
         if (message.hasText() && message.text.startsWith("/")) {
@@ -96,6 +122,17 @@ class DictaraBot(
         when {
             message.hasText() && message.text.startsWith("/start") -> {
                 send(chatId, "Send me any audio or voice message and I'll transcribe it.\nUse /settings to configure model and diarization.")
+                val username = message.from?.userName
+                if (username != null) {
+                    val token = try { client.getPendingLoginForUsername(username) } catch (_: Exception) { null }
+                    if (token != null) {
+                        execute(SendMessage.builder()
+                            .chatId(chatId.toString())
+                            .text("You have a pending login request for Dictara on the web. Confirm?")
+                            .replyMarkup(loginKeyboard(token))
+                            .build())
+                    }
+                }
                 return
             }
             message.hasText() && message.text.startsWith("/settings") -> {
@@ -249,6 +286,27 @@ class DictaraBot(
         val userId = cb.from.id
         val chatId = cb.message.chatId
         when {
+            cb.data.startsWith("confirm_login:") -> {
+                val token = cb.data.removePrefix("confirm_login:")
+                try {
+                    client.confirmLoginCallback(token, cb.from.id, cb.from.userName, cb.from.firstName, cb.from.lastName)
+                    execute(EditMessageText.builder().chatId(chatId.toString()).messageId(cb.message.messageId)
+                        .text("✓ You are now logged in to Dictara on the web.").build())
+                } catch (_: Exception) {
+                    execute(EditMessageText.builder().chatId(chatId.toString()).messageId(cb.message.messageId)
+                        .text("Login failed. The link may have expired.").build())
+                }
+                execute(AnswerCallbackQuery.builder().callbackQueryId(cb.id).build())
+                return
+            }
+            cb.data.startsWith("reject_login:") -> {
+                val token = cb.data.removePrefix("reject_login:")
+                try { client.rejectLogin(token) } catch (_: Exception) {}
+                execute(EditMessageText.builder().chatId(chatId.toString()).messageId(cb.message.messageId)
+                    .text("Login request rejected.").build())
+                execute(AnswerCallbackQuery.builder().callbackQueryId(cb.id).build())
+                return
+            }
             cb.data.startsWith("set_model:") ->
                 UserSettings.update(chatId, model = cb.data.removePrefix("set_model:"))
             cb.data.startsWith("set_language:") -> {
@@ -408,6 +466,14 @@ class DictaraBot(
 
         return InlineKeyboardMarkup.builder().keyboard(rows).build()
     }
+
+    private fun loginKeyboard(token: String): InlineKeyboardMarkup =
+        InlineKeyboardMarkup.builder()
+            .keyboardRow(listOf(
+                InlineKeyboardButton.builder().text("✓ Confirm").callbackData("confirm_login:$token").build(),
+                InlineKeyboardButton.builder().text("✗ Reject").callbackData("reject_login:$token").build(),
+            ))
+            .build()
 
     private fun send(chatId: Long, text: String): Message =
         execute(SendMessage.builder().chatId(chatId.toString()).text(text).build())

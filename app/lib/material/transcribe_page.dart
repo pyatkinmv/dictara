@@ -8,19 +8,26 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../shared/api_client.dart';
+import '../shared/auth_service.dart';
+import '../shared/history_section.dart';
 import '../shared/models.dart';
 
 enum _State { idle, uploading, processing, done, error }
 
 class TranscribePage extends StatefulWidget {
-  const TranscribePage({super.key});
+  final AuthService authService;
+  final ApiClient api;
+
+  const TranscribePage({super.key, required this.authService, required this.api});
 
   @override
   State<TranscribePage> createState() => _TranscribePageState();
 }
 
 class _TranscribePageState extends State<TranscribePage> {
-  final _api = ApiClient();
+  ApiClient get _api => widget.api;
+
+  final _historyKey = GlobalKey<HistorySectionState>();
 
   // Health
   bool _online = false;
@@ -128,6 +135,12 @@ class _TranscribePageState extends State<TranscribePage> {
           _state = _State.done;
           _jobResult = result;
         });
+        _historyKey.currentState?.addItem(HistoryItem(
+          jobId: _jobId!,
+          fileName: _fileName!,
+          createdAt: DateTime.now(),
+          status: JobStatus.done,
+        ));
       } else if (result.status == JobStatus.failed) {
         _pollTimer?.cancel();
         setState(() {
@@ -176,6 +189,35 @@ class _TranscribePageState extends State<TranscribePage> {
       appBar: AppBar(
         title: const Text('Dictara'),
         actions: [
+          ListenableBuilder(
+            listenable: widget.authService,
+            builder: (context, _) {
+              if (widget.authService.isLoggedIn) {
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                        widget.authService.displayName ?? 'Logged in',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.logout),
+                      tooltip: 'Logout',
+                      onPressed: widget.authService.logout,
+                    ),
+                  ],
+                );
+              }
+              return TextButton.icon(
+                icon: const Icon(Icons.account_circle_outlined),
+                label: const Text('Login with Telegram'),
+                onPressed: () => widget.authService.triggerLogin(context, widget.api),
+              );
+            },
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Chip(
@@ -245,6 +287,12 @@ class _TranscribePageState extends State<TranscribePage> {
                   const SizedBox(height: 24),
                   _ErrorSection(message: _errorMsg ?? 'Unknown error', onRetry: _reset),
                 ],
+                const SizedBox(height: 24),
+                HistorySection(
+                  key: _historyKey,
+                  api: _api,
+                  authService: widget.authService,
+                ),
               ],
             ),
           ),

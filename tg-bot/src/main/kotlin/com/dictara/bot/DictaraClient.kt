@@ -7,6 +7,7 @@ import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
@@ -25,6 +26,81 @@ class DictaraClient(private val baseUrl: String) {
         .writeTimeout(120, TimeUnit.SECONDS)
         .build()
     private val mapper = ObjectMapper().registerKotlinModule()
+
+    data class LoginNotification(val id: Long, val chatId: String, val token: String)
+
+    fun markBotStarted(telegramUserId: Long) {
+        val body = mapper.writeValueAsString(mapOf("telegram_user_id" to telegramUserId.toString()))
+        http.newCall(
+            Request.Builder()
+                .url("$baseUrl/auth/bot-started")
+                .post(body.toRequestBody("application/json".toMediaType()))
+                .build()
+        ).execute().close()
+    }
+
+    fun fetchPendingLoginNotifications(): List<LoginNotification> {
+        val resp = http.newCall(Request.Builder().url("$baseUrl/auth/pending-login-notifications").get().build()).execute()
+        val body = resp.body?.string() ?: "[]"
+        @Suppress("UNCHECKED_CAST")
+        val list = mapper.readValue(body, List::class.java) as List<Map<String, String>>
+        return list.map { m -> LoginNotification(m["id"]!!.toLong(), m["chatId"]!!, m["token"]!!) }
+    }
+
+    fun ackLoginNotification(id: Long) {
+        http.newCall(
+            Request.Builder()
+                .url("$baseUrl/auth/pending-login-notifications/$id/ack")
+                .post("".toRequestBody("application/json".toMediaType()))
+                .build()
+        ).execute().close()
+    }
+
+    fun getPendingLoginForUsername(username: String): String? {
+        val resp = http.newCall(
+            Request.Builder()
+                .url("$baseUrl/auth/pending-login-for-username?username=${URLEncoder.encode(username, "UTF-8")}")
+                .get()
+                .build()
+        ).execute()
+        if (!resp.isSuccessful) return null
+        val body = resp.body?.string() ?: return null
+        return runCatching { mapper.readTree(body)["token"]?.asText() }.getOrNull()
+    }
+
+    fun confirmLoginCallback(
+        token: String,
+        telegramUserId: Long,
+        telegramUsername: String?,
+        telegramFirstName: String?,
+        telegramLastName: String?,
+    ) {
+        val body = mapper.writeValueAsString(
+            mapOf(
+                "token" to token,
+                "telegram_user_id" to telegramUserId.toString(),
+                "telegram_username" to telegramUsername,
+                "telegram_first_name" to telegramFirstName,
+                "telegram_last_name" to telegramLastName,
+            ).filterValues { it != null }
+        )
+        http.newCall(
+            Request.Builder()
+                .url("$baseUrl/auth/login-link/confirm-callback")
+                .post(body.toRequestBody("application/json".toMediaType()))
+                .build()
+        ).execute().close()
+    }
+
+    fun rejectLogin(token: String) {
+        val body = mapper.writeValueAsString(mapOf("token" to token))
+        http.newCall(
+            Request.Builder()
+                .url("$baseUrl/auth/login-link/reject")
+                .post(body.toRequestBody("application/json".toMediaType()))
+                .build()
+        ).execute().close()
+    }
 
     fun fetchSupportedExtensions(): Set<String> = try {
         val response = http.newCall(Request.Builder().url("$baseUrl/formats").get().build()).execute()
