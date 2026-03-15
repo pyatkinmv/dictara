@@ -27,7 +27,7 @@ class TranscribeController(
     private val stageAttemptRepo: StageAttemptRepository,
 ) {
     companion object {
-        val SUPPORTED_EXTENSIONS = setOf("mp3", "mp4", "m4a", "wav", "ogg", "flac", "webm", "mkv", "avi", "mov")
+        val SUPPORTED_EXTENSIONS = setOf("mp3", "mp4", "m4a", "wav", "ogg", "oga", "opus", "flac", "webm", "mkv", "avi", "mov")
     }
 
     private val mapper = ObjectMapper().registerKotlinModule()
