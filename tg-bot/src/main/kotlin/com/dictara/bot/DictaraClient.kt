@@ -40,9 +40,14 @@ class DictaraClient(private val baseUrl: String) {
         summaryMode: SummaryMode = SummaryMode.AUTO,
         language: String = "auto",
         numSpeakers: Int? = null,
+        telegramUserId: Long,
+        telegramUsername: String? = null,
+        telegramFirstName: String? = null,
+        telegramLastName: String? = null,
         onProgress: ((String) -> Unit)? = null,
     ): TranscriptResult {
-        val jobId = submitJob(audioFile, model, diarize, summaryMode, language, numSpeakers)
+        val jobId = submitJob(audioFile, model, diarize, summaryMode, language, numSpeakers,
+            telegramUserId, telegramUsername, telegramFirstName, telegramLastName)
         return pollJob(jobId, diarize, summaryMode, onProgress)
     }
 
@@ -53,6 +58,10 @@ class DictaraClient(private val baseUrl: String) {
         summaryMode: SummaryMode,
         language: String,
         numSpeakers: Int?,
+        telegramUserId: Long,
+        telegramUsername: String?,
+        telegramFirstName: String?,
+        telegramLastName: String?,
     ): String {
         val body = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
@@ -66,7 +75,16 @@ class DictaraClient(private val baseUrl: String) {
             if (numSpeakers != null) append("&num_speakers=$numSpeakers")
         }
 
-        val response = http.newCall(Request.Builder().url(url).post(body).build()).execute()
+        val response = http.newCall(
+            Request.Builder().url(url).post(body)
+                .header("X-Telegram-User-Id", telegramUserId.toString())
+                .apply {
+                    telegramUsername?.let { header("X-Telegram-Username", it) }
+                    telegramFirstName?.let { header("X-Telegram-First-Name", it) }
+                    telegramLastName?.let { header("X-Telegram-Last-Name", it) }
+                }
+                .build()
+        ).execute()
         val responseBody = response.body?.string() ?: ""
         if (!response.isSuccessful) {
             val message = runCatching { mapper.readTree(responseBody)["message"]?.asText() }.getOrNull()

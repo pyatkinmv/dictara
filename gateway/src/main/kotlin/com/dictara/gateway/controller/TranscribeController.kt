@@ -101,8 +101,10 @@ class TranscribeController(
         @RequestParam(defaultValue = "false") diarize: Boolean,
         @RequestParam(name = "num_speakers", required = false) numSpeakers: Int?,
         @RequestParam(name = "summary_mode", defaultValue = "off") summaryMode: String,
-        @RequestHeader(name = "X-Telegram-Chat-Id", required = false) telegramChatId: String?,
-        @RequestHeader(name = "X-Telegram-Display-Name", required = false) displayName: String?,
+        @RequestHeader(name = "X-Telegram-User-Id", required = false) telegramUserId: String?,
+        @RequestHeader(name = "X-Telegram-Username", required = false) telegramUsername: String?,
+        @RequestHeader(name = "X-Telegram-First-Name", required = false) telegramFirstName: String?,
+        @RequestHeader(name = "X-Telegram-Last-Name", required = false) telegramLastName: String?,
     ): SubmitResponse {
         val ext = file.originalFilename?.substringAfterLast('.', "")?.lowercase() ?: ""
         if (ext !in SUPPORTED_EXTENSIONS) {
@@ -115,7 +117,7 @@ class TranscribeController(
             throw ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "File appears to be a $imageFormat image, not an audio/video file.")
         }
-        val user = resolveUser(telegramChatId, displayName)
+        val user = resolveUser(telegramUserId, telegramUsername, telegramFirstName, telegramLastName)
         val audio = saveAudio(file, user)
         val submission = submissionRepo.save(SubmissionEntity(
             user = user, audio = audio, model = model, language = language,
@@ -196,12 +198,38 @@ class TranscribeController(
     @GetMapping("/health")
     fun health() = mapOf("status" to "ok")
 
-    private fun resolveUser(telegramChatId: String?, displayName: String?): UserEntity {
-        val chatId = telegramChatId ?: "anonymous"
-        val existing = authIdentityRepo.findByProviderAndProviderUid("telegram", chatId)
-        if (existing != null) return existing.user
-        val user = userRepo.save(UserEntity(displayName = displayName ?: chatId))
-        authIdentityRepo.save(AuthIdentityEntity(user = user, provider = "telegram", providerUid = chatId))
+    private fun resolveUser(
+        telegramUserId: String?,
+        telegramUsername: String?,
+        telegramFirstName: String?,
+        telegramLastName: String?,
+    ): UserEntity {
+        val uid = telegramUserId ?: "anonymous"
+        val displayName = when {
+            !telegramUsername.isNullOrBlank() -> "@$telegramUsername"
+            !telegramFirstName.isNullOrBlank() && !telegramLastName.isNullOrBlank() ->
+                "$telegramFirstName $telegramLastName".trim()
+            !telegramFirstName.isNullOrBlank() -> telegramFirstName
+            else -> uid
+        }
+        val credentials = mapper.writeValueAsString(
+            mapOf("firstName" to telegramFirstName, "lastName" to telegramLastName, "username" to telegramUsername)
+                .filterValues { it != null }
+        )
+
+        val existing = authIdentityRepo.findByProviderAndProviderUid("telegram", uid)
+        if (existing != null) {
+            existing.user.displayName = displayName
+            userRepo.save(existing.user)
+            authIdentityRepo.save(AuthIdentityEntity(
+                id = existing.id, user = existing.user,
+                provider = "telegram", providerUid = uid,
+                credentials = credentials, createdAt = existing.createdAt,
+            ))
+            return existing.user
+        }
+        val user = userRepo.save(UserEntity(displayName = displayName))
+        authIdentityRepo.save(AuthIdentityEntity(user = user, provider = "telegram", providerUid = uid, credentials = credentials))
         return user
     }
 

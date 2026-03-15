@@ -163,10 +163,15 @@ class DictaraBot(
                     }
 
                     // Phase 1: transcribe (with live progress updates)
+                    val sender = message.from
                     val result = client.transcribe(
                         audioTmp, prefs.model, prefs.diarize,
                         prefs.summaryMode,
-                        prefs.language, prefs.numSpeakers
+                        prefs.language, prefs.numSpeakers,
+                        telegramUserId = sender.id,
+                        telegramUsername = sender.userName,
+                        telegramFirstName = sender.firstName,
+                        telegramLastName = sender.lastName,
                     ) { progressText ->
                         try {
                             execute(
