@@ -11,20 +11,10 @@ import 'models.dart';
 
 // ── Tag colors ────────────────────────────────────────────────────────────────
 
-const _kTagPalette = [
-  Color(0xFF6750A4), // purple
-  Color(0xFF006A6A), // teal
-  Color(0xFF8B5000), // amber-brown
-  Color(0xFF006E1C), // green
-  Color(0xFFB3261E), // red
-  Color(0xFF00639B), // blue
-  Color(0xFF6E1F7D), // violet
-  Color(0xFF735000), // warm brown
-];
-
 Color _tagColor(String tag) {
   final hash = tag.runes.fold(0, (acc, r) => (acc * 31 + r) & 0x7FFFFFFF);
-  return _kTagPalette[hash % _kTagPalette.length];
+  final hue = (hash % 360).toDouble();
+  return HSLColor.fromAHSL(1.0, hue, 0.55, 0.38).toColor();
 }
 
 Widget _tagChip(String tag, {VoidCallback? onDelete}) => Chip(
