@@ -13,7 +13,7 @@ import 'models.dart';
 
 Color _tagColor(String tag) {
   final hash = tag.runes.fold(0, (acc, r) => (acc * 31 + r) & 0x7FFFFFFF);
-  final hue = (hash % 360).toDouble();
+  final hue = (hash * 137.508) % 360;
   return HSLColor.fromAHSL(1.0, hue, 0.55, 0.38).toColor();
 }
 
