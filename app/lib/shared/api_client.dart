@@ -91,6 +91,25 @@ class ApiClient {
     return list.map((e) => HistoryItem.fromJson(e as Map<String, dynamic>)).toList();
   }
 
+  Future<List<String>> addTag(String jobId, String tag) async {
+    final res = await http.post(
+      Uri.parse('$_base/jobs/$jobId/tags'),
+      headers: {'Content-Type': 'application/json', ..._authHeaders},
+      body: jsonEncode({'tag': tag}),
+    );
+    if (res.statusCode != 200) throw Exception('Failed to add tag: ${res.statusCode}');
+    return (jsonDecode(res.body)['tags'] as List).cast<String>();
+  }
+
+  Future<List<String>> removeTag(String jobId, String tag) async {
+    final res = await http.delete(
+      Uri.parse('$_base/jobs/$jobId/tags/${Uri.encodeComponent(tag)}'),
+      headers: _authHeaders,
+    );
+    if (res.statusCode != 200) throw Exception('Failed to remove tag: ${res.statusCode}');
+    return (jsonDecode(res.body)['tags'] as List).cast<String>();
+  }
+
   Future<Map<String, dynamic>> loginByUsername(String username) async {
     final res = await http.post(
       Uri.parse('$_base/auth/login-by-username'),

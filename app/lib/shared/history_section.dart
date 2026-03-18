@@ -9,6 +9,36 @@ import 'api_client.dart';
 import 'auth_service.dart';
 import 'models.dart';
 
+// ── Tag colors ────────────────────────────────────────────────────────────────
+
+const _kTagPalette = [
+  Color(0xFF6750A4), // purple
+  Color(0xFF006A6A), // teal
+  Color(0xFF8B5000), // amber-brown
+  Color(0xFF006E1C), // green
+  Color(0xFFB3261E), // red
+  Color(0xFF00639B), // blue
+  Color(0xFF6E1F7D), // violet
+  Color(0xFF735000), // warm brown
+];
+
+Color _tagColor(String tag) {
+  final hash = tag.runes.fold(0, (acc, r) => (acc * 31 + r) & 0x7FFFFFFF);
+  return _kTagPalette[hash % _kTagPalette.length];
+}
+
+Widget _tagChip(String tag, {VoidCallback? onDelete}) => Chip(
+      label: Text(tag, style: const TextStyle(color: Colors.white, fontSize: 11)),
+      backgroundColor: _tagColor(tag),
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      onDeleted: onDelete,
+      deleteIconColor: Colors.white70,
+    );
+
+// ── HistorySection ────────────────────────────────────────────────────────────
+
 class HistorySection extends StatefulWidget {
   final ApiClient api;
   final AuthService authService;
@@ -93,7 +123,10 @@ class HistorySectionState extends State<HistorySection> {
       setState(() {
         _cache[jobId] = result;
         final idx = _items.indexWhere((i) => i.jobId == jobId);
-        if (idx != -1) _items[idx].status = result.status;
+        if (idx != -1) {
+          _items[idx].status = result.status;
+          _items[idx].tags = result.tags;
+        }
       });
     } catch (_) {}
   }
@@ -122,6 +155,32 @@ class HistorySectionState extends State<HistorySection> {
       ..setAttribute('download', '$baseName.txt')
       ..click();
     html.Url.revokeObjectUrl(url);
+  }
+
+  Future<void> _onAddTag(String jobId, String tag) async {
+    try {
+      final tags = await widget.api.addTag(jobId, tag);
+      if (!mounted) return;
+      setState(() {
+        final idx = _items.indexWhere((i) => i.jobId == jobId);
+        if (idx >= 0) _items[idx].tags = tags;
+        final cached = _cache[jobId];
+        if (cached != null) _cache[jobId] = cached.copyWith(tags: tags);
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _onRemoveTag(String jobId, String tag) async {
+    try {
+      final tags = await widget.api.removeTag(jobId, tag);
+      if (!mounted) return;
+      setState(() {
+        final idx = _items.indexWhere((i) => i.jobId == jobId);
+        if (idx >= 0) _items[idx].tags = tags;
+        final cached = _cache[jobId];
+        if (cached != null) _cache[jobId] = cached.copyWith(tags: tags);
+      });
+    } catch (_) {}
   }
 
   @override
@@ -159,11 +218,15 @@ class HistorySectionState extends State<HistorySection> {
             cachedResult: _cache[item.jobId],
             onTap: () => _toggleExpand(item.jobId),
             onDownload: () => _download(item.jobId),
+            onAddTag: (tag) => _onAddTag(item.jobId, tag),
+            onRemoveTag: (tag) => _onRemoveTag(item.jobId, tag),
           ),
       ],
     );
   }
 }
+
+// ── _HistoryTile ──────────────────────────────────────────────────────────────
 
 class _HistoryTile extends StatelessWidget {
   final HistoryItem item;
@@ -171,6 +234,8 @@ class _HistoryTile extends StatelessWidget {
   final JobResult? cachedResult;
   final VoidCallback onTap;
   final VoidCallback onDownload;
+  final ValueChanged<String> onAddTag;
+  final ValueChanged<String> onRemoveTag;
 
   const _HistoryTile({
     required this.item,
@@ -178,6 +243,8 @@ class _HistoryTile extends StatelessWidget {
     required this.cachedResult,
     required this.onTap,
     required this.onDownload,
+    required this.onAddTag,
+    required this.onRemoveTag,
   });
 
   @override
@@ -198,50 +265,68 @@ class _HistoryTile extends StatelessWidget {
                 : BorderRadius.circular(12),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      item.fileName,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(_formatDate(item.createdAt),
-                      style: Theme.of(context).textTheme.bodySmall),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: isDone
-                        ? IconButton(
-                            icon: const Icon(Icons.download, size: 16),
-                            padding: EdgeInsets.zero,
-                            onPressed: onDownload,
-                            tooltip: 'Download',
-                          )
-                        : isInProgress
-                            ? const Center(
-                                child: SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.fileName,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(_formatDate(item.createdAt),
+                          style: Theme.of(context).textTheme.bodySmall),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: isDone
+                            ? IconButton(
+                                icon: const Icon(Icons.download, size: 16),
+                                padding: EdgeInsets.zero,
+                                onPressed: onDownload,
+                                tooltip: 'Download',
                               )
-                            : const SizedBox.shrink(),
+                            : isInProgress
+                                ? const Center(
+                                    child: SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        isExpanded ? Icons.expand_less : Icons.expand_more,
+                        size: 20,
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    isExpanded ? Icons.expand_less : Icons.expand_more,
-                    size: 20,
-                  ),
+                  if (item.tags.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: item.tags.map((t) => _tagChip(t)).toList(),
+                    ),
+                  ],
                 ],
               ),
             ),
           ),
           if (isExpanded)
-            _ExpandedContent(item: item, result: cachedResult),
+            _ExpandedContent(
+              item: item,
+              result: cachedResult,
+              onAddTag: onAddTag,
+              onRemoveTag: onRemoveTag,
+            ),
         ],
       ),
     );
@@ -257,14 +342,45 @@ class _HistoryTile extends StatelessWidget {
   }
 }
 
-class _ExpandedContent extends StatelessWidget {
+// ── _ExpandedContent ──────────────────────────────────────────────────────────
+
+class _ExpandedContent extends StatefulWidget {
   final HistoryItem item;
   final JobResult? result;
+  final ValueChanged<String> onAddTag;
+  final ValueChanged<String> onRemoveTag;
 
-  const _ExpandedContent({required this.item, required this.result});
+  const _ExpandedContent({
+    required this.item,
+    required this.result,
+    required this.onAddTag,
+    required this.onRemoveTag,
+  });
+
+  @override
+  State<_ExpandedContent> createState() => _ExpandedContentState();
+}
+
+class _ExpandedContentState extends State<_ExpandedContent> {
+  final _tagController = TextEditingController();
+
+  @override
+  void dispose() {
+    _tagController.dispose();
+    super.dispose();
+  }
+
+  void _submitTag() {
+    final tag = _tagController.text.trim().toLowerCase();
+    if (tag.isEmpty || !RegExp(r'^[\w-]{1,64}$').hasMatch(tag)) return;
+    widget.onAddTag(tag);
+    _tagController.clear();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final result = widget.result;
+
     if (result == null) {
       return const Padding(
         padding: EdgeInsets.all(16),
@@ -272,21 +388,28 @@ class _ExpandedContent extends StatelessWidget {
       );
     }
 
-    if (result!.status == JobStatus.failed) {
+    if (result.status == JobStatus.failed) {
       return Padding(
-        padding: const EdgeInsets.all(12),
-        child: Text(
-          result!.error ?? 'Transcription failed',
-          style: TextStyle(color: Theme.of(context).colorScheme.error),
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              result.error ?? 'Transcription failed',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+            const SizedBox(height: 12),
+            _tagSection(context),
+          ],
         ),
       );
     }
 
-    if (result!.status != JobStatus.done) {
-      return _ProgressContent(result: result!);
+    if (result.status != JobStatus.done) {
+      return _ProgressContent(result: result);
     }
 
-    final text = result!.toTranscriptText();
+    final text = result.toTranscriptText();
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       child: Column(
@@ -306,19 +429,66 @@ class _ExpandedContent extends StatelessWidget {
               ),
             ),
           ),
-          if (result!.summary != null && result!.summary!.isNotEmpty) ...[
+          if (result.summary != null && result.summary!.isNotEmpty) ...[
             const SizedBox(height: 12),
             const Divider(),
             const SizedBox(height: 8),
             Text('Summary', style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 6),
-            SelectableText(result!.summary!),
+            SelectableText(result.summary!),
           ],
+          const SizedBox(height: 12),
+          const Divider(),
+          const SizedBox(height: 8),
+          _tagSection(context),
         ],
       ),
     );
   }
+
+  Widget _tagSection(BuildContext context) {
+    final tags = widget.item.tags;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (tags.isNotEmpty) ...[
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            children: tags
+                .map((t) => _tagChip(t, onDelete: () => widget.onRemoveTag(t)))
+                .toList(),
+          ),
+          const SizedBox(height: 8),
+        ],
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _tagController,
+                decoration: const InputDecoration(
+                  hintText: 'Add tag…',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                ),
+                onSubmitted: (_) => _submitTag(),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.add),
+              onPressed: _submitTag,
+              tooltip: 'Add tag',
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 }
+
+// ── _ProgressContent ──────────────────────────────────────────────────────────
 
 class _ProgressContent extends StatelessWidget {
   final JobResult result;

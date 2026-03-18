@@ -28,6 +28,7 @@ class TranscribeController(
     private val diarizationRepo: DiarizationRepository,
     private val summaryRepo: SummaryRepository,
     private val stageAttemptRepo: StageAttemptRepository,
+    private val tagRepo: SubmissionTagRepository,
 ) {
     companion object {
         val SUPPORTED_EXTENSIONS = setOf("mp3", "mp4", "m4a", "wav", "ogg", "oga", "opus", "flac", "webm", "mkv", "avi", "mov")
@@ -92,6 +93,7 @@ class TranscribeController(
         val durationS: Double?,
         val elapsedS: Double?,
         val error: String?,
+        val tags: List<String>,
     )
 
     @PostMapping("/transcribe")
@@ -184,6 +186,8 @@ class TranscribeController(
             }
         }
 
+        val tags = tagRepo.findBySubmissionId(id).map { it.tag }.sorted()
+
         return JobResponse(
             jobId = jobId,
             status = submission.status,
@@ -199,6 +203,7 @@ class TranscribeController(
             durationS = durationS,
             elapsedS = elapsedS,
             error = latestFailedAttempt?.error,
+            tags = tags,
         )
     }
 
@@ -207,20 +212,76 @@ class TranscribeController(
         val fileName: String,
         val createdAt: String,
         val status: String,
+        val tags: List<String>,
     )
 
     @GetMapping("/transcriptions")
     fun listTranscriptions(servletRequest: HttpServletRequest): List<TranscriptionSummary> {
         val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
             ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
-        return submissionRepo.findByUser_IdOrderByCreatedAtDesc(userId).map {
+        val submissions = submissionRepo.findByUser_IdOrderByCreatedAtDesc(userId)
+        val tagsBySubmission = tagRepo.findBySubmissionIdIn(submissions.mapNotNull { it.id })
+            .groupBy({ it.submissionId }, { it.tag })
+        return submissions.map {
             TranscriptionSummary(
                 jobId = it.id.toString(),
                 fileName = it.audio.originalName,
                 createdAt = it.createdAt.toString(),
                 status = it.status,
+                tags = (tagsBySubmission[it.id] ?: emptyList()).sorted(),
             )
         }
+    }
+
+    private val tagRegex = Regex("^[\\w-]{1,64}$")
+
+    @PostMapping("/jobs/{jobId}/tags")
+    @Transactional
+    fun addTag(
+        @PathVariable jobId: String,
+        @RequestBody body: Map<String, String>,
+        servletRequest: HttpServletRequest,
+    ): Map<String, List<String>> {
+        val id = runCatching { UUID.fromString(jobId) }.getOrElse {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid job ID")
+        }
+        val submission = submissionRepo.findById(id).orElseThrow {
+            ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found")
+        }
+        val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
+            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
+        if (submission.user.id != userId) throw ResponseStatusException(HttpStatus.FORBIDDEN)
+
+        val tag = body["tag"]?.trim()?.lowercase()
+            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing 'tag'")
+        if (!tagRegex.matches(tag)) throw ResponseStatusException(HttpStatus.BAD_REQUEST,
+            "Tag must be 1–64 word characters or hyphens")
+
+        if (!tagRepo.existsBySubmissionIdAndTag(id, tag)) {
+            tagRepo.save(SubmissionTagEntity(submissionId = id, tag = tag))
+        }
+        return mapOf("tags" to tagRepo.findBySubmissionId(id).map { it.tag }.sorted())
+    }
+
+    @DeleteMapping("/jobs/{jobId}/tags/{tag}")
+    @Transactional
+    fun removeTag(
+        @PathVariable jobId: String,
+        @PathVariable tag: String,
+        servletRequest: HttpServletRequest,
+    ): Map<String, List<String>> {
+        val id = runCatching { UUID.fromString(jobId) }.getOrElse {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid job ID")
+        }
+        val submission = submissionRepo.findById(id).orElseThrow {
+            ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found")
+        }
+        val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
+            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
+        if (submission.user.id != userId) throw ResponseStatusException(HttpStatus.FORBIDDEN)
+
+        tagRepo.deleteBySubmissionIdAndTag(id, tag)
+        return mapOf("tags" to tagRepo.findBySubmissionId(id).map { it.tag }.sorted())
     }
 
     @GetMapping("/formats")

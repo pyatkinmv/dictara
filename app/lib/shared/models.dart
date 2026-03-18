@@ -46,6 +46,7 @@ class JobResult {
   final String? error;
   final ProgressInfo? progress;
   final double? durationS;
+  final List<String> tags;
 
   const JobResult({
     required this.status,
@@ -56,7 +57,20 @@ class JobResult {
     this.error,
     this.progress,
     this.durationS,
+    this.tags = const [],
   });
+
+  JobResult copyWith({List<String>? tags}) => JobResult(
+    status: status,
+    segments: segments,
+    formattedText: formattedText,
+    summary: summary,
+    audioDurationS: audioDurationS,
+    error: error,
+    progress: progress,
+    durationS: durationS,
+    tags: tags ?? this.tags,
+  );
 
   factory JobResult.fromJson(Map<String, dynamic> json) {
     final statusStr = json['status'] as String;
@@ -85,6 +99,7 @@ class JobResult {
       error: json['error'] as String?,
       progress: progress,
       durationS: (json['duration_s'] as num?)?.toDouble(),
+      tags: (json['tags'] as List<dynamic>?)?.cast<String>() ?? [],
     );
   }
 
@@ -96,12 +111,14 @@ class HistoryItem {
   final String fileName;
   final DateTime createdAt;
   JobStatus status;
+  List<String> tags;
 
   HistoryItem({
     required this.jobId,
     required this.fileName,
     required this.createdAt,
     required this.status,
+    this.tags = const [],
   });
 
   factory HistoryItem.fromJson(Map<String, dynamic> json) => HistoryItem(
@@ -112,5 +129,6 @@ class HistoryItem {
           (s) => s.name == json['status'] as String,
           orElse: () => JobStatus.failed,
         ),
+        tags: (json['tags'] as List<dynamic>?)?.cast<String>() ?? [],
       );
 }
