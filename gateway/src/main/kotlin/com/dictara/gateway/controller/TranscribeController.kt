@@ -94,6 +94,7 @@ class TranscribeController(
         val elapsedS: Double?,
         val error: String?,
         val tags: List<String>,
+        val queuePosition: Int?,
     )
 
     @PostMapping("/transcribe")
@@ -190,6 +191,10 @@ class TranscribeController(
 
         val tags = tagRepo.findBySubmissionId(id).map { it.tag }.sorted()
 
+        val queuePosition = if (submission.status in listOf("pending", "processing")) {
+            submissionRepo.countActiveSubmissionsBefore(submission.createdAt).toInt() + 1
+        } else null
+
         return JobResponse(
             jobId = jobId,
             status = submission.status,
@@ -206,6 +211,7 @@ class TranscribeController(
             elapsedS = elapsedS,
             error = latestFailedAttempt?.error?.take(150),
             tags = tags,
+            queuePosition = queuePosition,
         )
     }
 

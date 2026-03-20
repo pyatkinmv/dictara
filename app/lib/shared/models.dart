@@ -47,6 +47,7 @@ class JobResult {
   final ProgressInfo? progress;
   final double? durationS;
   final List<String> tags;
+  final int? queuePosition;
 
   const JobResult({
     required this.status,
@@ -58,6 +59,7 @@ class JobResult {
     this.progress,
     this.durationS,
     this.tags = const [],
+    this.queuePosition,
   });
 
   JobResult copyWith({List<String>? tags}) => JobResult(
@@ -70,6 +72,7 @@ class JobResult {
     progress: progress,
     durationS: durationS,
     tags: tags ?? this.tags,
+    queuePosition: queuePosition,
   );
 
   factory JobResult.fromJson(Map<String, dynamic> json) {
@@ -100,6 +103,7 @@ class JobResult {
       progress: progress,
       durationS: (json['duration_s'] as num?)?.toDouble(),
       tags: (json['tags'] as List<dynamic>?)?.cast<String>() ?? [],
+      queuePosition: json['queue_position'] as int?,
     );
   }
 

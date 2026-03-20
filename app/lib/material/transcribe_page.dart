@@ -52,6 +52,7 @@ class _TranscribePageState extends State<TranscribePage> {
   String? _jobId;
   Timer? _pollTimer;
   ProgressInfo? _progress;
+  int? _queuePosition;
 
   @override
   void initState() {
@@ -127,7 +128,10 @@ class _TranscribePageState extends State<TranscribePage> {
     try {
       final result = await _api.pollJob(_jobId!);
       if (!mounted) return;
-      setState(() => _progress = result.progress);
+      setState(() {
+        _progress = result.progress;
+        _queuePosition = result.queuePosition;
+      });
 
       if (result.status == JobStatus.done) {
         _pollTimer?.cancel();
@@ -273,7 +277,7 @@ class _TranscribePageState extends State<TranscribePage> {
                 ],
                 if (_state == _State.processing) ...[
                   const SizedBox(height: 24),
-                  _ProgressSection(progress: _progress),
+                  _ProgressSection(progress: _progress, queuePosition: _queuePosition),
                 ],
                 if (_state == _State.done && _jobResult != null) ...[
                   const SizedBox(height: 24),
@@ -516,8 +520,9 @@ class _UploadingSection extends StatelessWidget {
 
 class _ProgressSection extends StatelessWidget {
   final ProgressInfo? progress;
+  final int? queuePosition;
 
-  const _ProgressSection({required this.progress});
+  const _ProgressSection({required this.progress, this.queuePosition});
 
   @override
   Widget build(BuildContext context) {
@@ -525,7 +530,9 @@ class _ProgressSection extends StatelessWidget {
     double? value;
     String label = '⏳ Processing…';
 
-    if (p != null) {
+    if (p == null && queuePosition != null) {
+      label = '⏳ Position in queue: $queuePosition';
+    } else if (p != null) {
       if (p.phase == 'summarizing') {
         label = '✍️ Summarizing…';
       } else if (p.phase == 'diarizing' && p.diarizeProgress != null) {

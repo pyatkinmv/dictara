@@ -183,6 +183,11 @@ class DictaraClient(private val baseUrl: String) {
             val response = http.newCall(Request.Builder().url("$baseUrl/jobs/$jobId").get().build()).execute()
             val root = mapper.readTree(response.body?.string() ?: "{}")
             when (root["status"]?.asText()) {
+                "pending" -> {
+                    val pos = root["queue_position"]?.takeIf { !it.isNull }?.asInt()
+                    val posStr = if (pos != null) " Position: $pos." else ""
+                    onProgress?.invoke("⏳ Waiting in queue...$posStr")
+                }
                 "processing" -> {
                     val elapsed = root["elapsed_s"]?.takeIf { !it.isNull }?.asDouble()
                     val elapsedStr = if (elapsed != null) " | ${fmtTime(elapsed)} elapsed" else ""
