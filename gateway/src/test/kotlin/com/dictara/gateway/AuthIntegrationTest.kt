@@ -50,7 +50,7 @@ class AuthIntegrationTest {
     private fun loginByUsername(username: String): Map<*, *> {
         val response = rest.postForEntity(
             "/auth/login-by-username",
-            HttpEntity(mapOf("telegramUsername" to username), jsonHeaders),
+            HttpEntity(mapOf("telegram_username" to username), jsonHeaders),
             Map::class.java,
         )
         assertThat(response.statusCode).isEqualTo(HttpStatus.OK)
@@ -60,7 +60,7 @@ class AuthIntegrationTest {
     private fun confirmCallback(token: String, telegramUserId: String, telegramUsername: String? = null) {
         val response = rest.postForEntity(
             "/auth/login-link/confirm-callback",
-            HttpEntity(mapOf("token" to token, "telegramUserId" to telegramUserId, "telegramUsername" to telegramUsername), jsonHeaders),
+            HttpEntity(mapOf("token" to token, "telegram_user_id" to telegramUserId, "telegram_username" to telegramUsername), jsonHeaders),
             Void::class.java,
         )
         assertThat(response.statusCode).isEqualTo(HttpStatus.OK)
@@ -139,7 +139,7 @@ class AuthIntegrationTest {
 
         val response = rest.postForEntity(
             "/auth/login-link/confirm-callback",
-            HttpEntity(mapOf("token" to expiredToken.token.toString(), "telegramUserId" to "uid_ivy"), jsonHeaders),
+            HttpEntity(mapOf("token" to expiredToken.token.toString(), "telegram_user_id" to "uid_ivy"), jsonHeaders),
             Map::class.java,
         )
         assertThat(response.statusCode).isEqualTo(HttpStatus.GONE)
