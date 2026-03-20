@@ -71,7 +71,7 @@ class PersistenceIntegrationTest {
             HttpEntity(body, headers), Map::class.java,
         )
         assertThat(response.statusCode).isEqualTo(HttpStatus.ACCEPTED)
-        return UUID.fromString(response.body!!["jobId"] as String)
+        return UUID.fromString(response.body!!["job_id"] as String)
     }
 
     private fun waitForStatus(jobId: UUID, targetStatus: String) {
@@ -121,7 +121,7 @@ class PersistenceIntegrationTest {
             "/transcribe?model=fast&diarize=false&summary_mode=off",
             HttpEntity(body, headers), Map::class.java,
         )
-        val jobId = UUID.fromString(response.body!!["jobId"] as String)
+        val jobId = UUID.fromString(response.body!!["job_id"] as String)
 
         waitForStatus(jobId, "failed")
 
