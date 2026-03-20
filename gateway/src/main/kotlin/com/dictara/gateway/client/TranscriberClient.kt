@@ -71,7 +71,7 @@ class TranscriberClient(private val props: DictaraProperties) {
         val root = mapper.readTree(response.body?.string() ?: "{}")
 
         val status = root["status"]?.asText() ?: "pending"
-        val progress = root["progress"]?.takeIf { !it.isNull }?.let { prog ->
+        val progress = root["progress"]?.takeIf { it.isObject }?.let { prog ->
             ProgressInfo(
                 phase = prog["phase"]?.asText() ?: "transcribing",
                 processedS = prog["processed_s"]?.takeIf { !it.isNull }?.asDouble(),
