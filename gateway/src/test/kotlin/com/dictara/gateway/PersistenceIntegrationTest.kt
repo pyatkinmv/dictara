@@ -74,6 +74,23 @@ class PersistenceIntegrationTest {
         return UUID.fromString(response.body!!["job_id"] as String)
     }
 
+    private fun submitRaw(chatId: String = "test-user"): UUID {
+        val fakeAudio = object : ByteArrayResource(ByteArray(8)) {
+            override fun getFilename() = "test-audio.m4a"
+        }
+        val body = LinkedMultiValueMap<String, Any>().apply { add("file", fakeAudio) }
+        val headers = HttpHeaders().apply {
+            contentType = MediaType.MULTIPART_FORM_DATA
+            set("X-Telegram-Chat-Id", chatId)
+        }
+        val response = rest.postForEntity(
+            "/transcribe?model=fast&diarize=false&summary_mode=off",
+            HttpEntity(body, headers), Map::class.java,
+        )
+        assertThat(response.statusCode).isEqualTo(HttpStatus.ACCEPTED)
+        return UUID.fromString(response.body!!["job_id"] as String)
+    }
+
     private fun waitForStatus(jobId: UUID, targetStatus: String) {
         val deadline = System.currentTimeMillis() + 15_000
         while (System.currentTimeMillis() < deadline) {
@@ -131,5 +148,37 @@ class PersistenceIntegrationTest {
         val attempts = stageAttemptRepo.findBySubmissionIdAndStageOrderByAttemptNumDesc(jobId, "transcription")
         assertThat(attempts).hasSize(3)
         assertThat(attempts.all { it.status == "failed" }).isTrue
+    }
+
+    @Test
+    fun `non-retryable transcriber failure fails immediately without retries`() {
+        wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
+            .willReturn(okJson("""{"job_id":"perm-fail-1"}""")))
+        wireMock.stubFor(get(urlEqualTo("/jobs/perm-fail-1"))
+            .willReturn(okJson("""{"status":"failed","error":"Unsupported codec","retryable":false}""")))
+
+        val jobId = submitRaw("perm-fail-user")
+        waitForStatus(jobId, "failed")
+
+        val attempts = stageAttemptRepo.findBySubmissionIdAndStageOrderByAttemptNumDesc(jobId, "transcription")
+        assertThat(attempts).hasSize(1)
+        assertThat(attempts[0].status).isEqualTo("failed")
+    }
+
+    @Test
+    fun `failed job error is truncated to 150 chars in response`() {
+        val longError = "E".repeat(200)
+        wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
+            .willReturn(okJson("""{"job_id":"long-err-1"}""")))
+        wireMock.stubFor(get(urlEqualTo("/jobs/long-err-1"))
+            .willReturn(okJson("""{"status":"failed","error":"$longError","retryable":false}""")))
+
+        val jobId = submitRaw("truncate-user")
+        waitForStatus(jobId, "failed")
+
+        val jobResp = rest.getForEntity("/jobs/$jobId", Map::class.java).body!!
+        val error = jobResp["error"] as String?
+        assertThat(error).isNotNull()
+        assertThat(error!!.length).isLessThanOrEqualTo(150)
     }
 }
