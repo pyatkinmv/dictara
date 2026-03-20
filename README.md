@@ -134,3 +134,36 @@ Send any audio/video file to your bot — it transcribes and returns `transcript
 | `large-v3` | ~16 min | ~21 min |
 
 GPU support is automatic when CUDA is available (10–20x faster).
+
+## Self-hosting
+
+**Requirements (minimal):** Linux server, 4 GB RAM, 30 GB disk, a domain.
+
+**Add swap** (recommended — helps with builds and model loading on low-RAM machines):
+```bash
+sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile
+sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+**Install Docker:**
+```bash
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER && newgrp docker
+```
+
+**Clone, configure, and start** — same as local quickstart. First build takes 20–30 min on a low-end CPU.
+
+**Reverse proxy + HTTPS** — [Caddy](https://caddyserver.com) handles TLS automatically via Let's Encrypt:
+```bash
+sudo apt install caddy
+
+sudo tee /etc/caddy/Caddyfile <<'EOF'
+your-domain.com {
+    reverse_proxy localhost:3000
+}
+EOF
+sudo systemctl reload caddy
+```
+
+**DNS:** Point an A record for your domain to the server's IP. Caddy obtains a certificate automatically once DNS propagates.
