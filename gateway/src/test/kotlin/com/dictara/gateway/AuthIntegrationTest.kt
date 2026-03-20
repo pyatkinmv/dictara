@@ -10,7 +10,10 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT
 import org.springframework.boot.test.web.client.TestRestTemplate
+import org.springframework.http.HttpEntity
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.testcontainers.containers.PostgreSQLContainer
@@ -42,10 +45,12 @@ class AuthIntegrationTest {
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
+    private val jsonHeaders = HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON }
+
     private fun loginByUsername(username: String): Map<*, *> {
         val response = rest.postForEntity(
             "/auth/login-by-username",
-            mapOf("telegramUsername" to username),
+            HttpEntity(mapOf("telegramUsername" to username), jsonHeaders),
             Map::class.java,
         )
         assertThat(response.statusCode).isEqualTo(HttpStatus.OK)
@@ -55,7 +60,7 @@ class AuthIntegrationTest {
     private fun confirmCallback(token: String, telegramUserId: String, telegramUsername: String? = null) {
         val response = rest.postForEntity(
             "/auth/login-link/confirm-callback",
-            mapOf("token" to token, "telegramUserId" to telegramUserId, "telegramUsername" to telegramUsername),
+            HttpEntity(mapOf("token" to token, "telegramUserId" to telegramUserId, "telegramUsername" to telegramUsername), jsonHeaders),
             Void::class.java,
         )
         assertThat(response.statusCode).isEqualTo(HttpStatus.OK)
@@ -134,7 +139,7 @@ class AuthIntegrationTest {
 
         val response = rest.postForEntity(
             "/auth/login-link/confirm-callback",
-            mapOf("token" to expiredToken.token.toString(), "telegramUserId" to "uid_ivy"),
+            HttpEntity(mapOf("token" to expiredToken.token.toString(), "telegramUserId" to "uid_ivy"), jsonHeaders),
             Map::class.java,
         )
         assertThat(response.statusCode).isEqualTo(HttpStatus.GONE)
