@@ -131,9 +131,11 @@ class TranscribeController(
             else -> userService.resolveAnonymous()
         }
         val audio = saveAudio(file, user)
+        val resolvedModel = mapOf("fast" to "small", "accurate" to "large-v3")[model] ?: model
+        val source = if (telegramUserId != null) "telegram" else "web"
         val submission = submissionRepo.save(SubmissionEntity(
-            user = user, audio = audio, model = model, language = language,
-            diarize = diarize, numSpeakers = numSpeakers, summaryMode = summaryMode,
+            user = user, audio = audio, model = resolvedModel, language = language,
+            diarize = diarize, numSpeakers = numSpeakers, summaryMode = summaryMode, source = source,
         ))
         org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
             object : org.springframework.transaction.support.TransactionSynchronization {
@@ -202,7 +204,7 @@ class TranscribeController(
             ) else null,
             durationS = durationS,
             elapsedS = elapsedS,
-            error = latestFailedAttempt?.error,
+            error = latestFailedAttempt?.error?.take(150),
             tags = tags,
         )
     }

@@ -17,6 +17,7 @@ class SubmissionEntity(
     @Column(nullable = false) val diarize: Boolean = false,
     @Column(name = "num_speakers") val numSpeakers: Int? = null,
     @Column(name = "summary_mode", nullable = false) val summaryMode: String = "off",
+    @Column(nullable = false) val source: String = "web",
     @Column(nullable = false) var status: String = "pending",
     @Column(name = "created_at", nullable = false, updatable = false) val createdAt: Instant = Instant.now(),
     @Column(name = "updated_at", nullable = false) var updatedAt: Instant = Instant.now(),

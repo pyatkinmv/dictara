@@ -1,0 +1,1 @@
+ALTER TABLE submissions ADD COLUMN source VARCHAR(20) NOT NULL DEFAULT 'web';
