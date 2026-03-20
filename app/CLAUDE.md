@@ -1,6 +1,6 @@
 # app — Flutter Web Client
 
-Two UI variants of the same transcription UI, served as separate Docker containers on different ports.
+Flutter web client served as a Docker container on port 3000.
 
 ## Structure
 
@@ -15,33 +15,17 @@ app/
     material/
       main_material.dart    Entry point for Material 3 build
       transcribe_page.dart  Material 3 UI
-    fluent/
-      main_fluent.dart      Entry point for Fluent UI build
-      transcribe_page_fluent.dart  Fluent UI (Windows-style)
   Dockerfile                Multi-stage: flutter build web --target=... → nginx:alpine
   nginx.conf                Serves static files; proxies /api/ → gateway:8080
 ```
 
-## UI variants
-
-| Service | Port | Style |
-|---------|------|-------|
-| `app-material` | 3000 | Material 3 (Google) |
-| `app-fluent` | 3001 | Fluent UI (Windows) |
-
-Both variants share `shared/` — identical API calls, data models, auth, and history logic. Only `build()` and widget helpers differ.
+The `material/` variant uses Material 3 widgets. The `shared/` directory contains all API calls, data models, auth, and history logic shared across the app.
 
 ## Build
 
 ```bash
-# Build one variant
 docker compose build app-material
-docker compose build app-fluent
-
-# Build both (sequential recommended — parallel Flutter builds are memory-heavy)
-docker compose build app-material && docker compose build app-fluent
-
-docker compose up -d app-material app-fluent
+docker compose up -d app-material
 ```
 
 ## Authentication

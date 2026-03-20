@@ -97,16 +97,6 @@ services:
       - gateway
     restart: unless-stopped
 
-  app-fluent:
-    build:
-      context: ./app
-      args:
-        FLUTTER_TARGET: lib/fluent/main_fluent.dart
-    ports:
-      - "3001:80"
-    depends_on:
-      - gateway
-    restart: unless-stopped
 
 volumes:
   model-cache:

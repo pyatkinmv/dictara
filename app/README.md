@@ -1,15 +1,10 @@
 # app — Flutter Web Client
 
-Flutter web client for Dictara, served as two separate Docker containers with different UI styles.
-
-| Service | Port | Style |
-|---------|------|-------|
-| `app-material` | 3000 | Material 3 (Google) |
-| `app-fluent` | 3001 | Fluent UI (Windows) |
+Flutter web client for Dictara, served on port 3000.
 
 ## Usage
 
-Open http://localhost:3000 (or `:3001` for Fluent).
+Open http://localhost:3000.
 
 1. **Login** — click "Login with Telegram", enter your `@username`
 2. **Drop a file** — choose any audio or video file
@@ -20,8 +15,8 @@ Open http://localhost:3000 (or `:3001` for Fluent).
 ## Build
 
 ```bash
-docker compose build app-material && docker compose build app-fluent
-docker compose up -d app-material app-fluent
+docker compose build app-material
+docker compose up -d app-material
 ```
 
 See [CLAUDE.md](CLAUDE.md) for architecture details.

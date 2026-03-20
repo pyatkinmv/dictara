@@ -29,7 +29,7 @@ Telegram ──► telegram-bot-api ──► tg-bot ──► gateway :8080
 | `gateway/` | Kotlin / Spring Boot | HTTP entry point, auth, job persistence, orchestration |
 | `transcriber/` | Python / FastAPI | Whisper transcription + pyannote diarization |
 | `tg-bot/` | Kotlin | Telegram bot — audio in, transcript out |
-| `app/` | Dart / Flutter | Web client (Material 3 + Fluent UI variants) |
+| `app/` | Dart / Flutter | Web client (Material 3) |
 
 ## Quickstart
 
@@ -77,7 +77,7 @@ First start downloads Whisper + diarization models (~4–5 GB total) to a persis
 
 **3. Use it**
 
-- Web UI: http://localhost:3000 (Material 3) or http://localhost:3001 (Fluent UI)
+- Web UI: http://localhost:3000
 - Telegram bot: send any audio/video file to your bot
 
 ## Web UI
@@ -109,7 +109,6 @@ Send any audio/video file to your bot — it transcribes and returns `transcript
 | `telegram-bot-api` | — | Local Telegram Bot API (large file support) |
 | `tg-bot` | — | Telegram bot |
 | `app-material` | `3000` | Flutter web — Material 3 |
-| `app-fluent` | `3001` | Flutter web — Fluent UI |
 
 ## Environment variables
 

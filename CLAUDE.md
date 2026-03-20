@@ -10,7 +10,7 @@ Transcribes audio/video files using Whisper with optional speaker diarization. R
 | `gateway/` | Kotlin / Spring Boot | HTTP API, auth, job persistence, orchestration | — |
 | `transcriber/` | Python | FastAPI transcription service — Whisper + pyannote | [transcriber/CLAUDE.md](transcriber/CLAUDE.md) |
 | `tg-bot/` | Kotlin | Telegram bot — sends audio, receives transcript.txt | [tg-bot/CLAUDE.md](tg-bot/CLAUDE.md) |
-| `app/` | Dart/Flutter | Web client — two UI variants (Material 3 + Fluent UI) | [app/CLAUDE.md](app/CLAUDE.md) |
+| `app/` | Dart/Flutter | Web client — Material 3 UI | [app/CLAUDE.md](app/CLAUDE.md) |
 
 ```
 dictara/
@@ -53,7 +53,6 @@ docker compose build gateway    && docker compose up -d gateway
 docker compose build transcriber && docker compose up -d transcriber
 docker compose build tg-bot      && docker compose up -d tg-bot
 docker compose build app-material && docker compose up -d app-material
-docker compose build app-fluent   && docker compose up -d app-fluent
 
 # Check health
 curl http://localhost:8080/health
@@ -69,6 +68,5 @@ curl http://localhost:8080/health
 | `telegram-bot-api` | image `aiogram/telegram-bot-api` | — | Local Bot API for >20 MB files |
 | `tg-bot` | `./tg-bot` | — | Outbound only; depends on gateway |
 | `app-material` | `./app` | `:3000` | Flutter web — Material 3 |
-| `app-fluent` | `./app` | `:3001` | Flutter web — Fluent UI |
 
 Model downloads cache to the `model-cache` Docker volume. `docker compose down` keeps volumes; only `docker compose down -v` deletes them.
