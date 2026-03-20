@@ -65,8 +65,8 @@ class DictaraClient(private val baseUrl: String) {
         val list = mapper.readValue(body, List::class.java) as List<Map<String, Any?>>
         return list.map { m ->
             PendingDelivery(
-                jobId = m["jobId"] as String,
-                chatId = (m["chatId"] as Number).toLong(),
+                jobId = m["job_id"] as String,
+                chatId = (m["chat_id"] as Number).toLong(),
                 status = m["status"] as String,
                 error = m["error"] as String?,
             )
@@ -163,9 +163,41 @@ class DictaraClient(private val baseUrl: String) {
         chatId: Long,
         onProgress: ((String) -> Unit)? = null,
     ): TranscriptResult {
-        val jobId = submitJob(audioFile, model, diarize, summaryMode, language, numSpeakers,
-            telegramUserId, telegramUsername, telegramFirstName, telegramLastName, chatId)
+        val jobId = submitWithRetry(audioFile, model, diarize, summaryMode, language, numSpeakers,
+            telegramUserId, telegramUsername, telegramFirstName, telegramLastName, chatId, onProgress)
         return pollJob(jobId, diarize, summaryMode, onProgress)
+    }
+
+    private fun submitWithRetry(
+        audioFile: File,
+        model: String,
+        diarize: Boolean,
+        summaryMode: SummaryMode,
+        language: String,
+        numSpeakers: Int?,
+        telegramUserId: Long,
+        telegramUsername: String?,
+        telegramFirstName: String?,
+        telegramLastName: String?,
+        chatId: Long,
+        onProgress: ((String) -> Unit)?,
+    ): String {
+        var pollInterval = 5_000L
+        val failureStart = System.currentTimeMillis()
+        while (true) {
+            try {
+                return submitJob(audioFile, model, diarize, summaryMode, language, numSpeakers,
+                    telegramUserId, telegramUsername, telegramFirstName, telegramLastName, chatId)
+            } catch (e: RuntimeException) {
+                throw e  // non-retryable (e.g. 4xx from gateway)
+            } catch (e: Exception) {
+                if (System.currentTimeMillis() - failureStart > 10 * 60 * 1000L)
+                    throw RuntimeException("Server unavailable for 10 minutes")
+                onProgress?.invoke("⚠️ Server temporarily unavailable, retrying...")
+                Thread.sleep(pollInterval)
+                pollInterval = minOf(pollInterval * 2, 300_000L)
+            }
+        }
     }
 
     private fun submitJob(
@@ -241,7 +273,7 @@ class DictaraClient(private val baseUrl: String) {
                         val elapsed = root["elapsed_s"]?.takeIf { !it.isNull }?.asDouble()
                         val elapsedStr = if (elapsed != null) " | ${fmtTime(elapsed)} elapsed" else ""
                         val prog = root["progress"]
-                        if (prog != null && !prog.isNull) {
+                        if (prog != null && prog.isObject) {
                             val phase = prog["phase"]?.asText()
                             val summarizeNote = if (summaryMode != SummaryMode.OFF) "\n✍️ Summarization to follow" else ""
                             when (phase) {
