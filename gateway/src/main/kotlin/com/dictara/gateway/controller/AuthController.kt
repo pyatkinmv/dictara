@@ -77,6 +77,8 @@ class AuthController(
             ))
             return LoginByUsernameResponse(token.toString(), "notified", null)
         } else {
+            loginTokenRepo.findAllByPendingUsernameAndConfirmedFalseAndRejectedFalse(username)
+                .forEach { it.rejected = true; loginTokenRepo.save(it) }
             loginTokenRepo.save(LoginTokenEntity(
                 token = token,
                 pendingUsername = username,
@@ -106,7 +108,7 @@ class AuthController(
 
     @GetMapping("/auth/pending-login-for-username")
     fun getPendingLoginForUsername(@RequestParam username: String): Map<String, String>? {
-        val token = loginTokenRepo.findByPendingUsernameAndConfirmedFalseAndRejectedFalse(username)
+        val token = loginTokenRepo.findFirstByPendingUsernameAndConfirmedFalseAndRejectedFalseOrderByCreatedAtDesc(username)
             ?: return null
         return mapOf("token" to token.token.toString())
     }
