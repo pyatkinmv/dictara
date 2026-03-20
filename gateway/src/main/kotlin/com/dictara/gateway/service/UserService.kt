@@ -35,7 +35,7 @@ class UserService(
         } ?: false
         val metaMap = mapOf("firstName" to telegramFirstName, "lastName" to telegramLastName, "username" to telegramUsername)
             .filterValues { it != null }
-            .let { if (botStarted) it + ("bot_started" to true) else it }
+            .let { if (botStarted || uid != "anonymous") it + ("bot_started" to true) else it }
         val metadata = mapper.writeValueAsString(metaMap)
 
         if (existing != null) {
