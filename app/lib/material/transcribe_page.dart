@@ -556,9 +556,12 @@ class _ProgressSection extends StatelessWidget {
     double? value;
     String label = '⏳ Processing…';
 
-    if (p == null && queuePosition != null) {
-      label = '⏳ Position in queue: $queuePosition';
-    } else if (p != null) {
+    String? queueLabel = queuePosition != null ? 'Position in queue: $queuePosition' : null;
+
+    if (p == null) {
+      label = queueLabel != null ? '⏳ $queueLabel' : '⏳ Processing…';
+      queueLabel = null; // already in main label, don't show twice
+    } else {
       if (p.phase == 'summarizing') {
         label = '✍️ Summarizing…';
       } else if (p.phase == 'diarizing' && p.diarizeProgress != null) {
@@ -580,6 +583,10 @@ class _ProgressSection extends StatelessWidget {
             Text(label),
             const SizedBox(height: 8),
             LinearProgressIndicator(value: value),
+            if (queueLabel != null) ...[
+              const SizedBox(height: 4),
+              Text(queueLabel, style: const TextStyle(fontSize: 12)),
+            ],
             if (reconnectingMsg != null) ...[
               const SizedBox(height: 8),
               Text(
