@@ -17,6 +17,7 @@ data class TranscriptResult(
     val durationSeconds: Double?,
     val audioDurationSeconds: Double? = null,
     val summary: String? = null,
+    val jobId: String = "",
 )
 
 class DictaraClient(private val baseUrl: String) {
@@ -28,6 +29,7 @@ class DictaraClient(private val baseUrl: String) {
     private val mapper = ObjectMapper().registerKotlinModule()
 
     data class LoginNotification(val id: Long, val chatId: String, val token: String)
+    data class PendingDelivery(val jobId: String, val chatId: Long, val status: String, val error: String?)
 
     fun markBotStarted(telegramUserId: Long) {
         val body = mapper.writeValueAsString(mapOf("telegram_user_id" to telegramUserId.toString()))
@@ -54,6 +56,43 @@ class DictaraClient(private val baseUrl: String) {
                 .post("".toRequestBody("application/json".toMediaType()))
                 .build()
         ).execute().close()
+    }
+
+    fun fetchPendingDeliveries(): List<PendingDelivery> {
+        val resp = http.newCall(Request.Builder().url("$baseUrl/telegram/pending-deliveries").get().build()).execute()
+        val body = resp.body?.string() ?: "[]"
+        @Suppress("UNCHECKED_CAST")
+        val list = mapper.readValue(body, List::class.java) as List<Map<String, Any?>>
+        return list.map { m ->
+            PendingDelivery(
+                jobId = m["jobId"] as String,
+                chatId = (m["chatId"] as Number).toLong(),
+                status = m["status"] as String,
+                error = m["error"] as String?,
+            )
+        }
+    }
+
+    fun ackDelivery(jobId: String) {
+        http.newCall(
+            Request.Builder()
+                .url("$baseUrl/telegram/deliveries/$jobId/ack")
+                .post("".toRequestBody("application/json".toMediaType()))
+                .build()
+        ).execute().close()
+    }
+
+    fun fetchJobResult(jobId: String): TranscriptResult {
+        val response = http.newCall(Request.Builder().url("$baseUrl/jobs/$jobId").get().build()).execute()
+        val root = mapper.readTree(response.body?.string() ?: "{}")
+        val result = root["result"]
+        return TranscriptResult(
+            text = result?.get("formatted_text")?.asText() ?: "",
+            durationSeconds = root["duration_s"]?.takeIf { !it.isNull }?.asDouble(),
+            audioDurationSeconds = result?.get("audio_duration_s")?.takeIf { !it.isNull }?.asDouble(),
+            summary = result?.get("summary")?.takeIf { !it.isNull }?.asText(),
+            jobId = jobId,
+        )
     }
 
     fun getPendingLoginForUsername(username: String): String? {
@@ -121,10 +160,11 @@ class DictaraClient(private val baseUrl: String) {
         telegramUsername: String? = null,
         telegramFirstName: String? = null,
         telegramLastName: String? = null,
+        chatId: Long,
         onProgress: ((String) -> Unit)? = null,
     ): TranscriptResult {
         val jobId = submitJob(audioFile, model, diarize, summaryMode, language, numSpeakers,
-            telegramUserId, telegramUsername, telegramFirstName, telegramLastName)
+            telegramUserId, telegramUsername, telegramFirstName, telegramLastName, chatId)
         return pollJob(jobId, diarize, summaryMode, onProgress)
     }
 
@@ -139,6 +179,7 @@ class DictaraClient(private val baseUrl: String) {
         telegramUsername: String?,
         telegramFirstName: String?,
         telegramLastName: String?,
+        chatId: Long,
     ): String {
         val body = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
@@ -155,6 +196,7 @@ class DictaraClient(private val baseUrl: String) {
         val response = http.newCall(
             Request.Builder().url(url).post(body)
                 .header("X-Telegram-User-Id", telegramUserId.toString())
+                .header("X-Telegram-Chat-Id", chatId.toString())
                 .apply {
                     fun enc(v: String) = URLEncoder.encode(v, "UTF-8")
                     telegramUsername?.let { header("X-Telegram-Username", enc(it)) }
@@ -178,54 +220,73 @@ class DictaraClient(private val baseUrl: String) {
         onProgress: ((String) -> Unit)? = null,
     ): TranscriptResult {
         val deadline = System.currentTimeMillis() + 4 * 60 * 60 * 1000L
+        var pollInterval = 5_000L
+        var failureStartMs: Long? = null
+
         while (System.currentTimeMillis() < deadline) {
-            Thread.sleep(5_000)
-            val response = http.newCall(Request.Builder().url("$baseUrl/jobs/$jobId").get().build()).execute()
-            val root = mapper.readTree(response.body?.string() ?: "{}")
-            when (root["status"]?.asText()) {
-                "pending" -> {
-                    val pos = root["queue_position"]?.takeIf { !it.isNull }?.asInt()
-                    val posStr = if (pos != null) " Position: $pos." else ""
-                    onProgress?.invoke("⏳ Waiting in queue...$posStr")
-                }
-                "processing" -> {
-                    val elapsed = root["elapsed_s"]?.takeIf { !it.isNull }?.asDouble()
-                    val elapsedStr = if (elapsed != null) " | ${fmtTime(elapsed)} elapsed" else ""
-                    val prog = root["progress"]
-                    if (prog != null && !prog.isNull) {
-                        val phase = prog["phase"]?.asText()
-                        val summarizeNote = if (summaryMode != SummaryMode.OFF) "\n✍️ Summarization to follow" else ""
-                        when (phase) {
-                            "diarizing" -> {
-                                val diarizeProgress = prog["diarize_progress"]?.takeIf { !it.isNull }?.asDouble()
-                                val bar = if (diarizeProgress != null)
-                                    "\n${progressBar(diarizeProgress)} ${(diarizeProgress * 100).toInt()}%"
-                                else ""
-                                onProgress?.invoke("👥 Detecting speakers...$bar$summarizeNote$elapsedStr")
-                            }
-                            else -> {
-                                val processed = prog["processed_s"]?.asDouble()
-                                val total = prog["total_s"]?.asDouble()?.takeIf { it > 0 }
-                                if (processed != null && total != null) {
-                                    val pct = (processed / total * 100).toInt()
-                                    val bar = progressBar(processed / total)
-                                    val diarizeNote = if (diarize) "\n👥 Speaker detection to follow" else ""
-                                    onProgress?.invoke("🎙 Transcribing audio...\n$bar $pct% (${fmtTime(processed)} / ${fmtTime(total)})$diarizeNote$summarizeNote$elapsedStr")
+            Thread.sleep(pollInterval)
+            try {
+                val response = http.newCall(Request.Builder().url("$baseUrl/jobs/$jobId").get().build()).execute()
+                val root = mapper.readTree(response.body?.string() ?: "{}")
+                // Successful response — reset backoff
+                failureStartMs = null
+                pollInterval = 5_000L
+                when (root["status"]?.asText()) {
+                    "pending" -> {
+                        val pos = root["queue_position"]?.takeIf { !it.isNull }?.asInt()
+                        val posStr = if (pos != null) " Position: $pos." else ""
+                        onProgress?.invoke("⏳ Waiting in queue...$posStr")
+                    }
+                    "processing" -> {
+                        val elapsed = root["elapsed_s"]?.takeIf { !it.isNull }?.asDouble()
+                        val elapsedStr = if (elapsed != null) " | ${fmtTime(elapsed)} elapsed" else ""
+                        val prog = root["progress"]
+                        if (prog != null && !prog.isNull) {
+                            val phase = prog["phase"]?.asText()
+                            val summarizeNote = if (summaryMode != SummaryMode.OFF) "\n✍️ Summarization to follow" else ""
+                            when (phase) {
+                                "diarizing" -> {
+                                    val diarizeProgress = prog["diarize_progress"]?.takeIf { !it.isNull }?.asDouble()
+                                    val bar = if (diarizeProgress != null)
+                                        "\n${progressBar(diarizeProgress)} ${(diarizeProgress * 100).toInt()}%"
+                                    else ""
+                                    onProgress?.invoke("👥 Detecting speakers...$bar$summarizeNote$elapsedStr")
+                                }
+                                else -> {
+                                    val processed = prog["processed_s"]?.asDouble()
+                                    val total = prog["total_s"]?.asDouble()?.takeIf { it > 0 }
+                                    if (processed != null && total != null) {
+                                        val pct = (processed / total * 100).toInt()
+                                        val bar = progressBar(processed / total)
+                                        val diarizeNote = if (diarize) "\n👥 Speaker detection to follow" else ""
+                                        onProgress?.invoke("🎙 Transcribing audio...\n$bar $pct% (${fmtTime(processed)} / ${fmtTime(total)})$diarizeNote$summarizeNote$elapsedStr")
+                                    }
                                 }
                             }
                         }
                     }
+                    "summarizing" -> onProgress?.invoke("✍️ Summarizing...")
+                    "done" -> {
+                        val result = root["result"]
+                        val text = result["formatted_text"]?.asText() ?: ""
+                        val summary = result["summary"]?.takeIf { !it.isNull }?.asText()
+                        val duration = root["duration_s"]?.takeIf { !it.isNull }?.asDouble()
+                        val audioDuration = result["audio_duration_s"]?.takeIf { !it.isNull }?.asDouble()
+                        return TranscriptResult(text, duration, audioDuration, summary, jobId)
+                    }
+                    "failed" -> throw RuntimeException(root["error"]?.asText() ?: "Unknown error")
                 }
-                "summarizing" -> onProgress?.invoke("✍️ Summarizing...")
-                "done" -> {
-                    val result = root["result"]
-                    val text = result["formatted_text"]?.asText() ?: ""
-                    val summary = result["summary"]?.takeIf { !it.isNull }?.asText()
-                    val duration = root["duration_s"]?.takeIf { !it.isNull }?.asDouble()
-                    val audioDuration = result["audio_duration_s"]?.takeIf { !it.isNull }?.asDouble()
-                    return TranscriptResult(text, duration, audioDuration, summary)
+            } catch (e: RuntimeException) {
+                throw e  // "failed" status or permanent errors — propagate immediately
+            } catch (e: Exception) {
+                // Transient network/IO error — apply exponential backoff
+                val now = System.currentTimeMillis()
+                if (failureStartMs == null) failureStartMs = now
+                if (now - failureStartMs!! > 10 * 60 * 1000L) {
+                    throw RuntimeException("Server unavailable for 10 minutes")
                 }
-                "failed" -> throw RuntimeException(root["error"]?.asText() ?: "Unknown error")
+                pollInterval = minOf(pollInterval * 2, 300_000L)
+                onProgress?.invoke("⚠️ Server temporarily unavailable, retrying...")
             }
         }
         throw RuntimeException("Timeout: transcription did not complete within 4 hours")

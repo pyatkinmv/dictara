@@ -70,6 +70,26 @@ class DictaraBot(
                 } catch (_: Exception) {}
             }
         }
+
+        executor.submit {
+            while (true) {
+                Thread.sleep(5_000)
+                try {
+                    for (d in client.fetchPendingDeliveries()) {
+                        try {
+                            when (d.status) {
+                                "done" -> {
+                                    val result = client.fetchJobResult(d.jobId)
+                                    sendTranscript(d.chatId, result)
+                                }
+                                "failed" -> send(d.chatId, "❌ Transcription failed: ${d.error ?: "unknown error"}")
+                            }
+                            client.ackDelivery(d.jobId)
+                        } catch (_: Exception) {}
+                    }
+                } catch (_: Exception) {}
+            }
+        }
     }
 
     private val fileBaseUrl = System.getenv("TELEGRAM_API_URL") ?: "https://api.telegram.org"
@@ -209,6 +229,7 @@ class DictaraBot(
                         telegramUsername = sender.userName,
                         telegramFirstName = sender.firstName,
                         telegramLastName = sender.lastName,
+                        chatId = chatId,
                     ) { progressText ->
                         try {
                             execute(
@@ -221,8 +242,9 @@ class DictaraBot(
                         } catch (_: Exception) {}
                     }
 
-                    // Phase 2: send transcript, delete status message
+                    // Phase 2: send transcript, delete status message, ack delivery
                     val sentMsg = sendTranscript(chatId, result, originalMessageId)
+                    try { client.ackDelivery(result.jobId) } catch (_: Exception) {}
                     try {
                         execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build())
                     } catch (_: Exception) {}

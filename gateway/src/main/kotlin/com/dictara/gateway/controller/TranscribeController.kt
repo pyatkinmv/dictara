@@ -2,6 +2,7 @@ package com.dictara.gateway.controller
 
 import com.dictara.gateway.entity.*
 import com.dictara.gateway.repository.*
+import java.time.Instant
 import com.dictara.gateway.service.OrchestratorService
 import com.dictara.gateway.service.UserService
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -29,6 +30,7 @@ class TranscribeController(
     private val summaryRepo: SummaryRepository,
     private val stageAttemptRepo: StageAttemptRepository,
     private val tagRepo: SubmissionTagRepository,
+    private val telegramDeliveryRepo: TelegramDeliveryRepository,
 ) {
     companion object {
         val SUPPORTED_EXTENSIONS = setOf("mp3", "mp4", "m4a", "wav", "ogg", "oga", "opus", "flac", "webm", "mkv", "avi", "mov")
@@ -111,6 +113,7 @@ class TranscribeController(
         @RequestHeader(name = "X-Telegram-Username", required = false) telegramUsername: String?,
         @RequestHeader(name = "X-Telegram-First-Name", required = false) telegramFirstName: String?,
         @RequestHeader(name = "X-Telegram-Last-Name", required = false) telegramLastName: String?,
+        @RequestHeader(name = "X-Telegram-Chat-Id", required = false) telegramChatId: Long?,
         servletRequest: HttpServletRequest,
     ): SubmitResponse {
         val ext = file.originalFilename?.substringAfterLast('.', "")?.lowercase() ?: ""
@@ -138,6 +141,9 @@ class TranscribeController(
             user = user, audio = audio, model = resolvedModel, language = language,
             diarize = diarize, numSpeakers = numSpeakers, summaryMode = summaryMode, source = source,
         ))
+        if (telegramChatId != null) {
+            telegramDeliveryRepo.save(TelegramDeliveryEntity(jobId = submission.id!!, chatId = telegramChatId))
+        }
         org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
             object : org.springframework.transaction.support.TransactionSynchronization {
                 override fun afterCommit() { orchestrator.signalPending() }
@@ -297,6 +303,35 @@ class TranscribeController(
 
     @GetMapping("/health")
     fun health() = mapOf("status" to "ok")
+
+    // ── Telegram delivery tracking ────────────────────────────────────────────
+
+    data class PendingDeliveryResponse(
+        val jobId: String,
+        val chatId: Long,
+        val status: String,
+        val error: String?,
+    )
+
+    @GetMapping("/telegram/pending-deliveries")
+    fun pendingDeliveries(): List<PendingDeliveryResponse> =
+        telegramDeliveryRepo.findPendingDeliveries().map { d ->
+            val submission = submissionRepo.findById(d.jobId).orElseThrow()
+            val error = if (submission.status == "failed")
+                stageAttemptRepo
+                    .findBySubmissionIdAndStageOrderByAttemptNumDesc(d.jobId, "transcription")
+                    .firstOrNull { it.status == "failed" }?.error?.take(150)
+            else null
+            PendingDeliveryResponse(d.jobId.toString(), d.chatId, submission.status, error)
+        }
+
+    @PostMapping("/telegram/deliveries/{jobId}/ack")
+    fun ackDelivery(@PathVariable jobId: String) {
+        telegramDeliveryRepo.findById(UUID.fromString(jobId)).ifPresent {
+            it.deliveredAt = Instant.now()
+            telegramDeliveryRepo.save(it)
+        }
+    }
 
     private fun saveAudio(file: MultipartFile, user: UserEntity): AudioMetaEntity {
         val meta = audioMetaRepo.save(AudioMetaEntity(

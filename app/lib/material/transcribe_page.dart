@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 // ignore: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:html' as html;
 import 'dart:typed_data';
@@ -54,6 +55,11 @@ class _TranscribePageState extends State<TranscribePage> {
   ProgressInfo? _progress;
   int? _queuePosition;
 
+  // Backoff state
+  DateTime? _firstFailureAt;
+  Duration _pollInterval = const Duration(seconds: 3);
+  String? _reconnectingMsg;
+
   @override
   void initState() {
     super.initState();
@@ -100,6 +106,9 @@ class _TranscribePageState extends State<TranscribePage> {
       _errorMsg = null;
       _jobResult = null;
       _progress = null;
+      _firstFailureAt = null;
+      _pollInterval = const Duration(seconds: 3);
+      _reconnectingMsg = null;
     });
 
     try {
@@ -128,9 +137,13 @@ class _TranscribePageState extends State<TranscribePage> {
     try {
       final result = await _api.pollJob(_jobId!);
       if (!mounted) return;
+      // Successful response — reset backoff
       setState(() {
         _progress = result.progress;
         _queuePosition = result.queuePosition;
+        _firstFailureAt = null;
+        _pollInterval = const Duration(seconds: 3);
+        _reconnectingMsg = null;
       });
 
       if (result.status == JobStatus.done) {
@@ -153,13 +166,25 @@ class _TranscribePageState extends State<TranscribePage> {
         });
       }
     } catch (e) {
-      _pollTimer?.cancel();
-      if (mounted) {
+      if (!mounted) return;
+      final now = DateTime.now();
+      _firstFailureAt ??= now;
+      if (now.difference(_firstFailureAt!).inMinutes >= 10) {
+        _pollTimer?.cancel();
         setState(() {
           _state = _State.error;
-          _errorMsg = e.toString();
+          _errorMsg = 'Server unavailable for too long. Please try again.';
         });
+        return;
       }
+      _pollInterval = Duration(
+        milliseconds: min(_pollInterval.inMilliseconds * 2, 300000),
+      );
+      _pollTimer?.cancel();
+      _pollTimer = Timer.periodic(_pollInterval, (_) => _poll());
+      setState(() {
+        _reconnectingMsg = '⚠️ Server temporarily unavailable, retrying…';
+      });
     }
   }
 
@@ -277,7 +302,7 @@ class _TranscribePageState extends State<TranscribePage> {
                 ],
                 if (_state == _State.processing) ...[
                   const SizedBox(height: 24),
-                  _ProgressSection(progress: _progress, queuePosition: _queuePosition),
+                  _ProgressSection(progress: _progress, queuePosition: _queuePosition, reconnectingMsg: _reconnectingMsg),
                 ],
                 if (_state == _State.done && _jobResult != null) ...[
                   const SizedBox(height: 24),
@@ -521,8 +546,9 @@ class _UploadingSection extends StatelessWidget {
 class _ProgressSection extends StatelessWidget {
   final ProgressInfo? progress;
   final int? queuePosition;
+  final String? reconnectingMsg;
 
-  const _ProgressSection({required this.progress, this.queuePosition});
+  const _ProgressSection({required this.progress, this.queuePosition, this.reconnectingMsg});
 
   @override
   Widget build(BuildContext context) {
@@ -554,6 +580,13 @@ class _ProgressSection extends StatelessWidget {
             Text(label),
             const SizedBox(height: 8),
             LinearProgressIndicator(value: value),
+            if (reconnectingMsg != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                reconnectingMsg!,
+                style: const TextStyle(color: Colors.orange, fontSize: 12),
+              ),
+            ],
           ],
         ),
       ),
