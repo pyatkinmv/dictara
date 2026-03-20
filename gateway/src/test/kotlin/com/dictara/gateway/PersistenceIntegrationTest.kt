@@ -13,7 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT
 import org.springframework.boot.test.web.client.TestRestTemplate
-import org.springframework.core.io.ClassPathResource
+import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.*
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
@@ -58,7 +58,10 @@ class PersistenceIntegrationTest {
                  "result":{"formatted_text":"Hello world.","audio_duration_s":5.0,
                            "segments":[{"start":0.0,"end":2.0,"text":"Hello world."}]}}
             """)))
-        val body = LinkedMultiValueMap<String, Any>().apply { add("file", ClassPathResource("test-audio.m4a")) }
+        val fakeAudio = object : ByteArrayResource(ByteArray(8)) {
+            override fun getFilename() = "test-audio.m4a"
+        }
+        val body = LinkedMultiValueMap<String, Any>().apply { add("file", fakeAudio) }
         val headers = HttpHeaders().apply {
             contentType = MediaType.MULTIPART_FORM_DATA
             set("X-Telegram-Chat-Id", chatId)
@@ -106,7 +109,10 @@ class PersistenceIntegrationTest {
         wireMock.stubFor(get(urlEqualTo("/jobs/fail-job"))
             .willReturn(okJson("""{"status":"failed","error":"GPU out of memory"}""")))
 
-        val body = LinkedMultiValueMap<String, Any>().apply { add("file", ClassPathResource("test-audio.m4a")) }
+        val fakeAudio = object : ByteArrayResource(ByteArray(8)) {
+            override fun getFilename() = "test-audio.m4a"
+        }
+        val body = LinkedMultiValueMap<String, Any>().apply { add("file", fakeAudio) }
         val headers = HttpHeaders().apply {
             contentType = MediaType.MULTIPART_FORM_DATA
             set("X-Telegram-Chat-Id", "retry-test-user")

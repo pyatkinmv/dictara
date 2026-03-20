@@ -9,7 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT
 import org.springframework.boot.test.web.client.TestRestTemplate
-import org.springframework.core.io.ClassPathResource
+import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.*
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
@@ -126,7 +126,9 @@ class TranscriptionIntegrationTest {
 
     private fun submitAudio(diarize: Boolean): String {
         val body = LinkedMultiValueMap<String, Any>()
-        body.add("file", ClassPathResource("test-audio.m4a"))
+        body.add("file", object : ByteArrayResource(ByteArray(8)) {
+            override fun getFilename() = "test-audio.m4a"
+        })
         val headers = HttpHeaders().apply {
             contentType = MediaType.MULTIPART_FORM_DATA
             set("X-Telegram-Chat-Id", "integration-test-user")
