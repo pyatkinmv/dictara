@@ -49,7 +49,7 @@ class PersistenceIntegrationTest {
         }
     }
 
-    private fun submitFile(chatId: String = "test-user"): UUID {
+    private fun submitFile(): UUID {
         wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
             .willReturn(okJson("""{"job_id":"persist-1"}""")))
         wireMock.stubFor(get(urlEqualTo("/jobs/persist-1"))
@@ -64,7 +64,6 @@ class PersistenceIntegrationTest {
         val body = LinkedMultiValueMap<String, Any>().apply { add("file", fakeAudio) }
         val headers = HttpHeaders().apply {
             contentType = MediaType.MULTIPART_FORM_DATA
-            set("X-Telegram-Chat-Id", chatId)
         }
         val response = rest.postForEntity(
             "/transcribe?model=fast&diarize=false&summary_mode=off",
@@ -74,14 +73,13 @@ class PersistenceIntegrationTest {
         return UUID.fromString(response.body!!["job_id"] as String)
     }
 
-    private fun submitRaw(chatId: String = "test-user"): UUID {
+    private fun submitRaw(): UUID {
         val fakeAudio = object : ByteArrayResource(ByteArray(8)) {
             override fun getFilename() = "test-audio.m4a"
         }
         val body = LinkedMultiValueMap<String, Any>().apply { add("file", fakeAudio) }
         val headers = HttpHeaders().apply {
             contentType = MediaType.MULTIPART_FORM_DATA
-            set("X-Telegram-Chat-Id", chatId)
         }
         val response = rest.postForEntity(
             "/transcribe?model=fast&diarize=false&summary_mode=off",
@@ -132,7 +130,6 @@ class PersistenceIntegrationTest {
         val body = LinkedMultiValueMap<String, Any>().apply { add("file", fakeAudio) }
         val headers = HttpHeaders().apply {
             contentType = MediaType.MULTIPART_FORM_DATA
-            set("X-Telegram-Chat-Id", "retry-test-user")
         }
         val response = rest.postForEntity(
             "/transcribe?model=fast&diarize=false&summary_mode=off",
@@ -157,7 +154,7 @@ class PersistenceIntegrationTest {
         wireMock.stubFor(get(urlEqualTo("/jobs/perm-fail-1"))
             .willReturn(okJson("""{"status":"failed","error":"Unsupported codec","retryable":false}""")))
 
-        val jobId = submitRaw("perm-fail-user")
+        val jobId = submitRaw()
         waitForStatus(jobId, "failed")
 
         val attempts = stageAttemptRepo.findBySubmissionIdAndStageOrderByAttemptNumDesc(jobId, "transcription")
@@ -173,7 +170,7 @@ class PersistenceIntegrationTest {
         wireMock.stubFor(get(urlEqualTo("/jobs/long-err-1"))
             .willReturn(okJson("""{"status":"failed","error":"$longError","retryable":false}""")))
 
-        val jobId = submitRaw("truncate-user")
+        val jobId = submitRaw()
         waitForStatus(jobId, "failed")
 
         val jobResp = rest.getForEntity("/jobs/$jobId", Map::class.java).body!!

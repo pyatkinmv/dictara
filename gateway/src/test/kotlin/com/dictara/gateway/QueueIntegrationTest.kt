@@ -43,7 +43,7 @@ class QueueIntegrationTest {
         }
     }
 
-    private fun submitFile(chatId: String, jobId: String): UUID {
+    private fun submitFile(chatId: Long, jobId: String): UUID {
         wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
             .willReturn(okJson("""{"job_id":"$jobId"}""")))
         wireMock.stubFor(get(urlEqualTo("/jobs/$jobId"))
@@ -55,7 +55,7 @@ class QueueIntegrationTest {
         val body = LinkedMultiValueMap<String, Any>().apply { add("file", fakeAudio) }
         val headers = HttpHeaders().apply {
             contentType = MediaType.MULTIPART_FORM_DATA
-            set("X-Telegram-Chat-Id", chatId)
+            set("X-Telegram-Chat-Id", chatId.toString())
         }
         val response = rest.postForEntity(
             "/transcribe?model=fast&diarize=false&summary_mode=off",
@@ -82,9 +82,9 @@ class QueueIntegrationTest {
 
     @Test
     fun `queue position reflects order of submission among active jobs`() {
-        val jobA = submitFile("queue-user-a", "q-job-a")
-        val jobB = submitFile("queue-user-b", "q-job-b")
-        val jobC = submitFile("queue-user-c", "q-job-c")
+        val jobA = submitFile(1001L, "q-job-a")
+        val jobB = submitFile(1002L, "q-job-b")
+        val jobC = submitFile(1003L, "q-job-c")
 
         waitForStatus(jobA, "processing")
         waitForStatus(jobB, "processing")
@@ -108,7 +108,7 @@ class QueueIntegrationTest {
         val body = LinkedMultiValueMap<String, Any>().apply { add("file", fakeAudio) }
         val headers = HttpHeaders().apply {
             contentType = MediaType.MULTIPART_FORM_DATA
-            set("X-Telegram-Chat-Id", "queue-done-user")
+            set("X-Telegram-Chat-Id", "2001")
         }
         val response = rest.postForEntity(
             "/transcribe?model=fast&diarize=false&summary_mode=off",

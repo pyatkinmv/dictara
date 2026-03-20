@@ -118,9 +118,9 @@ class TelegramDeliveryIntegrationTest {
         waitForStatus(jobId, "done")
 
         val deliveries = pendingDeliveries()
-        val entry = deliveries.find { it["jobId"] == jobId.toString() }
+        val entry = deliveries.find { it["job_id"] == jobId.toString() }
         assertThat(entry).isNotNull
-        assertThat(entry!!["chatId"]).isEqualTo(200)
+        assertThat(entry!!["chat_id"]).isEqualTo(200)
         assertThat(entry["status"]).isEqualTo("done")
         assertThat(entry["error"]).isNull()
     }
@@ -131,7 +131,7 @@ class TelegramDeliveryIntegrationTest {
         waitForStatus(jobId, "processing")
 
         val deliveries = pendingDeliveries()
-        assertThat(deliveries.none { it["jobId"] == jobId.toString() }).isTrue
+        assertThat(deliveries.none { it["job_id"] == jobId.toString() }).isTrue
     }
 
     @Test
@@ -153,11 +153,11 @@ class TelegramDeliveryIntegrationTest {
         )
         waitForStatus(jobId, "done")
 
-        assertThat(pendingDeliveries().any { it["jobId"] == jobId.toString() }).isTrue
+        assertThat(pendingDeliveries().any { it["job_id"] == jobId.toString() }).isTrue
 
         rest.postForEntity("/telegram/deliveries/$jobId/ack", HttpEntity.EMPTY, Void::class.java)
 
-        assertThat(pendingDeliveries().none { it["jobId"] == jobId.toString() }).isTrue
+        assertThat(pendingDeliveries().none { it["job_id"] == jobId.toString() }).isTrue
         assertThat(telegramDeliveryRepo.findById(jobId).orElseThrow().deliveredAt).isNotNull
     }
 
@@ -182,7 +182,7 @@ class TelegramDeliveryIntegrationTest {
         waitForStatus(jobId, "failed")
 
         val deliveries = pendingDeliveries()
-        val entry = deliveries.find { it["jobId"] == jobId.toString() }
+        val entry = deliveries.find { it["job_id"] == jobId.toString() }
         assertThat(entry).isNotNull
         assertThat(entry!!["status"]).isEqualTo("failed")
         assertThat((entry["error"] as String).length).isLessThanOrEqualTo(150)

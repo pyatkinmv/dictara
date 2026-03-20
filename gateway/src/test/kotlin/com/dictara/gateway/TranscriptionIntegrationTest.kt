@@ -131,7 +131,6 @@ class TranscriptionIntegrationTest {
         })
         val headers = HttpHeaders().apply {
             contentType = MediaType.MULTIPART_FORM_DATA
-            set("X-Telegram-Chat-Id", "integration-test-user")
         }
         val response = rest.postForEntity(
             "/transcribe?model=fast&diarize=$diarize&summary_mode=off",
