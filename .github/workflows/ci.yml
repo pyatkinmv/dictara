@@ -27,14 +27,47 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            gateway:
+              - 'gateway/**'
+            tg_bot:
+              - 'tg-bot/**'
+            app:
+              - 'app/**'
+            transcriber:
+              - 'transcriber/**'
+
       - uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           command_timeout: 45m
+          envs: GATEWAY_CHANGED,BOT_CHANGED,APP_CHANGED,TRANSCRIBER_CHANGED
           script: |
             cd ~/dictara
             git pull
-            docker compose build gateway
-            docker compose up -d gateway
+            if [ "$GATEWAY_CHANGED" = "true" ]; then
+              docker compose build gateway && docker compose up -d gateway
+            fi
+            if [ "$BOT_CHANGED" = "true" ]; then
+              docker compose build tg-bot && docker compose up -d tg-bot
+            fi
+            if [ "$APP_CHANGED" = "true" ]; then
+              docker compose build app-material && docker compose up -d app-material
+            fi
+            if [ "$TRANSCRIBER_CHANGED" = "true" ]; then
+              docker compose build transcriber && docker compose up -d transcriber
+            fi
+        env:
+          GATEWAY_CHANGED: ${{ steps.changes.outputs.gateway }}
+          BOT_CHANGED: ${{ steps.changes.outputs.tg_bot }}
+          APP_CHANGED: ${{ steps.changes.outputs.app }}
+          TRANSCRIBER_CHANGED: ${{ steps.changes.outputs.transcriber }}
