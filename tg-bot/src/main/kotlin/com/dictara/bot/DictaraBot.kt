@@ -104,8 +104,28 @@ class DictaraBot(
                                 "done" -> {
                                     log.info("Poller: sending transcript for jobId={} chatId={}", d.jobId, d.chatId)
                                     val result = client.fetchJobResult(d.jobId)
-                                    sendTranscript(d.chatId, result)
+                                    val sentMsg = sendTranscript(d.chatId, result)
                                     log.info("Poller: transcript sent for jobId={}", d.jobId)
+                                    if (result.summary != null) {
+                                        try {
+                                            val doneText = formatDoneText(result.durationSeconds)
+                                            val caption = "$doneText\n\n${result.summary}"
+                                            if (caption.length <= 1024) {
+                                                execute(
+                                                    EditMessageCaption.builder()
+                                                        .chatId(d.chatId.toString())
+                                                        .messageId(sentMsg.messageId)
+                                                        .caption(caption)
+                                                        .build()
+                                                )
+                                            } else {
+                                                val truncated = if (result.summary.length > 4096) result.summary.take(4093) + "…" else result.summary
+                                                send(d.chatId, truncated)
+                                            }
+                                        } catch (e: Exception) {
+                                            send(d.chatId, "Summary failed: ${e.message}")
+                                        }
+                                    }
                                 }
                                 "failed" -> send(d.chatId, "❌ Transcription failed: ${d.error ?: "unknown error"}")
                             }
