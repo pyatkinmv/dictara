@@ -68,16 +68,16 @@ jobs:
             export GIT_COMMIT=$(git rev-parse --short HEAD)
             export BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
             if [ "$GATEWAY_CHANGED" = "true" ]; then
-              docker compose build gateway && docker compose up -d gateway
+              docker compose build gateway && docker compose up -d --remove-orphans --force-recreate gateway
             fi
             if [ "$BOT_CHANGED" = "true" ]; then
-              docker compose build tg-bot && docker compose up -d tg-bot
+              docker compose build tg-bot && docker compose up -d --remove-orphans --force-recreate tg-bot
             fi
             if [ "$APP_CHANGED" = "true" ]; then
-              docker compose build app-material && docker compose up -d app-material
+              docker compose build app-material && docker compose up -d --remove-orphans --force-recreate app-material
             fi
             if [ "$TRANSCRIBER_CHANGED" = "true" ]; then
-              docker compose build transcriber && docker compose up -d transcriber
+              docker compose build transcriber && docker compose up -d --remove-orphans --force-recreate transcriber
             fi
         env:
           GATEWAY_CHANGED: ${{ steps.changes.outputs.gateway }}
