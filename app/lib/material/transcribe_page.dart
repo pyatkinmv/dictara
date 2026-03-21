@@ -559,7 +559,7 @@ class _ProgressSection extends StatelessWidget {
     String? queueLabel = queuePosition != null ? 'Position in queue: $queuePosition' : null;
 
     if (p == null) {
-      label = queueLabel != null ? '⏳ $queueLabel' : '⏳ Processing…';
+      label = queueLabel != null ? '⏳ $queueLabel' : '🎙 Transcribing…';
       queueLabel = null; // already in main label, don't show twice
     } else {
       if (p.phase == 'summarizing') {

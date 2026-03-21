@@ -297,8 +297,11 @@ class DictaraClient(private val baseUrl: String) {
                             }
                         } else {
                             val pos = root["queue_position"]?.takeIf { !it.isNull }?.asInt()
-                            val posStr = if (pos != null) " Position: $pos." else ""
-                            onProgress?.invoke("⏳ Starting transcription...$posStr")
+                            if (pos != null) {
+                                onProgress?.invoke("⏳ Waiting in queue... Position: $pos.")
+                            } else {
+                                onProgress?.invoke("🎙 Transcribing...")
+                            }
                         }
                     }
                     "summarizing" -> onProgress?.invoke("✍️ Summarizing...")

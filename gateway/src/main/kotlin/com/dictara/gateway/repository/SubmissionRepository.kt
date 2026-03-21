@@ -21,4 +21,7 @@ interface SubmissionRepository : JpaRepository<SubmissionEntity, UUID> {
 
     @Query("SELECT COUNT(s) FROM SubmissionEntity s WHERE s.status IN ('pending', 'processing') AND s.createdAt < :createdAt")
     fun countActiveSubmissionsBefore(createdAt: Instant): Long
+
+    @Query("SELECT COUNT(s) FROM SubmissionEntity s WHERE s.status IN ('pending', 'processing') AND s.id NOT IN :activeIds AND s.createdAt < :createdAt")
+    fun countWaitingSubmissionsBefore(createdAt: Instant, activeIds: Collection<UUID>): Long
 }

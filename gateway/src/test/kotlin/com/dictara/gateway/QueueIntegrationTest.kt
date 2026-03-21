@@ -80,6 +80,33 @@ class QueueIntegrationTest {
         return resp["queue_position"] as Int?
     }
 
+    private fun submitFileRaw(chatId: Long): UUID {
+        val fakeAudio = object : ByteArrayResource(ByteArray(8)) {
+            override fun getFilename() = "audio.m4a"
+        }
+        val body = LinkedMultiValueMap<String, Any>().apply { add("file", fakeAudio) }
+        val headers = HttpHeaders().apply {
+            contentType = MediaType.MULTIPART_FORM_DATA
+            set("X-Telegram-Chat-Id", chatId.toString())
+        }
+        val response = rest.postForEntity(
+            "/transcribe?model=fast&diarize=false&summary_mode=off",
+            HttpEntity(body, headers), Map::class.java,
+        )
+        assertThat(response.statusCode).isEqualTo(HttpStatus.ACCEPTED)
+        return UUID.fromString(response.body!!["job_id"] as String)
+    }
+
+    private fun waitForProgress(jobId: UUID) {
+        val deadline = System.currentTimeMillis() + 10_000
+        while (System.currentTimeMillis() < deadline) {
+            val resp = rest.getForEntity("/jobs/$jobId", Map::class.java).body!!
+            if (resp["progress"] != null) return
+            Thread.sleep(100)
+        }
+        error("Job $jobId did not get progress data within timeout")
+    }
+
     @Test
     fun `queue position reflects order of submission among active jobs`() {
         val jobA = submitFile(1001L, "q-job-a")
@@ -118,5 +145,51 @@ class QueueIntegrationTest {
         waitForStatus(jobId, "done")
 
         assertThat(queuePosition(jobId)).isNull()
+    }
+
+    @Test
+    fun `actively transcribed job has null queue position`() {
+        wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
+            .willReturn(okJson("""{"job_id":"q-active-1"}""")))
+        wireMock.stubFor(get(urlEqualTo("/jobs/q-active-1"))
+            .willReturn(okJson("""{"status":"processing","progress":{"phase":"transcribing","processed_s":10.0,"total_s":100.0}}""")))
+
+        val jobId = submitFileRaw(5001L)
+        waitForProgress(jobId)
+
+        assertThat(queuePosition(jobId)).isNull()
+    }
+
+    @Test
+    fun `waiting jobs are renumbered when earlier job is actively transcribed`() {
+        // Submit jobs one at a time so each gets its own transcriber job ID stub
+        wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
+            .willReturn(okJson("""{"job_id":"q-multi-a"}""")))
+        wireMock.stubFor(get(urlEqualTo("/jobs/q-multi-a"))
+            .willReturn(okJson("""{"status":"processing","progress":{"phase":"transcribing","processed_s":10.0,"total_s":100.0}}""")))
+        val jobA = submitFileRaw(6001L)
+        waitForStatus(jobA, "processing")
+
+        wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
+            .willReturn(okJson("""{"job_id":"q-multi-b"}""")))
+        wireMock.stubFor(get(urlEqualTo("/jobs/q-multi-b"))
+            .willReturn(okJson("""{"status":"processing"}""")))
+        val jobB = submitFileRaw(6002L)
+        waitForStatus(jobB, "processing")
+
+        wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
+            .willReturn(okJson("""{"job_id":"q-multi-c"}""")))
+        wireMock.stubFor(get(urlEqualTo("/jobs/q-multi-c"))
+            .willReturn(okJson("""{"status":"processing"}""")))
+        val jobC = submitFileRaw(6003L)
+        waitForStatus(jobC, "processing")
+
+        waitForProgress(jobA)
+
+        assertThat(queuePosition(jobA)).isNull()
+        val posB = queuePosition(jobB)!!
+        val posC = queuePosition(jobC)!!
+        assertThat(posB).isLessThan(posC)
+        assertThat(posC - posB).isEqualTo(1)
     }
 }

@@ -38,6 +38,9 @@ class OrchestratorService(
     /** Returns live in-progress data for a running job (not persisted). */
     fun getLiveProgress(submissionId: UUID): ProgressInfo? = liveProgress[submissionId]
 
+    /** Returns IDs of jobs currently being actively transcribed by the transcriber. */
+    fun getActiveJobIds(): Set<UUID> = liveProgress.keys.toSet()
+
     /** On startup: resume any stage_attempts that were in-flight when the process crashed. */
     @PostConstruct
     fun resumeInFlight() {
