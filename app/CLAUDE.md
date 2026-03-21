@@ -49,11 +49,19 @@ New item prepended automatically when a transcription completes in the current s
 ## App flow
 
 ```
-idle → [pick file] → [Transcribe button] → uploading → processing (poll every 3s) → done
-                                                                                   ↘ error → retry → idle
+idle → [pick file] → [Transcribe button] → uploading → pending (queue position shown)
+                                                            ↓
+                                                       processing (progress: transcribing → diarizing)
+                                                            ↓
+                                                       summarizing (if enabled)
+                                                            ↓
+                                                          done ← result shown
+                                                            ↘ error → retry → idle
 ```
 
-Progress phases: `transcribing` (seconds processed / total), `diarizing` (0–100%), `summarizing`.
+Gateway submission statuses: `pending` (waiting in queue), `processing` (transcriber active), `summarizing`, `done`, `failed`.
+
+Progress phases (within `processing`): `transcribing` (seconds processed / total), `diarizing` (0–100%).
 
 ## Key decisions
 

@@ -65,7 +65,9 @@ Stored in-memory keyed by **chat ID**. Defaults: model=`accurate`, diarize=`true
 User sends audio file
 Bot: "⏳ Transcribing your audio...
      Model: Accurate | Speakers: on (2) | Lang: RU | Summary: on"
-  → edited live with progress percentages
+  → pending: shows queue position while waiting
+  → processing: edited live with progress percentages (transcribing/diarizing)
+  → summarizing: shown while gateway summarizes (next job already dispatched)
 Bot: [transcript.txt]  caption: "Done in 4m 12s.\n\n<summary>"
 ```
 

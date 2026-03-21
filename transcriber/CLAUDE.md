@@ -16,7 +16,7 @@ gateway  ──HTTP──>  POST /transcribe  →  saves file to /tmp  →  crea
 gateway  ←  GET /jobs/{id}   ←  job_store (in-memory)  ←  set_done(segments)
 ```
 
-Single-worker executor — WhisperModel is not thread-safe for concurrent inference. Jobs queue up and run one at a time.
+Single-worker executor — WhisperModel is not thread-safe for concurrent inference. Jobs queue up and run one at a time. The gateway enforces the same invariant: at most one submission in `processing` at a time.
 
 ## Key files
 
