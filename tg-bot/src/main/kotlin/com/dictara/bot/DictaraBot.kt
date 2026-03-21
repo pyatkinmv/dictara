@@ -209,12 +209,23 @@ class DictaraBot(
                     val localPath = tgFile.filePath
                     if (fileBaseUrl != "https://api.telegram.org" && localPath.startsWith("/")) {
                         // Synchronize on localPath: same file_id always maps to the same local path,
-                        // so concurrent uploads of the same file would race on copy+delete without this.
+                        // so concurrent handlers for the same file would race on copy+delete without this.
                         synchronized(localPath.intern()) {
-                            File(localPath).inputStream().use { input ->
+                            val localFile = File(localPath)
+                            // Wait up to 10s for telegram-bot-api to finish writing the file to disk.
+                            val deadline = System.currentTimeMillis() + 10_000
+                            while (!localFile.exists() && System.currentTimeMillis() < deadline) {
+                                Thread.sleep(200)
+                            }
+                            if (!localFile.exists()) {
+                                // File consumed by a concurrent handler for the same file_id — discard duplicate.
+                                try { execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build()) } catch (_: Exception) {}
+                                return@submit
+                            }
+                            localFile.inputStream().use { input ->
                                 audioTmp.outputStream().use { input.copyTo(it) }
                             }
-                            File(localPath).delete()
+                            localFile.delete()
                         }
                     } else {
                         URL("$fileBaseUrl/file/bot$token/${localPath.trimStart('/')}")
