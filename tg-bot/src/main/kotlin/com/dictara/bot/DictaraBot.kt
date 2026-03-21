@@ -18,6 +18,7 @@ import org.telegram.telegrambots.meta.api.objects.Update
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.net.URL
 import java.nio.file.Files
@@ -32,12 +33,10 @@ class DictaraBot(
     options: DefaultBotOptions = DefaultBotOptions(),
 ) : TelegramLongPollingBot(options, token) {
 
+    private val log = LoggerFactory.getLogger(DictaraBot::class.java)
     private val client = DictaraClient(dictaraUrl)
     private val executor = Executors.newCachedThreadPool()
     private val supportedExtensions: Set<String> = client.fetchSupportedExtensions()
-
-    /** Deduplicates Telegram update delivery: same update_id can be re-delivered if ack is slow. */
-    private val seenUpdateIds = ConcurrentHashMap.newKeySet<Int>()
 
     /** userId → messageId of the settings message currently awaiting a language code reply */
     private val awaitingLanguage = ConcurrentHashMap<Long, Int>()
@@ -100,7 +99,7 @@ class DictaraBot(
     override fun getBotUsername() = "DictaraBot"
 
     override fun onUpdateReceived(update: Update) {
-        if (!seenUpdateIds.add(update.updateId)) return  // duplicate delivery — skip
+        log.debug("Update received: id={} hasMessage={} hasCallback={}", update.updateId, update.hasMessage(), update.hasCallbackQuery())
         when {
             update.hasCallbackQuery() -> handleCallback(update.callbackQuery)
             update.hasMessage() -> handleMessage(update.message)
@@ -165,6 +164,8 @@ class DictaraBot(
             }
         }
 
+        log.debug("Message from userId={} chatId={} type={}", userId, chatId, message.chat.type)
+
         val fileId = when {
             message.hasAnimation() -> return  // GIFs — silently ignore, no message
             message.hasAudio() -> message.audio.fileId
@@ -204,32 +205,27 @@ class DictaraBot(
         val originalMessageId = if (isGroup) message.messageId else null
         val statusMsg = send(chatId, baseLabel)
 
+        log.info("Audio received: fileId={} chatId={} prefs={}/{}/{}/{}", fileId, chatId, prefs.model, if (prefs.diarize) "diarize" else "nodiarize", prefs.language, prefs.summaryMode)
         executor.submit {
             try {
+                log.debug("GetFile start: fileId={}", fileId)
                 val tgFile = execute(GetFile().apply { this.fileId = fileId })
+                log.debug("GetFile result: fileId={} localPath={}", fileId, tgFile.filePath)
                 val ext = tgFile.filePath.substringAfterLast('.', "bin")
                 val audioTmp = Files.createTempFile("dictara-", ".$ext").toFile()
                 try {
                     val localPath = tgFile.filePath
                     if (fileBaseUrl != "https://api.telegram.org" && localPath.startsWith("/")) {
                         // Synchronize on localPath: same file_id always maps to the same local path,
-                        // so concurrent handlers for the same file would race on copy+delete without this.
+                        // so concurrent uploads of the same file would race on copy+delete without this.
+                        log.debug("Acquiring lock on localPath={}", localPath)
                         synchronized(localPath.intern()) {
-                            val localFile = File(localPath)
-                            // Wait up to 10s for telegram-bot-api to finish writing the file to disk.
-                            val deadline = System.currentTimeMillis() + 10_000
-                            while (!localFile.exists() && System.currentTimeMillis() < deadline) {
-                                Thread.sleep(200)
-                            }
-                            if (!localFile.exists()) {
-                                // File consumed by a concurrent handler for the same file_id — discard duplicate.
-                                try { execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build()) } catch (_: Exception) {}
-                                return@submit
-                            }
-                            localFile.inputStream().use { input ->
+                            log.debug("Lock acquired: localPath={} exists={}", localPath, File(localPath).exists())
+                            File(localPath).inputStream().use { input ->
                                 audioTmp.outputStream().use { input.copyTo(it) }
                             }
-                            localFile.delete()
+                            File(localPath).delete()
+                            log.debug("File copied and deleted: localPath={} audioTmp={}", localPath, audioTmp)
                         }
                     } else {
                         URL("$fileBaseUrl/file/bot$token/${localPath.trimStart('/')}")
@@ -239,6 +235,7 @@ class DictaraBot(
                     }
 
                     // Phase 1: transcribe (with live progress updates)
+                    log.info("Submitting to gateway: chatId={} fileId={} size={}b", chatId, fileId, audioTmp.length())
                     val sender = message.from
                     val result = client.transcribe(
                         audioTmp, prefs.model, prefs.diarize,
@@ -261,6 +258,7 @@ class DictaraBot(
                         } catch (_: Exception) {}
                     }
 
+                    log.info("Transcription done: chatId={} jobId={} durationS={}", chatId, result.jobId, result.durationSeconds)
                     // Phase 2: ack delivery first (prevents background poller from sending a duplicate),
                     // then send transcript and delete status message.
                     // NOTE: if sendTranscript crashes after the ack, the transcript is lost with no retry.
@@ -296,6 +294,7 @@ class DictaraBot(
                     audioTmp.delete()
                 }
             } catch (e: Exception) {
+                log.error("Failed to process audio: chatId={} fileId={} error={}", chatId, fileId, e.message, e)
                 send(chatId, if (senderTag != null) "Error transcribing $senderTag's audio: ${e.message}" else "Error: ${e.message}")
             }
         }
