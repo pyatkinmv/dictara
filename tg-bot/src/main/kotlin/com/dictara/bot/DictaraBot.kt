@@ -247,7 +247,9 @@ class DictaraBot(
                     }
 
                     // Phase 2: ack delivery first (prevents background poller from sending a duplicate),
-                    // then send transcript and delete status message
+                    // then send transcript and delete status message.
+                    // NOTE: if sendTranscript crashes after the ack, the transcript is lost with no retry.
+                    // Trade-off accepted: duplicates on every job are worse than a rare lost delivery.
                     try { client.ackDelivery(result.jobId) } catch (_: Exception) {}
                     val sentMsg = sendTranscript(chatId, result, originalMessageId)
                     try {
