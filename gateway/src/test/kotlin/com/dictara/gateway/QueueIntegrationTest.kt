@@ -4,6 +4,7 @@ import com.github.tomakehurst.wiremock.client.WireMock.*
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import org.springframework.beans.factory.annotation.Autowired
@@ -19,12 +20,24 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.util.UUID
+import javax.sql.DataSource
 
 @SpringBootTest(webEnvironment = RANDOM_PORT)
 @Testcontainers
 class QueueIntegrationTest {
 
     @Autowired lateinit var rest: TestRestTemplate
+    @Autowired lateinit var dataSource: DataSource
+
+    @BeforeEach
+    fun cleanDb() {
+        dataSource.connection.use { conn ->
+            conn.createStatement().execute(
+                "TRUNCATE TABLE stage_attempts, telegram_deliveries, submission_tags, " +
+                "diarizations, summaries, transcripts, audio_content, audio_meta, submissions CASCADE"
+            )
+        }
+    }
 
     companion object {
         @Container @JvmField val postgres = PostgreSQLContainer<Nothing>("postgres:16")
