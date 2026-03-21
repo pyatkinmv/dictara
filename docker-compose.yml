@@ -5,6 +5,8 @@ services:
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
         BUILD_TIME: ${BUILD_TIME:-unknown}
+    ports:
+      - "127.0.0.1:8000:8000"
     volumes:
       - model-cache:/models
     environment:
