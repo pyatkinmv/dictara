@@ -38,6 +38,11 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    testLogging {
+        showStandardStreams = true
+        events("failed")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
 }
 
 kotlin {
