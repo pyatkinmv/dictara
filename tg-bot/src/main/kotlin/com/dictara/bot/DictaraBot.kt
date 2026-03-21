@@ -207,11 +207,13 @@ class DictaraBot(
                 val audioTmp = Files.createTempFile("dictara-", ".$ext").toFile()
                 try {
                     val localPath = tgFile.filePath
-                    if (fileBaseUrl != "https://api.telegram.org" && localPath.startsWith("/")) {
-                        File(localPath).inputStream().use { input ->
+                    val localFile = if (fileBaseUrl != "https://api.telegram.org" && localPath.startsWith("/"))
+                        File(localPath) else null
+                    if (localFile != null && localFile.exists()) {
+                        localFile.inputStream().use { input ->
                             audioTmp.outputStream().use { input.copyTo(it) }
                         }
-                        File(localPath).delete()
+                        localFile.delete()
                     } else {
                         URL("$fileBaseUrl/file/bot$token/${localPath.trimStart('/')}")
                             .openStream().use { input ->
