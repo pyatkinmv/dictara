@@ -1,6 +1,10 @@
 FROM mwader/static-ffmpeg:latest AS ffmpeg
 
 FROM python:3.12-slim
+ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
+ENV GIT_COMMIT=$GIT_COMMIT
+ENV BUILD_TIME=$BUILD_TIME
 
 COPY --from=ffmpeg /ffmpeg /usr/local/bin/ffmpeg
 

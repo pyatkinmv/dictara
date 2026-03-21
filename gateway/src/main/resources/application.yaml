@@ -40,6 +40,27 @@ jwt:
   secret: ${JWT_SECRET:changeme-set-in-env}
   expiry-days: 30
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
+  info:
+    env:
+      enabled: true
+  metrics:
+    tags:
+      git_commit: ${GIT_COMMIT:unknown}
+      build_time: ${BUILD_TIME:unknown}
+
+info:
+  app:
+    git-commit: ${GIT_COMMIT:unknown}
+    build-time: ${BUILD_TIME:unknown}
+
 dictara:
   transcriber:
     url: ${TRANSCRIBER_URL:http://localhost:8000}

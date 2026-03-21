@@ -12,6 +12,9 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Query
 from jobs import job_store
 from transcriber import Transcriber, Diarizer, merge_diarization
 
+from prometheus_client import Gauge
+from prometheus_fastapi_instrumentator import Instrumentator
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -42,6 +45,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Dictara Transcription API", lifespan=lifespan)
+
+_build_info = Gauge("build_info", "Build metadata", ["git_commit", "build_time"])
+_build_info.labels(
+    git_commit=os.environ.get("GIT_COMMIT", "unknown"),
+    build_time=os.environ.get("BUILD_TIME", "unknown"),
+).set(1)
+
+Instrumentator().instrument(app).expose(app)
 
 
 # ── worker ────────────────────────────────────────────────────────────────────

@@ -21,6 +21,17 @@ jobs:
       - name: Run gateway tests
         working-directory: gateway
         run: gradle test
+      - name: Run tg-bot tests
+        working-directory: tg-bot
+        run: gradle test
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run transcriber smoke tests
+        working-directory: transcriber
+        run: |
+          pip install fastapi httpx pytest python-multipart prometheus-fastapi-instrumentator prometheus_client
+          pytest test_smoke.py -v
 
   deploy:
     needs: test
@@ -54,6 +65,8 @@ jobs:
           script: |
             cd ~/dictara
             git pull
+            export GIT_COMMIT=$(git rev-parse --short HEAD)
+            export BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
             if [ "$GATEWAY_CHANGED" = "true" ]; then
               docker compose build gateway && docker compose up -d gateway
             fi

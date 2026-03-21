@@ -12,8 +12,16 @@ repositories {
 
 dependencies {
     implementation("org.telegram:telegrambots:6.9.7.1")
+    implementation("io.micrometer:micrometer-core:1.13.6")
+    implementation("io.micrometer:micrometer-registry-prometheus:1.13.6")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.16.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 tasks.shadowJar {
