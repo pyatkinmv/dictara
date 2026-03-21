@@ -13,7 +13,13 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 
-@SpringBootTest(webEnvironment = RANDOM_PORT)
+@SpringBootTest(
+    webEnvironment = RANDOM_PORT,
+    properties = [
+        "management.endpoints.web.exposure.include=*",
+        "management.prometheus.metrics.export.enabled=true"
+    ]
+)
 @Testcontainers
 class ActuatorSmokeTest {
 
