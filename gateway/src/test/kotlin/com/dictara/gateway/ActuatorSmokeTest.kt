@@ -49,8 +49,8 @@ class ActuatorSmokeTest {
 
     @Test
     fun `actuator prometheus returns metrics`() {
-        val resp = rest.getForEntity("/actuator/prometheus", String::class.java)
+        val resp = rest.getForEntity("/actuator/prometheus", ByteArray::class.java)
         assertThat(resp.statusCode).isEqualTo(HttpStatus.OK)
-        assertThat(resp.body).isNotBlank()
+        assertThat(resp.body).isNotEmpty()
     }
 }
