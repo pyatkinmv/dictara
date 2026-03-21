@@ -28,7 +28,7 @@ import org.testcontainers.junit.jupiter.Testcontainers
 import java.util.UUID
 import javax.sql.DataSource
 
-@SpringBootTest(webEnvironment = RANDOM_PORT)
+@SpringBootTest(webEnvironment = RANDOM_PORT, properties = ["spring.main.allow-bean-definition-overriding=true"])
 @Testcontainers
 @Import(SummarizingIntegrationTest.StubSummarizerConfig::class)
 class SummarizingIntegrationTest {

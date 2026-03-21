@@ -5,11 +5,13 @@ import com.dictara.gateway.entity.SubmissionEntity
 import com.dictara.gateway.entity.UserEntity
 import com.dictara.gateway.repository.*
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment.NONE
+import javax.sql.DataSource
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.testcontainers.containers.PostgreSQLContainer
@@ -38,6 +40,17 @@ class SubmissionStateServiceTest {
     @Autowired lateinit var userRepo: UserRepository
     @Autowired lateinit var audioMetaRepo: AudioMetaRepository
     @Autowired lateinit var submissionRepo: SubmissionRepository
+    @Autowired lateinit var dataSource: DataSource
+
+    @BeforeEach
+    fun cleanDb() {
+        dataSource.connection.use { conn ->
+            conn.createStatement().execute(
+                "TRUNCATE TABLE stage_attempts, telegram_deliveries, submission_tags, " +
+                "diarizations, summaries, transcripts, audio_content, audio_meta, submissions CASCADE"
+            )
+        }
+    }
 
     @Test
     fun `claimNextPendingSubmission returns null when no submissions exist`() {
