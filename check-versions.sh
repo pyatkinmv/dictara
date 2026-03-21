@@ -23,15 +23,15 @@ check_service() {
     fi
 
     local git_commit build_time
-    git_commit=$(echo "$response" | grep -o '"git.commit[^"]*":"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"')
-    build_time=$(echo "$response" | grep -o '"build.time[^"]*":"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"')
+    git_commit=$(echo "$response" | grep -o '"git.commit[^"]*":"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"' || true)
+    build_time=$(echo "$response" | grep -o '"build.time[^"]*":"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"' || true)
 
     # fallback: prometheus label format  git_commit="abc"
     if [ -z "$git_commit" ]; then
-        git_commit=$(echo "$response" | grep -o 'git_commit="[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"')
+        git_commit=$(echo "$response" | grep -o 'git_commit="[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"' || true)
     fi
     if [ -z "$build_time" ]; then
-        build_time=$(echo "$response" | grep -o 'build_time="[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"')
+        build_time=$(echo "$response" | grep -o 'build_time="[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"' || true)
     fi
 
     if [ -n "$git_commit" ]; then
