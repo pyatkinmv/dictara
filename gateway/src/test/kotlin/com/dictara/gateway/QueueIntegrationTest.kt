@@ -122,17 +122,18 @@ class QueueIntegrationTest {
 
     @Test
     fun `queue position reflects order of submission among active jobs`() {
+        // A gets dispatched immediately; B and C stay pending (only one job runs at a time)
         val jobA = submitFile(1001L, "q-job-a")
-        val jobB = submitFile(1002L, "q-job-b")
-        val jobC = submitFile(1003L, "q-job-c")
+        val jobB = submitFileRaw(1002L)
+        val jobC = submitFileRaw(1003L)
 
         waitForStatus(jobA, "processing")
-        waitForStatus(jobB, "processing")
-        waitForStatus(jobC, "processing")
 
-        assertThat(queuePosition(jobA)).isEqualTo(1)
-        assertThat(queuePosition(jobB)).isEqualTo(2)
-        assertThat(queuePosition(jobC)).isEqualTo(3)
+        // A is being transcribed — no queue position
+        assertThat(queuePosition(jobA)).isNull()
+        // B and C are pending — queue positions 1 and 2
+        assertThat(queuePosition(jobB)).isEqualTo(1)
+        assertThat(queuePosition(jobC)).isEqualTo(2)
     }
 
     @Test
@@ -174,30 +175,44 @@ class QueueIntegrationTest {
     }
 
     @Test
+    fun `job B is dispatched after job A completes`() {
+        // POST: first call dispatches A, second call dispatches B after A finishes
+        wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
+            .inScenario("seq").whenScenarioStateIs("Started")
+            .willReturn(okJson("""{"job_id":"seq-a"}"""))
+            .willSetStateTo("a-submitted"))
+        wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
+            .inScenario("seq").whenScenarioStateIs("a-submitted")
+            .willReturn(okJson("""{"job_id":"seq-b"}""")))
+
+        wireMock.stubFor(get(urlEqualTo("/jobs/seq-a"))
+            .willReturn(okJson("""{"status":"done","duration_s":0.1,"result":{"formatted_text":"Hi","audio_duration_s":1.0,"segments":[]}}""")))
+        wireMock.stubFor(get(urlEqualTo("/jobs/seq-b"))
+            .willReturn(okJson("""{"status":"processing"}""")))
+
+        val jobA = submitFileRaw(7001L)
+        val jobB = submitFileRaw(7002L)
+
+        waitForStatus(jobA, "done")       // A completes
+        waitForStatus(jobB, "processing") // B automatically dispatched afterwards
+
+        assertThat(queuePosition(jobB)).isNull() // B is now processing, not in queue
+    }
+
+    @Test
     fun `waiting jobs are renumbered when earlier job is actively transcribed`() {
-        // Submit jobs one at a time so each gets its own transcriber job ID stub
+        // A: dispatched with progress data confirming active transcription
         wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
             .willReturn(okJson("""{"job_id":"q-multi-a"}""")))
         wireMock.stubFor(get(urlEqualTo("/jobs/q-multi-a"))
             .willReturn(okJson("""{"status":"processing","progress":{"phase":"transcribing","processed_s":10.0,"total_s":100.0}}""")))
         val jobA = submitFileRaw(6001L)
-        waitForStatus(jobA, "processing")
 
-        wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
-            .willReturn(okJson("""{"job_id":"q-multi-b"}""")))
-        wireMock.stubFor(get(urlEqualTo("/jobs/q-multi-b"))
-            .willReturn(okJson("""{"status":"processing"}""")))
+        // B and C: stay pending (A is already processing; only one job runs at a time)
         val jobB = submitFileRaw(6002L)
-        waitForStatus(jobB, "processing")
-
-        wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
-            .willReturn(okJson("""{"job_id":"q-multi-c"}""")))
-        wireMock.stubFor(get(urlEqualTo("/jobs/q-multi-c"))
-            .willReturn(okJson("""{"status":"processing"}""")))
         val jobC = submitFileRaw(6003L)
-        waitForStatus(jobC, "processing")
 
-        waitForProgress(jobA)
+        waitForProgress(jobA)  // A has live progress — confirmed actively transcribing
 
         assertThat(queuePosition(jobA)).isNull()
         val posB = queuePosition(jobB)!!

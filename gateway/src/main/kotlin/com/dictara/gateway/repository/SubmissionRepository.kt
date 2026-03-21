@@ -16,12 +16,9 @@ interface SubmissionRepository : JpaRepository<SubmissionEntity, UUID> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(value = [QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2")])
-    @Query("SELECT s FROM SubmissionEntity s JOIN FETCH s.audio JOIN FETCH s.user WHERE s.status = 'pending' ORDER BY s.createdAt")
-    fun findPendingForUpdate(): List<SubmissionEntity>
+    @Query("SELECT s FROM SubmissionEntity s JOIN FETCH s.audio JOIN FETCH s.user WHERE s.status = 'pending' ORDER BY s.createdAt LIMIT 1")
+    fun findNextPendingForUpdate(): SubmissionEntity?
 
-    @Query("SELECT COUNT(s) FROM SubmissionEntity s WHERE s.status IN ('pending', 'processing') AND s.createdAt < :createdAt")
-    fun countActiveSubmissionsBefore(createdAt: Instant): Long
-
-    @Query("SELECT COUNT(s) FROM SubmissionEntity s WHERE s.status IN ('pending', 'processing') AND s.id NOT IN :activeIds AND s.createdAt < :createdAt")
-    fun countWaitingSubmissionsBefore(createdAt: Instant, activeIds: Collection<UUID>): Long
+    @Query("SELECT COUNT(s) FROM SubmissionEntity s WHERE s.status = 'pending' AND s.createdAt < :createdAt")
+    fun countPendingSubmissionsBefore(createdAt: Instant): Long
 }

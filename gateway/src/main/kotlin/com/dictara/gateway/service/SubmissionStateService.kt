@@ -14,16 +14,16 @@ class SubmissionStateService(
     private val transcriptRepo: TranscriptRepository,
     private val summaryRepo: SummaryRepository,
 ) {
-    /** Picks up pending submissions, marks them processing, and returns them. */
+    /** Claims the next pending submission (oldest by createdAt), marks it processing, and returns it.
+     *  Returns null if no pending submissions exist or another job is already processing.
+     *  The partial unique index on status='processing' enforces at most one at a time. */
     @Transactional
-    fun claimPendingSubmissions(): List<SubmissionEntity> {
-        val pending = submissionRepo.findPendingForUpdate()
-        pending.forEach {
-            it.status = "processing"
-            it.updatedAt = Instant.now()
-        }
-        submissionRepo.saveAll(pending)
-        return pending
+    fun claimNextPendingSubmission(): SubmissionEntity? {
+        val submission = submissionRepo.findNextPendingForUpdate() ?: return null
+        submission.status = "processing"
+        submission.updatedAt = Instant.now()
+        submissionRepo.save(submission)
+        return submission
     }
 
     /** Picks up in-flight stage_attempts for crash recovery. */
@@ -94,6 +94,28 @@ class SubmissionStateService(
         val attempt = stageAttemptRepo.findById(attemptId).orElseThrow()
         attempt.status = "done"
         attempt.finishedAt = Instant.now()
+        stageAttemptRepo.save(attempt)
+    }
+
+    /** Transitions a submission to 'summarizing' (after transcription completes). */
+    @Transactional
+    fun startSummarizing(submissionId: UUID) {
+        val submission = submissionRepo.findById(submissionId).orElseThrow()
+        submission.status = "summarizing"
+        submission.updatedAt = Instant.now()
+        submissionRepo.save(submission)
+    }
+
+    /** Resets an incompletely-claimed submission back to 'pending' (gateway crashed before transcriber submit).
+     *  Marks the dangling stage_attempt as failed so it won't be picked up again. */
+    @Transactional
+    fun resetToQueue(attempt: StageAttemptEntity) {
+        val submission = submissionRepo.findById(attempt.submissionId).orElseThrow()
+        submission.status = "pending"
+        submission.updatedAt = Instant.now()
+        submissionRepo.save(submission)
+        attempt.status = "failed"
+        attempt.error = "Incomplete claim — reset on restart"
         stageAttemptRepo.save(attempt)
     }
 

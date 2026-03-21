@@ -32,14 +32,11 @@ class OrchestratorService(
 
     /** Called by controller after creating a pending submission. */
     fun signalPending() {
-        executor.submit { processPending() }
+        executor.submit { dispatchNext() }
     }
 
     /** Returns live in-progress data for a running job (not persisted). */
     fun getLiveProgress(submissionId: UUID): ProgressInfo? = liveProgress[submissionId]
-
-    /** Returns IDs of jobs currently being actively transcribed by the transcriber. */
-    fun getActiveJobIds(): Set<UUID> = liveProgress.keys.toSet()
 
     /** On startup: resume any stage_attempts that were in-flight when the process crashed. */
     @PostConstruct
@@ -48,20 +45,27 @@ class OrchestratorService(
             try {
                 val inFlight = stateService.claimInFlightAttempts()
                 inFlight.forEach { attempt ->
-                    liveProgress[attempt.submissionId] = ProgressInfo("transcribing")
-                    executor.submit { resumeTranscription(attempt) }
+                    if (attempt.externalJobId == null) {
+                        // Gateway crashed after claiming but before submitting to transcriber — reset to queue
+                        stateService.resetToQueue(attempt)
+                    } else {
+                        liveProgress[attempt.submissionId] = ProgressInfo("transcribing")
+                        executor.submit { resumeTranscription(attempt) }
+                    }
                 }
+                // After recovery, dispatch the next pending job if nothing is running
+                dispatchNext()
             } catch (e: Exception) {
                 System.err.println("Crash recovery error: ${e.message}")
             }
         }
     }
 
-    private fun processPending() {
-        val submissions = stateService.claimPendingSubmissions()
-        submissions.forEach { submission ->
-            executor.submit { runTranscription(submission) }
-        }
+    /** Claims the next pending submission (if any) and dispatches it to the transcriber.
+     *  The partial unique index on status='processing' ensures at most one runs at a time. */
+    private fun dispatchNext() {
+        val submission = stateService.claimNextPendingSubmission() ?: return
+        executor.submit { runTranscription(submission) }
     }
 
     // ── Transcription Stage ─────────────────────────────────────────────────
@@ -98,14 +102,17 @@ class OrchestratorService(
             liveProgress.remove(submissionId)
             if (e is PermanentJobFailureException) {
                 stateService.failSubmission(submissionId)
+                dispatchNext()
                 return
             }
             val totalAttempts = stateService.countAttempts(submissionId, "transcription")
             if (totalAttempts < 3) {
+                // Retrying — job stays in 'processing', do NOT dispatch next
                 Thread.sleep(props.transcriber.pollIntervalMs * 2)
                 runTranscription(submission)
             } else {
                 stateService.failSubmission(submissionId)
+                dispatchNext()
             }
         }
     }
@@ -131,8 +138,9 @@ class OrchestratorService(
             val totalAttempts = stateService.countAttempts(submissionId, "transcription")
             if (totalAttempts >= 3) {
                 stateService.failSubmission(submissionId)
+                dispatchNext()
             }
-            // If < 3, submission stays status=processing; acceptable Plan 1 limitation
+            // If < 3, submission stays 'processing' and will be retried on next signalPending
         }
     }
 
@@ -142,9 +150,12 @@ class OrchestratorService(
         val summaryMode = SummaryMode.valueOf(submission.summaryMode.uppercase())
         if (summaryMode == SummaryMode.OFF || !summarizer.isAvailable()) {
             stateService.completeSubmission(submission.id!!)
+            dispatchNext()  // transcriber is now free
             return
         }
-        runSummarization(submission.id!!, submission.language, formattedText, summaryMode)
+        stateService.startSummarizing(submission.id!!)
+        dispatchNext()  // transcriber is now free — next job starts while summarization runs
+        executor.submit { runSummarization(submission.id!!, submission.language, formattedText, summaryMode) }
     }
 
     private fun runSummarization(submissionId: UUID, language: String, formattedText: String, mode: SummaryMode) {

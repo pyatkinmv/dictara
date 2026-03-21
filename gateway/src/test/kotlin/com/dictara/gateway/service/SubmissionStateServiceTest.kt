@@ -40,9 +40,9 @@ class SubmissionStateServiceTest {
     @Autowired lateinit var submissionRepo: SubmissionRepository
 
     @Test
-    fun `claimPendingSubmissions returns nothing when no submissions exist`() {
-        val result = stateService.claimPendingSubmissions()
-        assertThat(result).isEmpty()
+    fun `claimNextPendingSubmission returns null when no submissions exist`() {
+        val result = stateService.claimNextPendingSubmission()
+        assertThat(result).isNull()
     }
 
     @Test

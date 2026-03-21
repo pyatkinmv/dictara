@@ -196,16 +196,9 @@ class TranscribeController(
 
         val tags = tagRepo.findBySubmissionId(id).map { it.tag }.sorted()
 
-        val activeIds = orchestrator.getActiveJobIds()
-        val queuePosition = if (submission.status in listOf("pending", "processing")) {
-            if (activeIds.contains(submission.id)) null
-            else {
-                val count = if (activeIds.isEmpty())
-                    submissionRepo.countActiveSubmissionsBefore(submission.createdAt)
-                else
-                    submissionRepo.countWaitingSubmissionsBefore(submission.createdAt, activeIds)
-                count.toInt() + 1
-            }
+        // 'pending' = waiting in queue; 'processing' = transcriber is actively working (no position).
+        val queuePosition = if (submission.status == "pending") {
+            submissionRepo.countPendingSubmissionsBefore(submission.createdAt).toInt() + 1
         } else null
 
         return JobResponse(
