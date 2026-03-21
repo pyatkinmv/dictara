@@ -8,6 +8,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
@@ -21,6 +22,7 @@ data class TranscriptResult(
 )
 
 class DictaraClient(private val baseUrl: String) {
+    private val log = LoggerFactory.getLogger(DictaraClient::class.java)
     private val http = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
@@ -80,8 +82,10 @@ class DictaraClient(private val baseUrl: String) {
                 .post("".toRequestBody("application/json".toMediaType()))
                 .build()
         ).execute()
-        val body = resp.body?.string() ?: return false
-        return runCatching { mapper.readTree(body)["claimed"]?.asBoolean() }.getOrNull() ?: false
+        val body = resp.body?.string() ?: ""
+        val claimed = runCatching { mapper.readTree(body)["claimed"]?.asBoolean() }.getOrNull() ?: false
+        log.info("ackDelivery: jobId={} httpStatus={} body={} claimed={}", jobId, resp.code, body, claimed)
+        return claimed
     }
 
     fun fetchJobResult(jobId: String): TranscriptResult {

@@ -87,23 +87,35 @@ class DictaraBot(
             while (true) {
                 Thread.sleep(5_000)
                 try {
-                    for (d in client.fetchPendingDeliveries()) {
+                    val pending = client.fetchPendingDeliveries()
+                    if (pending.isNotEmpty()) {
+                        log.info("Poller: fetched {} pending deliveries: {}", pending.size, pending.map { it.jobId })
+                    }
+                    for (d in pending) {
                         try {
+                            log.info("Poller: acking jobId={} status={}", d.jobId, d.status)
                             val claimed = client.ackDelivery(d.jobId)
+                            log.info("Poller: ack result jobId={} claimed={}", d.jobId, claimed)
                             if (!claimed) {
-                                log.debug("Delivery already claimed by inline handler: jobId={}", d.jobId)
+                                log.info("Poller: delivery already claimed by inline handler, skipping: jobId={}", d.jobId)
                                 continue
                             }
                             when (d.status) {
                                 "done" -> {
+                                    log.info("Poller: sending transcript for jobId={} chatId={}", d.jobId, d.chatId)
                                     val result = client.fetchJobResult(d.jobId)
                                     sendTranscript(d.chatId, result)
+                                    log.info("Poller: transcript sent for jobId={}", d.jobId)
                                 }
                                 "failed" -> send(d.chatId, "❌ Transcription failed: ${d.error ?: "unknown error"}")
                             }
-                        } catch (_: Exception) {}
+                        } catch (e: Exception) {
+                            log.error("Poller: error processing delivery jobId={}: {}", d.jobId, e.message, e)
+                        }
                     }
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    log.error("Poller: error fetching deliveries: {}", e.message, e)
+                }
             }
         }
 
@@ -302,13 +314,20 @@ class DictaraBot(
 
                     log.info("Transcription done: chatId={} jobId={} durationS={}", chatId, result.jobId, result.durationSeconds)
                     // Phase 2: atomically claim delivery — only the caller that gets claimed=true sends the transcript.
-                    val claimed = try { client.ackDelivery(result.jobId) } catch (_: Exception) { false }
+                    log.info("Inline: acking jobId={}", result.jobId)
+                    val claimed = try { client.ackDelivery(result.jobId) } catch (e: Exception) {
+                        log.error("Inline: ackDelivery failed for jobId={}: {}", result.jobId, e.message, e)
+                        false
+                    }
+                    log.info("Inline: ack result jobId={} claimed={}", result.jobId, claimed)
                     if (!claimed) {
-                        log.warn("Delivery already claimed by background poller: jobId={} chatId={}", result.jobId, chatId)
+                        log.warn("Inline: delivery already claimed by background poller, skipping send: jobId={} chatId={}", result.jobId, chatId)
                         try { execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build()) } catch (_: Exception) {}
                         return@submit
                     }
+                    log.info("Inline: sending transcript for jobId={} chatId={}", result.jobId, chatId)
                     val sentMsg = sendTranscript(chatId, result, originalMessageId)
+                    log.info("Inline: transcript sent for jobId={}", result.jobId)
                     try {
                         execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build())
                     } catch (_: Exception) {}
