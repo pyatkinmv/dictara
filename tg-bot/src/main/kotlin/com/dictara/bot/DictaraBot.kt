@@ -18,6 +18,7 @@ import org.telegram.telegrambots.meta.api.objects.Update
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton
+import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.net.URL
@@ -26,17 +27,26 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicLong
 
 class DictaraBot(
     private val token: String,
     dictaraUrl: String,
     options: DefaultBotOptions = DefaultBotOptions(),
+    registry: MeterRegistry,
+    private val botApiDataDir: String = System.getenv("BOT_API_DATA_DIR") ?: "/var/lib/telegram-bot-api",
 ) : TelegramLongPollingBot(options, token) {
 
     private val log = LoggerFactory.getLogger(DictaraBot::class.java)
     private val client = DictaraClient(dictaraUrl)
     private val executor = Executors.newCachedThreadPool()
     private val supportedExtensions: Set<String> = client.fetchSupportedExtensions()
+
+    private val volumeFilesGauge  = AtomicLong(0).also { registry.gauge("dictara_bot_api_volume_files", it) }
+    private val volumeBytesGauge  = AtomicLong(0).also { registry.gauge("dictara_bot_api_volume_bytes", it) }
+    private val oldestAgeGauge    = AtomicLong(0).also { registry.gauge("dictara_bot_api_oldest_file_age_seconds", it) }
+    private val deletedFilesCounter = registry.counter("dictara_bot_api_cleanup_deleted_files_total")
+    private val deletedBytesCounter = registry.counter("dictara_bot_api_cleanup_deleted_bytes_total")
 
     /** userId → messageId of the settings message currently awaiting a language code reply */
     private val awaitingLanguage = ConcurrentHashMap<Long, Int>()
@@ -90,6 +100,40 @@ class DictaraBot(
                         } catch (_: Exception) {}
                     }
                 } catch (_: Exception) {}
+            }
+        }
+
+        executor.submit {
+            while (true) {
+                Thread.sleep(60_000)
+                try {
+                    val root = File(botApiDataDir)
+                    if (!root.exists()) continue
+
+                    val allFiles = root.walkTopDown().filter { it.isFile }.toList()
+                    volumeFilesGauge.set(allFiles.size.toLong())
+                    volumeBytesGauge.set(allFiles.sumOf { it.length() })
+                    oldestAgeGauge.set(
+                        allFiles.maxOfOrNull { System.currentTimeMillis() - it.lastModified() }
+                            ?.div(1000) ?: 0
+                    )
+
+                    val tenMinutesAgo = System.currentTimeMillis() - 10 * 60 * 1000L
+                    val toDelete = allFiles.filter { it.lastModified() < tenMinutesAgo }
+                    toDelete.forEach { f ->
+                        val size = f.length()
+                        if (f.delete()) {
+                            deletedFilesCounter.increment()
+                            deletedBytesCounter.increment(size.toDouble())
+                            log.debug("Cleanup deleted: path={} size={}b", f.path, size)
+                        }
+                    }
+                    if (toDelete.isNotEmpty())
+                        log.info("Cleanup: deleted={} files, freed={}b", toDelete.size, toDelete.sumOf { it.length() })
+
+                } catch (e: Exception) {
+                    log.error("Cleanup job error: {}", e.message, e)
+                }
             }
         }
     }
@@ -216,17 +260,11 @@ class DictaraBot(
                 try {
                     val localPath = tgFile.filePath
                     if (fileBaseUrl != "https://api.telegram.org" && localPath.startsWith("/")) {
-                        // Synchronize on localPath: same file_id always maps to the same local path,
-                        // so concurrent uploads of the same file would race on copy+delete without this.
-                        log.debug("Acquiring lock on localPath={}", localPath)
-                        synchronized(localPath.intern()) {
-                            log.debug("Lock acquired: localPath={} exists={}", localPath, File(localPath).exists())
-                            File(localPath).inputStream().use { input ->
-                                audioTmp.outputStream().use { input.copyTo(it) }
-                            }
-                            File(localPath).delete()
-                            log.debug("File copied and deleted: localPath={} audioTmp={}", localPath, audioTmp)
+                        log.debug("Copying local file: localPath={}", localPath)
+                        File(localPath).inputStream().use { input ->
+                            audioTmp.outputStream().use { input.copyTo(it) }
                         }
+                        log.debug("File copied: localPath={} audioTmp={}", localPath, audioTmp)
                     } else {
                         URL("$fileBaseUrl/file/bot$token/${localPath.trimStart('/')}")
                             .openStream().use { input ->

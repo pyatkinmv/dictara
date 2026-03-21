@@ -25,9 +25,6 @@ fun main() {
         options.baseUrl = "$apiUrl/bot"
     }
 
-    val api = TelegramBotsApi(DefaultBotSession::class.java)
-    api.registerBot(DictaraBot(token, dictaraUrl, options))
-
     val registry = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
     registry.config().commonTags(
         "git_commit", System.getenv("GIT_COMMIT") ?: "unknown",
@@ -37,6 +34,9 @@ fun main() {
     JvmGcMetrics().bindTo(registry)
     JvmThreadMetrics().bindTo(registry)
     ProcessorMetrics().bindTo(registry)
+
+    val api = TelegramBotsApi(DefaultBotSession::class.java)
+    api.registerBot(DictaraBot(token, dictaraUrl, options, registry))
 
     HttpServer.create(InetSocketAddress(9090), 0).apply {
         createContext("/metrics") { ex ->
