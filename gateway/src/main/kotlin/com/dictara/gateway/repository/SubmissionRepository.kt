@@ -14,6 +14,8 @@ interface SubmissionRepository : JpaRepository<SubmissionEntity, UUID> {
 
     fun findByUser_IdOrderByCreatedAtDesc(userId: UUID): List<SubmissionEntity>
 
+    fun existsByStatus(status: String): Boolean
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(value = [QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2")])
     @Query("SELECT s FROM SubmissionEntity s JOIN FETCH s.audio JOIN FETCH s.user WHERE s.status = 'pending' ORDER BY s.createdAt LIMIT 1")

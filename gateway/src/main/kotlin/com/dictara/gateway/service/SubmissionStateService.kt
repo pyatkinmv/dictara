@@ -19,6 +19,7 @@ class SubmissionStateService(
      *  The partial unique index on status='processing' enforces at most one at a time. */
     @Transactional
     fun claimNextPendingSubmission(): SubmissionEntity? {
+        if (submissionRepo.existsByStatus("processing")) return null
         val submission = submissionRepo.findNextPendingForUpdate() ?: return null
         submission.status = "processing"
         submission.updatedAt = Instant.now()

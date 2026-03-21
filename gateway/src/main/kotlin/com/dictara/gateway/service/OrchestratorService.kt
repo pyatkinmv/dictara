@@ -27,12 +27,14 @@ class OrchestratorService(
     private val transcriptRepo: TranscriptRepository,
 ) {
     private val executor = Executors.newCachedThreadPool()
+    // Single-threaded: serializes all dispatch decisions so only one claim runs at a time
+    private val dispatchExecutor = Executors.newSingleThreadExecutor()
     private val liveProgress = ConcurrentHashMap<UUID, ProgressInfo>()
     private val mapper = ObjectMapper().registerKotlinModule()
 
     /** Called by controller after creating a pending submission. */
     fun signalPending() {
-        executor.submit { dispatchNext() }
+        dispatchExecutor.submit { doDispatch() }
     }
 
     /** Returns live in-progress data for a running job (not persisted). */
@@ -61,9 +63,14 @@ class OrchestratorService(
         }
     }
 
-    /** Claims the next pending submission (if any) and dispatches it to the transcriber.
-     *  The partial unique index on status='processing' ensures at most one runs at a time. */
+    /** Schedules a dispatch attempt on the single-threaded dispatchExecutor.
+     *  Safe to call from any thread; returns immediately. */
     private fun dispatchNext() {
+        dispatchExecutor.submit { doDispatch() }
+    }
+
+    /** Runs on dispatchExecutor only — serialized so no concurrent claims are possible. */
+    private fun doDispatch() {
         val submission = stateService.claimNextPendingSubmission() ?: return
         executor.submit { runTranscription(submission) }
     }
