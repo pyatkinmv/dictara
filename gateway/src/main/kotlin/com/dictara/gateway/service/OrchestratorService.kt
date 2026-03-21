@@ -181,7 +181,7 @@ class OrchestratorService(
             Thread.sleep(props.transcriber.pollIntervalMs)
             val snapshot = transcriberClient.getJob(transcriberJobId)
             when (snapshot.status) {
-                "processing" -> snapshot.progress?.let { liveProgress[submissionId] = it }
+                "processing" -> liveProgress[submissionId] = snapshot.progress ?: liveProgress.getOrDefault(submissionId, ProgressInfo("transcribing"))
                 "done" -> return snapshot
                 "failed" -> {
                     val msg = snapshot.error ?: "Transcriber job failed"
