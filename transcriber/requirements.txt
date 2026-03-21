@@ -1,3 +1,4 @@
+# ML dependencies pinned — see transcriber/CLAUDE.md for constraints
 prometheus-fastapi-instrumentator
 faster-whisper
 pyannote.audio>=2.1,<4.0

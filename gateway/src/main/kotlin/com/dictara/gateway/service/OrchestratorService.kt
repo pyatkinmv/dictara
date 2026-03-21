@@ -87,7 +87,7 @@ class OrchestratorService(
             val formattedText = formatSegments(snapshot.segments ?: emptyList())
 
             stateService.saveTranscriptAndCompleteAttempt(
-                submissionId, attempt.id!!, segmentsJson, formattedText, snapshot.audioDurationS,
+                submissionId, attempt.id, segmentsJson, formattedText, snapshot.audioDurationS,
             )
             liveProgress.remove(submissionId)
             advanceToSummarization(submission, formattedText)
@@ -117,7 +117,7 @@ class OrchestratorService(
             val formattedText = formatSegments(snapshot.segments ?: emptyList())
 
             stateService.saveTranscriptAndCompleteAttempt(
-                submissionId, attempt.id!!, segmentsJson, formattedText, snapshot.audioDurationS,
+                submissionId, attempt.id, segmentsJson, formattedText, snapshot.audioDurationS,
             )
             liveProgress.remove(submissionId)
 
