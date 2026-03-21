@@ -49,7 +49,14 @@ class ActuatorSmokeTest {
 
     @Test
     fun `actuator prometheus is exposed`() {
+        val actuatorRoot = rest.getForEntity("/actuator", String::class.java)
         val resp = rest.getForEntity("/actuator/prometheus", String::class.java)
-        assertThat(resp.statusCode).isEqualTo(HttpStatus.OK)
+        assertThat(resp.statusCode)
+            .withFailMessage(
+                "Prometheus endpoint returned ${resp.statusCode}. " +
+                "Body: ${resp.body?.take(300)}. " +
+                "Actuator root (${actuatorRoot.statusCode}): ${actuatorRoot.body}"
+            )
+            .isEqualTo(HttpStatus.OK)
     }
 }
