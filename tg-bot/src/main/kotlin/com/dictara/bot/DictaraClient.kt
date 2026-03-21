@@ -73,13 +73,15 @@ class DictaraClient(private val baseUrl: String) {
         }
     }
 
-    fun ackDelivery(jobId: String) {
-        http.newCall(
+    fun ackDelivery(jobId: String): Boolean {
+        val resp = http.newCall(
             Request.Builder()
                 .url("$baseUrl/telegram/deliveries/$jobId/ack")
                 .post("".toRequestBody("application/json".toMediaType()))
                 .build()
-        ).execute().close()
+        ).execute()
+        val body = resp.body?.string() ?: return false
+        return runCatching { mapper.readTree(body)["claimed"]?.asBoolean() }.getOrNull() ?: false
     }
 
     fun fetchJobResult(jobId: String): TranscriptResult {

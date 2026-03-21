@@ -326,11 +326,10 @@ class TranscribeController(
         }
 
     @PostMapping("/telegram/deliveries/{jobId}/ack")
-    fun ackDelivery(@PathVariable jobId: String) {
-        telegramDeliveryRepo.findById(UUID.fromString(jobId)).ifPresent {
-            it.deliveredAt = Instant.now()
-            telegramDeliveryRepo.save(it)
-        }
+    @Transactional
+    fun ackDelivery(@PathVariable jobId: String): Map<String, Boolean> {
+        val count = telegramDeliveryRepo.claimDelivery(UUID.fromString(jobId))
+        return mapOf("claimed" to (count > 0))
     }
 
     private fun saveAudio(file: MultipartFile, user: UserEntity): AudioMetaEntity {

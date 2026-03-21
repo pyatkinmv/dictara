@@ -89,6 +89,11 @@ class DictaraBot(
                 try {
                     for (d in client.fetchPendingDeliveries()) {
                         try {
+                            val claimed = client.ackDelivery(d.jobId)
+                            if (!claimed) {
+                                log.debug("Delivery already claimed by inline handler: jobId={}", d.jobId)
+                                continue
+                            }
                             when (d.status) {
                                 "done" -> {
                                     val result = client.fetchJobResult(d.jobId)
@@ -96,7 +101,6 @@ class DictaraBot(
                                 }
                                 "failed" -> send(d.chatId, "❌ Transcription failed: ${d.error ?: "unknown error"}")
                             }
-                            client.ackDelivery(d.jobId)
                         } catch (_: Exception) {}
                     }
                 } catch (_: Exception) {}
@@ -297,11 +301,13 @@ class DictaraBot(
                     }
 
                     log.info("Transcription done: chatId={} jobId={} durationS={}", chatId, result.jobId, result.durationSeconds)
-                    // Phase 2: ack delivery first (prevents background poller from sending a duplicate),
-                    // then send transcript and delete status message.
-                    // NOTE: if sendTranscript crashes after the ack, the transcript is lost with no retry.
-                    // Trade-off accepted: duplicates on every job are worse than a rare lost delivery.
-                    try { client.ackDelivery(result.jobId) } catch (_: Exception) {}
+                    // Phase 2: atomically claim delivery — only the caller that gets claimed=true sends the transcript.
+                    val claimed = try { client.ackDelivery(result.jobId) } catch (_: Exception) { false }
+                    if (!claimed) {
+                        log.warn("Delivery already claimed by background poller: jobId={} chatId={}", result.jobId, chatId)
+                        try { execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build()) } catch (_: Exception) {}
+                        return@submit
+                    }
                     val sentMsg = sendTranscript(chatId, result, originalMessageId)
                     try {
                         execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build())

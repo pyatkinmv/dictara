@@ -155,7 +155,8 @@ class TelegramDeliveryIntegrationTest {
 
         assertThat(pendingDeliveries().any { it["job_id"] == jobId.toString() }).isTrue
 
-        rest.postForEntity("/telegram/deliveries/$jobId/ack", HttpEntity.EMPTY, Void::class.java)
+        val ackResp = rest.postForEntity("/telegram/deliveries/$jobId/ack", HttpEntity.EMPTY, Map::class.java)
+        assertThat(ackResp.body!!["claimed"]).isEqualTo(true)
 
         assertThat(pendingDeliveries().none { it["job_id"] == jobId.toString() }).isTrue
         assertThat(telegramDeliveryRepo.findById(jobId).orElseThrow().deliveredAt).isNotNull
@@ -207,9 +208,14 @@ class TelegramDeliveryIntegrationTest {
         )
         waitForStatus(jobId, "done")
 
-        repeat(3) {
-            val resp = rest.postForEntity("/telegram/deliveries/$jobId/ack", HttpEntity.EMPTY, Void::class.java)
-            assertThat(resp.statusCode).isEqualTo(HttpStatus.OK)
+        val first = rest.postForEntity("/telegram/deliveries/$jobId/ack", HttpEntity.EMPTY, Map::class.java)
+        assertThat(first.statusCode).isEqualTo(HttpStatus.OK)
+        assertThat(first.body!!["claimed"]).isEqualTo(true)
+
+        repeat(2) {
+            val subsequent = rest.postForEntity("/telegram/deliveries/$jobId/ack", HttpEntity.EMPTY, Map::class.java)
+            assertThat(subsequent.statusCode).isEqualTo(HttpStatus.OK)
+            assertThat(subsequent.body!!["claimed"]).isEqualTo(false)
         }
         assertThat(telegramDeliveryRepo.findById(jobId).orElseThrow().deliveredAt).isNotNull
     }
