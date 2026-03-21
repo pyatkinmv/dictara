@@ -1,4 +1,4 @@
-# Stage 1: build Flutter web app
+# Stage 1: build Flutter web
 FROM ghcr.io/cirruslabs/flutter:stable AS builder
 WORKDIR /app
 COPY pubspec.yaml pubspec.lock* ./
