@@ -55,7 +55,7 @@ if [ -n "$response" ]; then
     status=$(echo "$response" | grep -o '"status":"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"')
     db=$(echo "$response" | grep -o '"db":{"status":"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"')
     disk_free=$(echo "$response" | grep -o '"free":[0-9]*' | grep -o '[0-9]*')
-    disk_free_gb=$(echo "scale=1; ${disk_free:-0} / 1073741824" | bc)
+    disk_free_gb=$(awk "BEGIN {printf \"%.1f\", ${disk_free:-0} / 1073741824}")
     ok "health  status=${status}  db=${db:-unknown}  disk_free=${disk_free_gb}GB"
 fi
 
