@@ -36,6 +36,9 @@ class DictaraBot(
     private val executor = Executors.newCachedThreadPool()
     private val supportedExtensions: Set<String> = client.fetchSupportedExtensions()
 
+    /** Deduplicates Telegram update delivery: same update_id can be re-delivered if ack is slow. */
+    private val seenUpdateIds = ConcurrentHashMap.newKeySet<Int>()
+
     /** userId → messageId of the settings message currently awaiting a language code reply */
     private val awaitingLanguage = ConcurrentHashMap<Long, Int>()
 
@@ -97,6 +100,7 @@ class DictaraBot(
     override fun getBotUsername() = "DictaraBot"
 
     override fun onUpdateReceived(update: Update) {
+        if (!seenUpdateIds.add(update.updateId)) return  // duplicate delivery — skip
         when {
             update.hasCallbackQuery() -> handleCallback(update.callbackQuery)
             update.hasMessage() -> handleMessage(update.message)
