@@ -246,9 +246,10 @@ class DictaraBot(
                         } catch (_: Exception) {}
                     }
 
-                    // Phase 2: send transcript, delete status message, ack delivery
-                    val sentMsg = sendTranscript(chatId, result, originalMessageId)
+                    // Phase 2: ack delivery first (prevents background poller from sending a duplicate),
+                    // then send transcript and delete status message
                     try { client.ackDelivery(result.jobId) } catch (_: Exception) {}
+                    val sentMsg = sendTranscript(chatId, result, originalMessageId)
                     try {
                         execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build())
                     } catch (_: Exception) {}
