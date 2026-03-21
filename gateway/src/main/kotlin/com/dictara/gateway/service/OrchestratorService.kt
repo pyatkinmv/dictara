@@ -48,6 +48,7 @@ class OrchestratorService(
             try {
                 val inFlight = stateService.claimInFlightAttempts()
                 inFlight.forEach { attempt ->
+                    liveProgress[attempt.submissionId] = ProgressInfo("transcribing")
                     executor.submit { resumeTranscription(attempt) }
                 }
             } catch (e: Exception) {
