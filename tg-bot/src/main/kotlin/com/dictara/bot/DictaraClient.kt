@@ -257,7 +257,7 @@ class DictaraClient(private val baseUrl: String) {
         summaryMode: SummaryMode,
         onProgress: ((String) -> Unit)? = null,
     ): TranscriptResult {
-        val deadline = System.currentTimeMillis() + 4 * 60 * 60 * 1000L
+        val deadline = System.currentTimeMillis() + 8 * 60 * 60 * 1000L
         var pollInterval = 5_000L
         var failureStartMs: Long? = null
 
