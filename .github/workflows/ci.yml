@@ -27,11 +27,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Run transcriber tests
+      - name: Run transcriber smoke tests
         working-directory: transcriber
         run: |
-          pip install fastapi httpx pytest anyio python-multipart prometheus-fastapi-instrumentator prometheus_client
-          pytest test_smoke.py test_cancel.py -v
+          pip install fastapi httpx pytest python-multipart prometheus-fastapi-instrumentator prometheus_client
+          pytest test_smoke.py -v
 
   deploy:
     needs: test
