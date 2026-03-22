@@ -9,13 +9,46 @@
   "version": 1,
   "refresh": "30s",
   "time": { "from": "now-1h", "to": "now" },
+
+  "templating": {
+    "list": [
+      {
+        "name": "level", "label": "Log level", "type": "custom", "hide": 0,
+        "current": { "text": "All", "value": ".+" },
+        "options": [
+          { "text": "All",   "value": ".+",           "selected": true },
+          { "text": "error", "value": "error" },
+          { "text": "warn",  "value": "warn|warning" },
+          { "text": "info",  "value": "info" },
+          { "text": "debug", "value": "debug" }
+        ]
+      }
+    ]
+  },
+
   "panels": [
 
     { "id": 50, "type": "row", "title": "Deployments", "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 }, "collapsed": false },
 
     {
+      "id": 52, "title": "Service health", "type": "stat",
+      "gridPos": { "x": 0, "y": 1, "w": 24, "h": 3 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "refId": "A", "expr": "up{job=~\"gateway|transcriber|tg-bot|app-material\"}", "instant": true, "legendFormat": "{{job}}" }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "orientation": "horizontal" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN" }, "1": { "text": "UP" } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        }
+      }
+    },
+
+    {
       "id": 51, "title": "Current deployments", "type": "table",
-      "gridPos": { "x": 0, "y": 1, "w": 24, "h": 4 },
+      "gridPos": { "x": 0, "y": 4, "w": 24, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         { "refId": "A", "expr": "dictara_build", "instant": true, "legendFormat": "" },
@@ -26,7 +59,7 @@
         { "id": "labelsToFields", "options": { "mode": "columns" } },
         { "id": "merge", "options": {} },
         { "id": "organize", "options": {
-          "excludeByName": { "Time": true, "Value": true, "Value #A": true, "Value #B": true, "__name__": true },
+          "excludeByName": { "Time": true, "Value": true, "Value #A": true, "Value #B": true, "Value #C": true, "__name__": true },
           "indexByName": { "job": 0, "git_commit": 1, "build_time": 2 }
         }}
       ],
@@ -34,19 +67,24 @@
       "options": { "sortBy": [{ "displayName": "job" }] }
     },
 
-    { "id": 1, "type": "row", "title": "Job Pipeline", "gridPos": { "x": 0, "y": 5, "w": 24, "h": 1 }, "collapsed": false },
+    { "id": 1, "type": "row", "title": "Job Pipeline", "gridPos": { "x": 0, "y": 8, "w": 24, "h": 1 }, "collapsed": false },
 
     {
       "id": 2, "title": "Queue depth (pending)", "type": "timeseries",
-      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 8 },
+      "gridPos": { "x": 0, "y": 9, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [{ "expr": "dictara_jobs{status=\"pending\"}", "legendFormat": "pending" }],
-      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "short" } }
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "pending" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } }] }
+        ]
+      }
     },
 
     {
       "id": 3, "title": "Jobs by status", "type": "timeseries",
-      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 8 },
+      "gridPos": { "x": 12, "y": 9, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         { "expr": "dictara_jobs{status=\"processing\"}",   "legendFormat": "processing" },
@@ -54,14 +92,22 @@
         { "expr": "dictara_jobs{status=\"done\"}",        "legendFormat": "done" },
         { "expr": "dictara_jobs{status=\"failed\"}",      "legendFormat": "failed" }
       ],
-      "fieldConfig": { "defaults": { "unit": "short" } }
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "processing" },  "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }] },
+          { "matcher": { "id": "byName", "options": "summarizing" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }] },
+          { "matcher": { "id": "byName", "options": "done" },        "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] },
+          { "matcher": { "id": "byName", "options": "failed" },      "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] }
+        ]
+      }
     },
 
-    { "id": 10, "type": "row", "title": "Telegram Delivery", "gridPos": { "x": 0, "y": 14, "w": 24, "h": 1 }, "collapsed": false },
+    { "id": 10, "type": "row", "title": "Telegram Delivery", "gridPos": { "x": 0, "y": 17, "w": 24, "h": 1 }, "collapsed": false },
 
     {
       "id": 11, "title": "Undelivered", "type": "stat",
-      "gridPos": { "x": 0, "y": 15, "w": 6, "h": 4 },
+      "gridPos": { "x": 0, "y": 18, "w": 6, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [{ "expr": "dictara_delivery_undelivered", "legendFormat": "" }],
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
@@ -74,7 +120,7 @@
 
     {
       "id": 12, "title": "Exhausted (gave up after 10 retries)", "type": "stat",
-      "gridPos": { "x": 6, "y": 15, "w": 6, "h": 4 },
+      "gridPos": { "x": 6, "y": 18, "w": 6, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [{ "expr": "dictara_delivery_exhausted", "legendFormat": "" }],
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
@@ -84,29 +130,37 @@
       ] } } }
     },
 
-    { "id": 20, "type": "row", "title": "Gateway HTTP", "gridPos": { "x": 0, "y": 19, "w": 24, "h": 1 }, "collapsed": false },
+    { "id": 20, "type": "row", "title": "Gateway HTTP", "gridPos": { "x": 0, "y": 22, "w": 24, "h": 1 }, "collapsed": false },
 
     {
-      "id": 21, "title": "Request rate (req/s)", "type": "timeseries",
-      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "id": 21, "title": "Business request rate (req/s)", "type": "timeseries",
+      "gridPos": { "x": 0, "y": 23, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "sum(rate(http_server_requests_seconds_count{job=\"gateway\"}[2m])) by (uri, status)", "legendFormat": "{{status}} {{uri}}" }],
+      "targets": [{ "expr": "sum(rate(http_server_requests_seconds_count{job=\"gateway\", uri!~\"/actuator.*|/health|/formats\"}[2m])) by (uri, status)", "legendFormat": "{{status}} {{uri}}" }],
       "fieldConfig": { "defaults": { "unit": "reqps" } }
     },
 
     {
       "id": 22, "title": "Latency p99 (s)", "type": "timeseries",
-      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "gridPos": { "x": 12, "y": 23, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{job=\"gateway\"}[2m])) by (le, uri))", "legendFormat": "p99 {{uri}}" }],
       "fieldConfig": { "defaults": { "unit": "s" } }
     },
 
-    { "id": 30, "type": "row", "title": "JVM", "gridPos": { "x": 0, "y": 28, "w": 24, "h": 1 }, "collapsed": false },
+    {
+      "id": 23, "title": "Technical request rate (req/s)", "type": "timeseries",
+      "gridPos": { "x": 0, "y": 31, "w": 12, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(rate(http_server_requests_seconds_count{job=\"gateway\", uri=~\"/actuator.*|/health|/formats\"}[2m])) by (uri, status)", "legendFormat": "{{status}} {{uri}}" }],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+
+    { "id": 30, "type": "row", "title": "JVM", "gridPos": { "x": 0, "y": 36, "w": 24, "h": 1 }, "collapsed": false },
 
     {
       "id": 31, "title": "JVM heap used", "type": "timeseries",
-      "gridPos": { "x": 0, "y": 29, "w": 12, "h": 8 },
+      "gridPos": { "x": 0, "y": 37, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [{ "expr": "jvm_memory_used_bytes{area=\"heap\"}", "legendFormat": "{{job}} heap" }],
       "fieldConfig": { "defaults": { "unit": "bytes" } }
@@ -114,20 +168,27 @@
 
     {
       "id": 32, "title": "JVM GC pause (s/s)", "type": "timeseries",
-      "gridPos": { "x": 12, "y": 29, "w": 12, "h": 8 },
+      "gridPos": { "x": 12, "y": 37, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [{ "expr": "rate(jvm_gc_pause_seconds_sum[2m])", "legendFormat": "{{job}} {{action}}" }],
       "fieldConfig": { "defaults": { "unit": "s" } }
     },
 
-    { "id": 40, "type": "row", "title": "Logs", "gridPos": { "x": 0, "y": 37, "w": 24, "h": 1 }, "collapsed": false },
+    { "id": 40, "type": "row", "title": "Logs", "gridPos": { "x": 0, "y": 45, "w": 24, "h": 1 }, "collapsed": false },
 
     {
       "id": 41, "title": "All service logs", "type": "logs",
-      "gridPos": { "x": 0, "y": 38, "w": 24, "h": 12 },
+      "gridPos": { "x": 0, "y": 46, "w": 24, "h": 12 },
       "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
-      "targets": [{ "expr": "{service=~\"gateway|tg-bot|transcriber\"}", "legendFormat": "" }],
-      "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showTime": true, "wrapLogMessage": false }
+      "targets": [{ "expr": "{service=~\"gateway|tg-bot|transcriber\", level=~\"$level\"}", "legendFormat": "" }],
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showTime": true,
+        "wrapLogMessage": false,
+        "displayedFields": ["service"]
+      }
     }
   ]
 }

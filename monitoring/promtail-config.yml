@@ -24,3 +24,8 @@ scrape_configs:
         target_label: service
       - source_labels: ['__meta_docker_container_log_stream']
         target_label: stream
+    pipeline_stages:
+      - regex:
+          expression: '\b(?P<level>INFO|WARN|WARNING|ERROR|DEBUG|TRACE|CRITICAL)\b'
+      - labels:
+          level:
