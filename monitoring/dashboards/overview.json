@@ -180,7 +180,7 @@
       "id": 41, "title": "All service logs", "type": "logs",
       "gridPos": { "x": 0, "y": 46, "w": 24, "h": 12 },
       "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
-      "targets": [{ "expr": "{service=~\"gateway|tg-bot|transcriber\", level=~\"$level\"}", "legendFormat": "" }],
+      "targets": [{ "expr": "{service=~\"gateway|tg-bot|transcriber\", level=~\"$level\"} | line_format \"[{{.service}}] {{__line__}}\"", "legendFormat": "" }],
       "options": {
         "dedupStrategy": "none",
         "enableLogDetails": true,
