@@ -19,7 +19,8 @@
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         { "refId": "A", "expr": "dictara_build", "instant": true, "legendFormat": "" },
-        { "refId": "B", "expr": "build_info{job=\"transcriber\"}", "instant": true, "legendFormat": "" }
+        { "refId": "B", "expr": "build_info{job=\"transcriber\"}", "instant": true, "legendFormat": "" },
+        { "refId": "C", "expr": "app_build_info", "instant": true, "legendFormat": "" }
       ],
       "transformations": [
         { "id": "labelsToFields", "options": { "mode": "columns" } },

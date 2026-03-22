@@ -18,3 +18,8 @@ scrape_configs:
       - targets: ['tg-bot:9090']
     metrics_path: /metrics
     fallback_scrape_protocol: PrometheusText0.0.4
+
+  - job_name: app-material
+    static_configs:
+      - targets: ['app-material:80']
+    metrics_path: /metrics

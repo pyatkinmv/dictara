@@ -14,4 +14,7 @@ ARG BUILD_TIME=unknown
 COPY --from=builder /app/build/web /usr/share/nginx/html
 RUN echo "{\"git_commit\":\"${GIT_COMMIT}\",\"build_time\":\"${BUILD_TIME}\"}" \
     > /usr/share/nginx/html/version.json
+RUN printf '# HELP app_build_info Build information\n# TYPE app_build_info gauge\napp_build_info{git_commit="%s",build_time="%s"} 1\n' \
+    "${GIT_COMMIT}" "${BUILD_TIME}" \
+    > /usr/share/nginx/html/metrics.txt
 COPY nginx.conf /etc/nginx/conf.d/default.conf
