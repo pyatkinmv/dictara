@@ -7,7 +7,10 @@ import com.dictara.gateway.service.UserService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import jakarta.servlet.http.HttpServletRequest
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
@@ -246,6 +249,17 @@ class TranscribeController(
                 tags = (tagsBySubmission[it.id] ?: emptyList()).sorted(),
             )
         }
+    }
+
+    @GetMapping("/transcript")
+    fun downloadTranscript(@RequestParam jobId: UUID): ResponseEntity<ByteArray> {
+        val text = diarizationRepo.findBySubmissionId(jobId)?.formattedText
+            ?: transcriptRepo.findBySubmissionId(jobId)?.formattedText
+            ?: return ResponseEntity.notFound().build()
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"transcript_$jobId.txt\"")
+            .contentType(MediaType.TEXT_PLAIN)
+            .body(text.toByteArray(Charsets.UTF_8))
     }
 
     private val tagRegex = Regex("^[\\w-]{1,64}$")

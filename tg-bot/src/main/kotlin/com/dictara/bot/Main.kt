@@ -39,8 +39,10 @@ fun main() {
     JvmThreadMetrics().bindTo(registry)
     ProcessorMetrics().bindTo(registry)
 
+    val baseUrl = System.getenv("DICTARY_BASE_URL") ?: "https://dictary.app"
+
     val api = TelegramBotsApi(DefaultBotSession::class.java)
-    api.registerBot(DictaraBot(token, dictaraUrl, options, registry))
+    api.registerBot(DictaraBot(token, dictaraUrl, options, registry, baseUrl))
 
     HttpServer.create(InetSocketAddress(9090), 0).apply {
         createContext("/metrics") { ex ->

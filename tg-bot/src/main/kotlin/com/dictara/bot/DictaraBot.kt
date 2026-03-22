@@ -35,6 +35,7 @@ class DictaraBot(
     dictaraUrl: String,
     options: DefaultBotOptions = DefaultBotOptions(),
     registry: MeterRegistry,
+    private val baseUrl: String = "https://dictary.app",
     private val botApiDataDir: String = System.getenv("BOT_API_DATA_DIR") ?: "/var/lib/telegram-bot-api",
 ) : TelegramLongPollingBot(options, token) {
 
@@ -140,8 +141,22 @@ class DictaraBot(
                         } catch (e: Exception) {
                             val retryAfterS = (e as? TelegramApiRequestException)?.parameters?.retryAfter?.toLong()
                             log.error("Poller: send failed jobId={} retryAfterS={}: {}", d.jobId, retryAfterS, e.message, e)
-                            try { client.failDelivery(d.jobId, retryAfterS) } catch (ex: Exception) {
-                                log.error("Poller: could not report failure for jobId={}: {}", d.jobId, ex.message)
+                            if (retryAfterS != null) {
+                                val url = "$baseUrl/transcript?jobId=${d.jobId}"
+                                try {
+                                    send(d.chatId, "Transcript is ready — download it here: $url", replyToMessageId = d.telegramMessageId)
+                                    client.confirmDelivery(d.jobId)
+                                    log.info("Poller: delivered as link jobId={}", d.jobId)
+                                } catch (linkEx: Exception) {
+                                    log.error("Poller: link send also failed jobId={}: {}", d.jobId, linkEx.message)
+                                    try { client.failDelivery(d.jobId, retryAfterS) } catch (ex: Exception) {
+                                        log.error("Poller: could not report failure for jobId={}: {}", d.jobId, ex.message)
+                                    }
+                                }
+                            } else {
+                                try { client.failDelivery(d.jobId, retryAfterS) } catch (ex: Exception) {
+                                    log.error("Poller: could not report failure for jobId={}: {}", d.jobId, ex.message)
+                                }
                             }
                         }
                     }
@@ -372,8 +387,22 @@ class DictaraBot(
                     } catch (e: Exception) {
                         val retryAfterS = (e as? TelegramApiRequestException)?.parameters?.retryAfter?.toLong()
                         log.error("Inline: send failed jobId={} retryAfterS={}: {}", result.jobId, retryAfterS, e.message, e)
-                        try { client.failDelivery(result.jobId, retryAfterS) } catch (ex: Exception) {
-                            log.error("Inline: could not report failure for jobId={}: {}", result.jobId, ex.message)
+                        if (retryAfterS != null) {
+                            val url = "$baseUrl/transcript?jobId=${result.jobId}"
+                            try {
+                                send(chatId, "Transcript is ready — download it here: $url", replyToMessageId = originalMessageId)
+                                client.confirmDelivery(result.jobId)
+                                log.info("Inline: delivered as link jobId={}", result.jobId)
+                            } catch (linkEx: Exception) {
+                                log.error("Inline: link send also failed jobId={}: {}", result.jobId, linkEx.message)
+                                try { client.failDelivery(result.jobId, retryAfterS) } catch (ex: Exception) {
+                                    log.error("Inline: could not report failure for jobId={}: {}", result.jobId, ex.message)
+                                }
+                            }
+                        } else {
+                            try { client.failDelivery(result.jobId, retryAfterS) } catch (ex: Exception) {
+                                log.error("Inline: could not report failure for jobId={}: {}", result.jobId, ex.message)
+                            }
                         }
                         return@submit
                     }

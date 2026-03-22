@@ -91,6 +91,7 @@ services:
       TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
       GATEWAY_URL: http://gateway:8080
       TELEGRAM_API_URL: http://telegram-bot-api:8081
+      DICTARY_BASE_URL: https://dictary.app
     volumes:
       - bot-api-data:/var/lib/telegram-bot-api
     depends_on:
