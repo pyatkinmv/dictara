@@ -10,22 +10,6 @@
   "refresh": "30s",
   "time": { "from": "now-1h", "to": "now" },
 
-  "templating": {
-    "list": [
-      {
-        "name": "level", "label": "Log level", "type": "custom", "hide": 0,
-        "current": { "text": "All", "value": ".*" },
-        "options": [
-          { "text": "All",   "value": ".*",              "selected": true },
-          { "text": "error", "value": "(?i)error" },
-          { "text": "warn",  "value": "(?i)warn(ing)?" },
-          { "text": "info",  "value": "(?i)info" },
-          { "text": "debug", "value": "(?i)debug" }
-        ]
-      }
-    ]
-  },
-
   "panels": [
 
     { "id": 50, "type": "row", "title": "Deployments", "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 }, "collapsed": false },
@@ -180,7 +164,7 @@
       "id": 41, "title": "All service logs", "type": "logs",
       "gridPos": { "x": 0, "y": 46, "w": 24, "h": 12 },
       "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
-      "targets": [{ "expr": "{service=~\"gateway|tg-bot|transcriber\", level=~\"$level\"} | line_format \"[{{.service}}] {{__line__}}\"", "legendFormat": "" }],
+      "targets": [{ "expr": "{service=~\"gateway|tg-bot|transcriber\"} | line_format \"[{{.service}}] {{__line__}}\"", "legendFormat": "" }],
       "options": {
         "dedupStrategy": "none",
         "enableLogDetails": true,
