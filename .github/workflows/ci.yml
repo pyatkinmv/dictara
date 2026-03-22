@@ -56,6 +56,7 @@ jobs:
               - 'transcriber/**'
             monitoring:
               - 'monitoring/**'
+              - 'docker-compose.yml'
 
       - uses: appleboy/ssh-action@v1
         with:

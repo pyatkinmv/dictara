@@ -25,13 +25,13 @@ docker run -d --name grafana -p 3001:3000 grafana/grafana
 
 **2. Open SSH tunnel** (keep this terminal open while using Grafana):
 ```bash
-ssh -N -L 9090:localhost:9090 -L 3100:localhost:3100 pyatkinmv@34.6.236.165
+ssh -N -L 9091:localhost:9091 -L 3100:localhost:3100 pyatkinmv@34.6.236.165
 ```
 
 **3. Open Grafana** at http://localhost:3001 (login: admin / admin)
 
 **4. Add data sources** (Connections → Data sources → Add):
-- **Prometheus** — URL: `http://host.docker.internal:9090`
+- **Prometheus** — URL: `http://host.docker.internal:9091`
 - **Loki** — URL: `http://host.docker.internal:3100`
 
 > On Linux use `http://172.17.0.1:9090` instead of `host.docker.internal`.

@@ -85,6 +85,8 @@ services:
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
         BUILD_TIME: ${BUILD_TIME:-unknown}
+    ports:
+      - "127.0.0.1:9090:9090"
     environment:
       TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
       GATEWAY_URL: http://gateway:8080
@@ -118,7 +120,7 @@ services:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     ports:
-      - "127.0.0.1:9090:9090"
+      - "127.0.0.1:9091:9090"
     restart: unless-stopped
 
   loki:
