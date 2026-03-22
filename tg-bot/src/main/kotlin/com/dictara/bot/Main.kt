@@ -1,6 +1,7 @@
 package com.dictara.bot
 
 import com.sun.net.httpserver.HttpServer
+import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics
 import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics
 import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics
@@ -30,6 +31,9 @@ fun main() {
         "git_commit", System.getenv("GIT_COMMIT") ?: "unknown",
         "build_time", System.getenv("BUILD_TIME") ?: "unknown"
     )
+    Gauge.builder("dictara_build_info") { 1.0 }
+        .description("Build information (git_commit and build_time are common tags)")
+        .register(registry)
     JvmMemoryMetrics().bindTo(registry)
     JvmGcMetrics().bindTo(registry)
     JvmThreadMetrics().bindTo(registry)
