@@ -39,7 +39,7 @@ class DictaraBot(
     private val botApiDataDir: String = System.getenv("BOT_API_DATA_DIR") ?: "/var/lib/telegram-bot-api",
 ) : TelegramLongPollingBot(options, token) {
 
-    private val log = LoggerFactory.getLogger(DictaraBot::class.java)
+    private val log = LoggerFactory.getLogger(DictaraBot::class.java)  // rebuild
     private val client = DictaraClient(dictaraUrl)
     private val executor = Executors.newCachedThreadPool()
     private val supportedExtensions: Set<String> = client.fetchSupportedExtensions()
