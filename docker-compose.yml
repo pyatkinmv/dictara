@@ -85,8 +85,6 @@ services:
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
         BUILD_TIME: ${BUILD_TIME:-unknown}
-    ports:
-      - "127.0.0.1:9090:9090"
     environment:
       TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
       GATEWAY_URL: http://gateway:8080
