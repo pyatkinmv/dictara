@@ -31,7 +31,7 @@ class DictaraClient(private val baseUrl: String) {
     private val mapper = ObjectMapper().registerKotlinModule()
 
     data class LoginNotification(val id: Long, val chatId: String, val token: String)
-    data class PendingDelivery(val jobId: String, val chatId: Long, val telegramMessageId: Int?, val status: String, val error: String?)
+    data class PendingDelivery(val jobId: String, val chatId: Long, val telegramMessageId: Long?, val status: String, val error: String?)
 
     fun markBotStarted(telegramUserId: Long) {
         val body = mapper.writeValueAsString(mapOf("telegram_user_id" to telegramUserId.toString()))
@@ -69,7 +69,7 @@ class DictaraClient(private val baseUrl: String) {
             PendingDelivery(
                 jobId = m["job_id"] as String,
                 chatId = (m["chat_id"] as Number).toLong(),
-                telegramMessageId = (m["telegram_message_id"] as Number?)?.toInt(),
+                telegramMessageId = (m["telegram_message_id"] as Number?)?.toLong(),
                 status = m["status"] as String,
                 error = m["error"] as String?,
             )
@@ -168,7 +168,7 @@ class DictaraClient(private val baseUrl: String) {
         telegramFirstName: String? = null,
         telegramLastName: String? = null,
         chatId: Long,
-        telegramMessageId: Int? = null,
+        telegramMessageId: Long? = null,
         onProgress: ((String) -> Unit)? = null,
     ): TranscriptResult {
         val jobId = submitWithRetry(audioFile, model, diarize, summaryMode, language, numSpeakers,
@@ -188,7 +188,7 @@ class DictaraClient(private val baseUrl: String) {
         telegramFirstName: String?,
         telegramLastName: String?,
         chatId: Long,
-        telegramMessageId: Int?,
+        telegramMessageId: Long?,
         onProgress: ((String) -> Unit)?,
     ): String {
         var pollInterval = 5_000L
@@ -221,7 +221,7 @@ class DictaraClient(private val baseUrl: String) {
         telegramFirstName: String?,
         telegramLastName: String?,
         chatId: Long,
-        telegramMessageId: Int?,
+        telegramMessageId: Long?,
     ): String {
         val body = MultipartBody.Builder()
             .setType(MultipartBody.FORM)

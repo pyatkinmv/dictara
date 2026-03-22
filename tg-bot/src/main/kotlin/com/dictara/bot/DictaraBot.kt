@@ -282,7 +282,7 @@ class DictaraBot(
         val senderTag = if (isGroup) message.from?.userName?.let { "@$it" } ?: message.from?.firstName ?: "Someone" else null
         val who = if (senderTag != null) "$senderTag's" else "your"
         val baseLabel = "⏳ Transcribing $who audio...\n\nModel: $modelLabel | Speakers: $speakersLabel | Lang: $langLabel | Summary: $summaryLabel"
-        val originalMessageId = message.messageId
+        val originalMessageId = message.messageId.toLong()
         val statusMsg = send(chatId, baseLabel, replyToMessageId = originalMessageId)
 
         log.info("Audio received: fileId={} chatId={} prefs={}/{}/{}/{}", fileId, chatId, prefs.model, if (prefs.diarize) "diarize" else "nodiarize", prefs.language, prefs.summaryMode)
@@ -384,7 +384,7 @@ class DictaraBot(
         }
     }
 
-    private fun sendTranscript(chatId: Long, result: TranscriptResult, replyToMessageId: Int? = null): Message {
+    private fun sendTranscript(chatId: Long, result: TranscriptResult, replyToMessageId: Long? = null): Message {
         val dateStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"))
         val txtFile = Files.createTempFile("transcript-", ".txt").toFile()
         try {
@@ -394,7 +394,7 @@ class DictaraBot(
                     .chatId(chatId.toString())
                     .document(InputFile(txtFile, "transcript_$dateStr.txt"))
                     .caption(formatDoneText(result.durationSeconds))
-                    .apply { if (replyToMessageId != null) replyToMessageId(replyToMessageId) }
+                    .apply { if (replyToMessageId != null) replyToMessageId(replyToMessageId.toInt()) }
                     .build()
             )
         } finally {
@@ -602,8 +602,8 @@ class DictaraBot(
             ))
             .build()
 
-    private fun send(chatId: Long, text: String, replyToMessageId: Int? = null): Message =
+    private fun send(chatId: Long, text: String, replyToMessageId: Long? = null): Message =
         execute(SendMessage.builder().chatId(chatId.toString()).text(text)
-            .apply { if (replyToMessageId != null) replyToMessageId(replyToMessageId) }
+            .apply { if (replyToMessageId != null) replyToMessageId(replyToMessageId.toInt()) }
             .build())
 }

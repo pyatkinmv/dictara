@@ -113,7 +113,7 @@ class TranscribeController(
         @RequestHeader(name = "X-Telegram-First-Name", required = false) telegramFirstName: String?,
         @RequestHeader(name = "X-Telegram-Last-Name", required = false) telegramLastName: String?,
         @RequestHeader(name = "X-Telegram-Chat-Id", required = false) telegramChatId: Long?,
-        @RequestHeader(name = "X-Telegram-Message-Id", required = false) telegramMessageId: Int?,
+        @RequestHeader(name = "X-Telegram-Message-Id", required = false) telegramMessageId: Long?,
         servletRequest: HttpServletRequest,
     ): SubmitResponse {
         val ext = file.originalFilename?.substringAfterLast('.', "")?.lowercase() ?: ""
@@ -310,7 +310,7 @@ class TranscribeController(
     data class PendingDeliveryResponse(
         val jobId: String,
         val chatId: Long,
-        val telegramMessageId: Int?,
+        val telegramMessageId: Long?,
         val status: String,
         val error: String?,
     )

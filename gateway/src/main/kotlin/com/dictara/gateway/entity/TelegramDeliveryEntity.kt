@@ -12,6 +12,6 @@ import java.util.UUID
 class TelegramDeliveryEntity(
     @Id val jobId: UUID,
     @Column(nullable = false) val chatId: Long,
-    @Column val telegramMessageId: Int? = null,
+    @Column val telegramMessageId: Long? = null,
     @Column var deliveredAt: Instant? = null,
 )

@@ -109,7 +109,7 @@ class TelegramDeliveryIntegrationTest {
                 HttpEntity(body, headers), Map::class.java).body!!["job_id"] as String
         )
         val delivery = telegramDeliveryRepo.findById(jobId).orElseThrow()
-        assertThat(delivery.telegramMessageId).isEqualTo(42)
+        assertThat(delivery.telegramMessageId).isEqualTo(42L)
     }
 
     @Test
