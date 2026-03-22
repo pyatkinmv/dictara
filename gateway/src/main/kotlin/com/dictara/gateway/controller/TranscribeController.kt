@@ -334,6 +334,26 @@ class TranscribeController(
         return mapOf("claimed" to (count > 0))
     }
 
+    @PostMapping("/telegram/deliveries/{jobId}/delivered")
+    @Transactional
+    fun confirmDelivered(@PathVariable jobId: String) {
+        telegramDeliveryRepo.confirmDelivered(UUID.fromString(jobId))
+    }
+
+    @PostMapping("/telegram/deliveries/{jobId}/failed")
+    @Transactional
+    fun deliveryFailed(@PathVariable jobId: String, @RequestBody body: Map<String, Any?>) {
+        val id = UUID.fromString(jobId)
+        val retryAfterS = (body["retry_after_s"] as? Number)?.toLong()
+        val retryAfterTs = if (retryAfterS != null) {
+            Instant.now().plusSeconds(retryAfterS)
+        } else {
+            val attempt = telegramDeliveryRepo.findById(id).map { it.attemptCount }.orElse(1)
+            Instant.now().plusSeconds(minOf(30L shl (attempt - 1), 3600L))
+        }
+        telegramDeliveryRepo.scheduleRetry(id, retryAfterTs)
+    }
+
     private fun saveAudio(file: MultipartFile, user: UserEntity): AudioMetaEntity {
         val meta = audioMetaRepo.save(AudioMetaEntity(
             user = user,

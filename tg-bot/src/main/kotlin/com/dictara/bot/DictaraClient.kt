@@ -76,6 +76,28 @@ class DictaraClient(private val baseUrl: String) {
         }
     }
 
+    fun confirmDelivery(jobId: String) {
+        http.newCall(
+            Request.Builder()
+                .url("$baseUrl/telegram/deliveries/$jobId/delivered")
+                .post("".toRequestBody("application/json".toMediaType()))
+                .build()
+        ).execute().close()
+    }
+
+    fun failDelivery(jobId: String, retryAfterS: Long?) {
+        val body = if (retryAfterS != null)
+            mapper.writeValueAsString(mapOf("retry_after_s" to retryAfterS))
+        else
+            "{}"
+        http.newCall(
+            Request.Builder()
+                .url("$baseUrl/telegram/deliveries/$jobId/failed")
+                .post(body.toRequestBody("application/json".toMediaType()))
+                .build()
+        ).execute().close()
+    }
+
     fun ackDelivery(jobId: String): Boolean {
         val resp = http.newCall(
             Request.Builder()

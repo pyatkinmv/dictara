@@ -19,6 +19,7 @@ import org.telegram.telegrambots.meta.api.objects.commands.BotCommand
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton
 import io.micrometer.core.instrument.MeterRegistry
+import org.telegram.telegrambots.meta.exceptions.TelegramApiRequestException
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.net.URL
@@ -92,19 +93,23 @@ class DictaraBot(
                         log.info("Poller: fetched {} pending deliveries: {}", pending.size, pending.map { it.jobId })
                     }
                     for (d in pending) {
+                        log.info("Poller: acking jobId={} status={}", d.jobId, d.status)
+                        val claimed = try { client.ackDelivery(d.jobId) } catch (e: Exception) {
+                            log.error("Poller: ackDelivery failed for jobId={}: {}", d.jobId, e.message, e)
+                            false
+                        }
+                        log.info("Poller: ack result jobId={} claimed={}", d.jobId, claimed)
+                        if (!claimed) {
+                            log.info("Poller: delivery already claimed by inline handler, skipping: jobId={}", d.jobId)
+                            continue
+                        }
                         try {
-                            log.info("Poller: acking jobId={} status={}", d.jobId, d.status)
-                            val claimed = client.ackDelivery(d.jobId)
-                            log.info("Poller: ack result jobId={} claimed={}", d.jobId, claimed)
-                            if (!claimed) {
-                                log.info("Poller: delivery already claimed by inline handler, skipping: jobId={}", d.jobId)
-                                continue
-                            }
                             when (d.status) {
                                 "done" -> {
                                     log.info("Poller: sending transcript for jobId={} chatId={}", d.jobId, d.chatId)
                                     val result = client.fetchJobResult(d.jobId)
                                     val sentMsg = sendTranscript(d.chatId, result, d.telegramMessageId)
+                                    client.confirmDelivery(d.jobId)
                                     log.info("Poller: transcript sent for jobId={}", d.jobId)
                                     if (result.summary != null) {
                                         try {
@@ -127,10 +132,17 @@ class DictaraBot(
                                         }
                                     }
                                 }
-                                "failed" -> send(d.chatId, "❌ Transcription failed: ${d.error ?: "unknown error"}", replyToMessageId = d.telegramMessageId)
+                                "failed" -> {
+                                    send(d.chatId, "❌ Transcription failed: ${d.error ?: "unknown error"}", replyToMessageId = d.telegramMessageId)
+                                    client.confirmDelivery(d.jobId)
+                                }
                             }
                         } catch (e: Exception) {
-                            log.error("Poller: error processing delivery jobId={}: {}", d.jobId, e.message, e)
+                            val retryAfterS = (e as? TelegramApiRequestException)?.parameters?.retryAfter?.toLong()
+                            log.error("Poller: send failed jobId={} retryAfterS={}: {}", d.jobId, retryAfterS, e.message, e)
+                            try { client.failDelivery(d.jobId, retryAfterS) } catch (ex: Exception) {
+                                log.error("Poller: could not report failure for jobId={}: {}", d.jobId, ex.message)
+                            }
                         }
                     }
                 } catch (e: Exception) {
@@ -347,8 +359,19 @@ class DictaraBot(
                         return@submit
                     }
                     log.info("Inline: sending transcript for jobId={} chatId={}", result.jobId, chatId)
-                    val sentMsg = sendTranscript(chatId, result, originalMessageId)
-                    log.info("Inline: transcript sent for jobId={}", result.jobId)
+                    val sentMsg = try {
+                        val msg = sendTranscript(chatId, result, originalMessageId)
+                        client.confirmDelivery(result.jobId)
+                        log.info("Inline: transcript sent for jobId={}", result.jobId)
+                        msg
+                    } catch (e: Exception) {
+                        val retryAfterS = (e as? TelegramApiRequestException)?.parameters?.retryAfter?.toLong()
+                        log.error("Inline: send failed jobId={} retryAfterS={}: {}", result.jobId, retryAfterS, e.message, e)
+                        try { client.failDelivery(result.jobId, retryAfterS) } catch (ex: Exception) {
+                            log.error("Inline: could not report failure for jobId={}: {}", result.jobId, ex.message)
+                        }
+                        return@submit
+                    }
                     try {
                         execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build())
                     } catch (_: Exception) {}

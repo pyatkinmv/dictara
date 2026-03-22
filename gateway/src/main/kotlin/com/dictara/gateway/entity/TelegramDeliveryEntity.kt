@@ -14,4 +14,7 @@ class TelegramDeliveryEntity(
     @Column(nullable = false) val chatId: Long,
     @Column val telegramMessageId: Long? = null,
     @Column var deliveredAt: Instant? = null,
+    @Column var claimedAt: Instant? = null,
+    @Column var retryAfterTs: Instant? = null,
+    @Column var attemptCount: Int = 0,
 )

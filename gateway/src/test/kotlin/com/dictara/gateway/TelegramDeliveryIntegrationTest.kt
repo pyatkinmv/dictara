@@ -157,7 +157,7 @@ class TelegramDeliveryIntegrationTest {
     }
 
     @Test
-    fun `ack removes job from pending deliveries`() {
+    fun `ack sets claimed_at and removes job from pending deliveries`() {
         wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
             .willReturn(okJson("""{"job_id":"td-ack-1"}""")))
         wireMock.stubFor(get(urlEqualTo("/jobs/td-ack-1"))
@@ -180,8 +180,77 @@ class TelegramDeliveryIntegrationTest {
         val ackResp = rest.postForEntity("/telegram/deliveries/$jobId/ack", HttpEntity.EMPTY, Map::class.java)
         assertThat(ackResp.body!!["claimed"]).isEqualTo(true)
 
+        // After ack: claimed_at is set, delivered_at is still null (not yet confirmed)
+        val delivery = telegramDeliveryRepo.findById(jobId).orElseThrow()
+        assertThat(delivery.claimedAt).isNotNull
+        assertThat(delivery.deliveredAt).isNull()
+        assertThat(delivery.attemptCount).isEqualTo(1)
+        // Claimed job no longer in pending
         assertThat(pendingDeliveries().none { it["job_id"] == jobId.toString() }).isTrue
-        assertThat(telegramDeliveryRepo.findById(jobId).orElseThrow().deliveredAt).isNotNull
+    }
+
+    @Test
+    fun `delivered endpoint sets delivered_at`() {
+        wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
+            .willReturn(okJson("""{"job_id":"td-delivered-1"}""")))
+        wireMock.stubFor(get(urlEqualTo("/jobs/td-delivered-1"))
+            .willReturn(okJson("""{"status":"done","duration_s":1.0,"result":{"formatted_text":"Ok.","audio_duration_s":1.0,"segments":[]}}""")))
+
+        val body = LinkedMultiValueMap<String, Any>().apply { add("file", fakeAudio()) }
+        val headers = HttpHeaders().apply {
+            contentType = MediaType.MULTIPART_FORM_DATA
+            set("X-Telegram-User-Id", "999")
+            set("X-Telegram-Chat-Id", "410")
+        }
+        val jobId = UUID.fromString(
+            rest.postForEntity("/transcribe?model=fast&diarize=false&summary_mode=off",
+                HttpEntity(body, headers), Map::class.java).body!!["job_id"] as String
+        )
+        waitForStatus(jobId, "done")
+
+        rest.postForEntity("/telegram/deliveries/$jobId/ack", HttpEntity.EMPTY, Map::class.java)
+        val resp = rest.postForEntity("/telegram/deliveries/$jobId/delivered", HttpEntity.EMPTY, Void::class.java)
+        assertThat(resp.statusCode).isEqualTo(HttpStatus.OK)
+
+        val delivery = telegramDeliveryRepo.findById(jobId).orElseThrow()
+        assertThat(delivery.deliveredAt).isNotNull
+    }
+
+    @Test
+    fun `failed endpoint resets claimed_at and schedules retry`() {
+        wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
+            .willReturn(okJson("""{"job_id":"td-failed-1"}""")))
+        wireMock.stubFor(get(urlEqualTo("/jobs/td-failed-1"))
+            .willReturn(okJson("""{"status":"done","duration_s":1.0,"result":{"formatted_text":"Ok.","audio_duration_s":1.0,"segments":[]}}""")))
+
+        val body = LinkedMultiValueMap<String, Any>().apply { add("file", fakeAudio()) }
+        val headers = HttpHeaders().apply {
+            contentType = MediaType.MULTIPART_FORM_DATA
+            set("X-Telegram-User-Id", "999")
+            set("X-Telegram-Chat-Id", "420")
+        }
+        val jobId = UUID.fromString(
+            rest.postForEntity("/transcribe?model=fast&diarize=false&summary_mode=off",
+                HttpEntity(body, headers), Map::class.java).body!!["job_id"] as String
+        )
+        waitForStatus(jobId, "done")
+
+        rest.postForEntity("/telegram/deliveries/$jobId/ack", HttpEntity.EMPTY, Map::class.java)
+
+        // Report failure with explicit retry_after_s
+        val failResp = rest.postForEntity(
+            "/telegram/deliveries/$jobId/failed",
+            HttpEntity(mapOf("retry_after_s" to 3600), HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON }),
+            Void::class.java,
+        )
+        assertThat(failResp.statusCode).isEqualTo(HttpStatus.OK)
+
+        val delivery = telegramDeliveryRepo.findById(jobId).orElseThrow()
+        assertThat(delivery.claimedAt).isNull()
+        assertThat(delivery.deliveredAt).isNull()
+        assertThat(delivery.retryAfterTs).isNotNull
+        // Still attempt_count=1 from the ack
+        assertThat(delivery.attemptCount).isEqualTo(1)
     }
 
     @Test
@@ -239,6 +308,6 @@ class TelegramDeliveryIntegrationTest {
             assertThat(subsequent.statusCode).isEqualTo(HttpStatus.OK)
             assertThat(subsequent.body!!["claimed"]).isEqualTo(false)
         }
-        assertThat(telegramDeliveryRepo.findById(jobId).orElseThrow().deliveredAt).isNotNull
+        assertThat(telegramDeliveryRepo.findById(jobId).orElseThrow().claimedAt).isNotNull
     }
 }
