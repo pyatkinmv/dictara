@@ -14,13 +14,13 @@
     "list": [
       {
         "name": "level", "label": "Log level", "type": "custom", "hide": 0,
-        "current": { "text": "All", "value": ".+" },
+        "current": { "text": "All", "value": ".*" },
         "options": [
-          { "text": "All",   "value": ".+",           "selected": true },
-          { "text": "error", "value": "error" },
-          { "text": "warn",  "value": "warn|warning" },
-          { "text": "info",  "value": "info" },
-          { "text": "debug", "value": "debug" }
+          { "text": "All",   "value": ".*",              "selected": true },
+          { "text": "error", "value": "(?i)error" },
+          { "text": "warn",  "value": "(?i)warn(ing)?" },
+          { "text": "info",  "value": "(?i)info" },
+          { "text": "debug", "value": "(?i)debug" }
         ]
       }
     ]
@@ -186,8 +186,7 @@
         "enableLogDetails": true,
         "prettifyLogMessage": false,
         "showTime": true,
-        "wrapLogMessage": false,
-        "displayedFields": ["service"]
+        "wrapLogMessage": false
       }
     }
   ]
