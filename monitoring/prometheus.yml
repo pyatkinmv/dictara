@@ -17,3 +17,4 @@ scrape_configs:
     static_configs:
       - targets: ['tg-bot:9090']
     metrics_path: /metrics
+    fallback_scrape_protocol: PrometheusText0.0.4
