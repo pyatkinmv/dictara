@@ -1,0 +1,110 @@
+{
+  "__inputs": [
+    { "name": "DS_PROMETHEUS", "label": "Prometheus", "type": "datasource", "pluginId": "prometheus" },
+    { "name": "DS_LOKI",       "label": "Loki",       "type": "datasource", "pluginId": "loki" }
+  ],
+  "title": "Dictara Overview",
+  "uid": "dictara-overview",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+
+    { "id": 1, "type": "row", "title": "Job Pipeline", "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 }, "collapsed": false },
+
+    {
+      "id": 2, "title": "Queue depth (pending)", "type": "timeseries",
+      "gridPos": { "x": 0, "y": 1, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "dictara_jobs_total{status=\"pending\"}", "legendFormat": "pending" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "short" } }
+    },
+
+    {
+      "id": 3, "title": "Jobs by status", "type": "timeseries",
+      "gridPos": { "x": 12, "y": 1, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "dictara_jobs_total{status=\"processing\"}",   "legendFormat": "processing" },
+        { "expr": "dictara_jobs_total{status=\"summarizing\"}", "legendFormat": "summarizing" },
+        { "expr": "dictara_jobs_total{status=\"done\"}",        "legendFormat": "done" },
+        { "expr": "dictara_jobs_total{status=\"failed\"}",      "legendFormat": "failed" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+
+    { "id": 10, "type": "row", "title": "Telegram Delivery", "gridPos": { "x": 0, "y": 9, "w": 24, "h": 1 }, "collapsed": false },
+
+    {
+      "id": 11, "title": "Undelivered", "type": "stat",
+      "gridPos": { "x": 0, "y": 10, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "dictara_delivery_undelivered", "legendFormat": "" }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [
+        { "color": "green", "value": null },
+        { "color": "yellow", "value": 1 },
+        { "color": "red", "value": 5 }
+      ] } } }
+    },
+
+    {
+      "id": 12, "title": "Exhausted (gave up after 10 retries)", "type": "stat",
+      "gridPos": { "x": 6, "y": 10, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "dictara_delivery_exhausted", "legendFormat": "" }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [
+        { "color": "green", "value": null },
+        { "color": "red", "value": 1 }
+      ] } } }
+    },
+
+    { "id": 20, "type": "row", "title": "Gateway HTTP", "gridPos": { "x": 0, "y": 14, "w": 24, "h": 1 }, "collapsed": false },
+
+    {
+      "id": 21, "title": "Request rate (req/s)", "type": "timeseries",
+      "gridPos": { "x": 0, "y": 15, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(rate(http_server_requests_seconds_count{job=\"gateway\"}[2m])) by (uri, status)", "legendFormat": "{{status}} {{uri}}" }],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+
+    {
+      "id": 22, "title": "Latency p99 (s)", "type": "timeseries",
+      "gridPos": { "x": 12, "y": 15, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{job=\"gateway\"}[2m])) by (le, uri))", "legendFormat": "p99 {{uri}}" }],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+
+    { "id": 30, "type": "row", "title": "JVM", "gridPos": { "x": 0, "y": 23, "w": 24, "h": 1 }, "collapsed": false },
+
+    {
+      "id": 31, "title": "JVM heap used", "type": "timeseries",
+      "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "jvm_memory_used_bytes{area=\"heap\"}", "legendFormat": "{{job}} heap" }],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+
+    {
+      "id": 32, "title": "JVM GC pause (s/s)", "type": "timeseries",
+      "gridPos": { "x": 12, "y": 24, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "rate(jvm_gc_pause_seconds_sum[2m])", "legendFormat": "{{job}} {{action}}" }],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+
+    { "id": 40, "type": "row", "title": "Logs", "gridPos": { "x": 0, "y": 32, "w": 24, "h": 1 }, "collapsed": false },
+
+    {
+      "id": 41, "title": "All service logs", "type": "logs",
+      "gridPos": { "x": 0, "y": 33, "w": 24, "h": 12 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "targets": [{ "expr": "{service=~\"gateway|tg-bot|transcriber\"}", "legendFormat": "" }],
+      "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showTime": true, "wrapLogMessage": false }
+    }
+  ]
+}
