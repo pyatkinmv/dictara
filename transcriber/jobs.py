@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Literal
 
-JobStatus = Literal["pending", "processing", "done", "failed", "cancelled"]
+JobStatus = Literal["pending", "processing", "done", "failed"]
 
 
 @dataclass
@@ -22,7 +22,6 @@ class Job:
     total_s: float | None = None      # total audio duration
     phase: str = "transcribing"       # "transcribing" | "diarizing"
     diarize_progress: float | None = None  # 0.0–1.0 fraction
-    cancel_requested: bool = False    # set by cancel endpoint; checked by subprocess monitor loop
 
 
 class JobStore:
@@ -75,22 +74,6 @@ class JobStore:
             job.status = "failed"
             job.error = error
             job.retryable = retryable
-            job.finished_at = time.time()
-
-    def request_cancel(self, job_id: str) -> bool:
-        """Request cancellation of a job. Returns True if the job was in a cancellable state
-        (pending or processing), False if it has already reached a terminal state."""
-        with self._lock:
-            job = self._jobs.get(job_id)
-            if job is None or job.status not in ("pending", "processing"):
-                return False
-            job.cancel_requested = True
-            return True
-
-    def set_cancelled(self, job_id: str) -> None:
-        with self._lock:
-            job = self._jobs[job_id]
-            job.status = "cancelled"
             job.finished_at = time.time()
 
 
