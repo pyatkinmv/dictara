@@ -295,7 +295,12 @@ class DictaraBot(
         val who = if (senderTag != null) "$senderTag's" else "your"
         val baseLabel = "⏳ Transcribing $who audio...\n\nModel: $modelLabel | Speakers: $speakersLabel | Lang: $langLabel | Summary: $summaryLabel"
         val originalMessageId = message.messageId.toLong()
-        val statusMsg = send(chatId, baseLabel, replyToMessageId = originalMessageId)
+        val statusMsg: Message? = try {
+            send(chatId, baseLabel, replyToMessageId = originalMessageId)
+        } catch (e: Exception) {
+            log.warn("Audio: could not send Transcribing status to chatId={}: {}", chatId, e.message)
+            null
+        }
 
         log.info("Audio received: fileId={} chatId={} prefs={}/{}/{}/{}", fileId, chatId, prefs.model, if (prefs.diarize) "diarize" else "nodiarize", prefs.language, prefs.summaryMode)
         executor.submit {
@@ -334,7 +339,7 @@ class DictaraBot(
                         chatId = chatId,
                         telegramMessageId = originalMessageId,
                     ) { progressText ->
-                        try {
+                        if (statusMsg != null) try {
                             execute(
                                 EditMessageText.builder()
                                     .chatId(chatId.toString())
@@ -355,7 +360,7 @@ class DictaraBot(
                     log.info("Inline: ack result jobId={} claimed={}", result.jobId, claimed)
                     if (!claimed) {
                         log.warn("Inline: delivery already claimed by background poller, skipping send: jobId={} chatId={}", result.jobId, chatId)
-                        try { execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build()) } catch (_: Exception) {}
+                        if (statusMsg != null) try { execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build()) } catch (_: Exception) {}
                         return@submit
                     }
                     log.info("Inline: sending transcript for jobId={} chatId={}", result.jobId, chatId)
@@ -372,7 +377,7 @@ class DictaraBot(
                         }
                         return@submit
                     }
-                    try {
+                    if (statusMsg != null) try {
                         execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build())
                     } catch (_: Exception) {}
 
