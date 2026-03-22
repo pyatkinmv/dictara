@@ -104,7 +104,7 @@ class DictaraBot(
                                 "done" -> {
                                     log.info("Poller: sending transcript for jobId={} chatId={}", d.jobId, d.chatId)
                                     val result = client.fetchJobResult(d.jobId)
-                                    val sentMsg = sendTranscript(d.chatId, result)
+                                    val sentMsg = sendTranscript(d.chatId, result, d.telegramMessageId)
                                     log.info("Poller: transcript sent for jobId={}", d.jobId)
                                     if (result.summary != null) {
                                         try {
@@ -120,14 +120,14 @@ class DictaraBot(
                                                 )
                                             } else {
                                                 val truncated = if (result.summary.length > 4096) result.summary.take(4093) + "…" else result.summary
-                                                send(d.chatId, truncated)
+                                                send(d.chatId, truncated, replyToMessageId = d.telegramMessageId)
                                             }
                                         } catch (e: Exception) {
-                                            send(d.chatId, "Summary failed: ${e.message}")
+                                            send(d.chatId, "Summary failed: ${e.message}", replyToMessageId = d.telegramMessageId)
                                         }
                                     }
                                 }
-                                "failed" -> send(d.chatId, "❌ Transcription failed: ${d.error ?: "unknown error"}")
+                                "failed" -> send(d.chatId, "❌ Transcription failed: ${d.error ?: "unknown error"}", replyToMessageId = d.telegramMessageId)
                             }
                         } catch (e: Exception) {
                             log.error("Poller: error processing delivery jobId={}: {}", d.jobId, e.message, e)
@@ -282,8 +282,8 @@ class DictaraBot(
         val senderTag = if (isGroup) message.from?.userName?.let { "@$it" } ?: message.from?.firstName ?: "Someone" else null
         val who = if (senderTag != null) "$senderTag's" else "your"
         val baseLabel = "⏳ Transcribing $who audio...\n\nModel: $modelLabel | Speakers: $speakersLabel | Lang: $langLabel | Summary: $summaryLabel"
-        val originalMessageId = if (isGroup) message.messageId else null
-        val statusMsg = send(chatId, baseLabel)
+        val originalMessageId = message.messageId
+        val statusMsg = send(chatId, baseLabel, replyToMessageId = originalMessageId)
 
         log.info("Audio received: fileId={} chatId={} prefs={}/{}/{}/{}", fileId, chatId, prefs.model, if (prefs.diarize) "diarize" else "nodiarize", prefs.language, prefs.summaryMode)
         executor.submit {
@@ -320,6 +320,7 @@ class DictaraBot(
                         telegramFirstName = sender.firstName,
                         telegramLastName = sender.lastName,
                         chatId = chatId,
+                        telegramMessageId = originalMessageId,
                     ) { progressText ->
                         try {
                             execute(
@@ -378,7 +379,7 @@ class DictaraBot(
                 }
             } catch (e: Exception) {
                 log.error("Failed to process audio: chatId={} fileId={} error={}", chatId, fileId, e.message, e)
-                send(chatId, if (senderTag != null) "Error transcribing $senderTag's audio: ${e.message}" else "Error: ${e.message}")
+                send(chatId, if (senderTag != null) "Error transcribing $senderTag's audio: ${e.message}" else "Error: ${e.message}", replyToMessageId = originalMessageId)
             }
         }
     }
@@ -601,6 +602,8 @@ class DictaraBot(
             ))
             .build()
 
-    private fun send(chatId: Long, text: String): Message =
-        execute(SendMessage.builder().chatId(chatId.toString()).text(text).build())
+    private fun send(chatId: Long, text: String, replyToMessageId: Int? = null): Message =
+        execute(SendMessage.builder().chatId(chatId.toString()).text(text)
+            .apply { if (replyToMessageId != null) replyToMessageId(replyToMessageId) }
+            .build())
 }

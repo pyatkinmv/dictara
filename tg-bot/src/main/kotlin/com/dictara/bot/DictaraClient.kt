@@ -31,7 +31,7 @@ class DictaraClient(private val baseUrl: String) {
     private val mapper = ObjectMapper().registerKotlinModule()
 
     data class LoginNotification(val id: Long, val chatId: String, val token: String)
-    data class PendingDelivery(val jobId: String, val chatId: Long, val status: String, val error: String?)
+    data class PendingDelivery(val jobId: String, val chatId: Long, val telegramMessageId: Int?, val status: String, val error: String?)
 
     fun markBotStarted(telegramUserId: Long) {
         val body = mapper.writeValueAsString(mapOf("telegram_user_id" to telegramUserId.toString()))
@@ -69,6 +69,7 @@ class DictaraClient(private val baseUrl: String) {
             PendingDelivery(
                 jobId = m["job_id"] as String,
                 chatId = (m["chat_id"] as Number).toLong(),
+                telegramMessageId = (m["telegram_message_id"] as Number?)?.toInt(),
                 status = m["status"] as String,
                 error = m["error"] as String?,
             )
@@ -167,10 +168,11 @@ class DictaraClient(private val baseUrl: String) {
         telegramFirstName: String? = null,
         telegramLastName: String? = null,
         chatId: Long,
+        telegramMessageId: Int? = null,
         onProgress: ((String) -> Unit)? = null,
     ): TranscriptResult {
         val jobId = submitWithRetry(audioFile, model, diarize, summaryMode, language, numSpeakers,
-            telegramUserId, telegramUsername, telegramFirstName, telegramLastName, chatId, onProgress)
+            telegramUserId, telegramUsername, telegramFirstName, telegramLastName, chatId, telegramMessageId, onProgress)
         return pollJob(jobId, diarize, summaryMode, onProgress)
     }
 
@@ -186,6 +188,7 @@ class DictaraClient(private val baseUrl: String) {
         telegramFirstName: String?,
         telegramLastName: String?,
         chatId: Long,
+        telegramMessageId: Int?,
         onProgress: ((String) -> Unit)?,
     ): String {
         var pollInterval = 5_000L
@@ -193,7 +196,7 @@ class DictaraClient(private val baseUrl: String) {
         while (true) {
             try {
                 return submitJob(audioFile, model, diarize, summaryMode, language, numSpeakers,
-                    telegramUserId, telegramUsername, telegramFirstName, telegramLastName, chatId)
+                    telegramUserId, telegramUsername, telegramFirstName, telegramLastName, chatId, telegramMessageId)
             } catch (e: RuntimeException) {
                 throw e  // non-retryable (e.g. 4xx from gateway)
             } catch (e: Exception) {
@@ -218,6 +221,7 @@ class DictaraClient(private val baseUrl: String) {
         telegramFirstName: String?,
         telegramLastName: String?,
         chatId: Long,
+        telegramMessageId: Int?,
     ): String {
         val body = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
@@ -235,6 +239,7 @@ class DictaraClient(private val baseUrl: String) {
             Request.Builder().url(url).post(body)
                 .header("X-Telegram-User-Id", telegramUserId.toString())
                 .header("X-Telegram-Chat-Id", chatId.toString())
+                .apply { if (telegramMessageId != null) header("X-Telegram-Message-Id", telegramMessageId.toString()) }
                 .apply {
                     fun enc(v: String) = URLEncoder.encode(v, "UTF-8")
                     telegramUsername?.let { header("X-Telegram-Username", enc(it)) }

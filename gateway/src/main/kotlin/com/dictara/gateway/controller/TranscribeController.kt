@@ -113,6 +113,7 @@ class TranscribeController(
         @RequestHeader(name = "X-Telegram-First-Name", required = false) telegramFirstName: String?,
         @RequestHeader(name = "X-Telegram-Last-Name", required = false) telegramLastName: String?,
         @RequestHeader(name = "X-Telegram-Chat-Id", required = false) telegramChatId: Long?,
+        @RequestHeader(name = "X-Telegram-Message-Id", required = false) telegramMessageId: Int?,
         servletRequest: HttpServletRequest,
     ): SubmitResponse {
         val ext = file.originalFilename?.substringAfterLast('.', "")?.lowercase() ?: ""
@@ -141,7 +142,7 @@ class TranscribeController(
             diarize = diarize, numSpeakers = numSpeakers, summaryMode = summaryMode, source = source,
         ))
         if (telegramChatId != null) {
-            telegramDeliveryRepo.save(TelegramDeliveryEntity(jobId = submission.id!!, chatId = telegramChatId))
+            telegramDeliveryRepo.save(TelegramDeliveryEntity(jobId = submission.id!!, chatId = telegramChatId, telegramMessageId = telegramMessageId))
         }
         org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
             object : org.springframework.transaction.support.TransactionSynchronization {
@@ -309,6 +310,7 @@ class TranscribeController(
     data class PendingDeliveryResponse(
         val jobId: String,
         val chatId: Long,
+        val telegramMessageId: Int?,
         val status: String,
         val error: String?,
     )
@@ -322,7 +324,7 @@ class TranscribeController(
                     .findBySubmissionIdAndStageOrderByAttemptNumDesc(d.jobId, "transcription")
                     .firstOrNull { it.status == "failed" }?.error?.take(150)
             else null
-            PendingDeliveryResponse(d.jobId.toString(), d.chatId, submission.status, error)
+            PendingDeliveryResponse(d.jobId.toString(), d.chatId, d.telegramMessageId, submission.status, error)
         }
 
     @PostMapping("/telegram/deliveries/{jobId}/ack")
