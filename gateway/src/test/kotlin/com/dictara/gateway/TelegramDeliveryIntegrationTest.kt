@@ -89,7 +89,27 @@ class TelegramDeliveryIntegrationTest {
         val delivery = telegramDeliveryRepo.findById(jobId).orElse(null)
         assertThat(delivery).isNotNull
         assertThat(delivery.chatId).isEqualTo(100L)
+        assertThat(delivery.telegramMessageId).isNull()
         assertThat(delivery.deliveredAt).isNull()
+    }
+
+    @Test
+    fun `submit with message id stores it in delivery row`() {
+        val body = LinkedMultiValueMap<String, Any>().apply { add("file", fakeAudio()) }
+        val headers = HttpHeaders().apply {
+            contentType = MediaType.MULTIPART_FORM_DATA
+            set("X-Telegram-User-Id", "999")
+            set("X-Telegram-Chat-Id", "100")
+            set("X-Telegram-Message-Id", "42")
+        }
+        wireMock.stubFor(post(urlPathEqualTo("/transcribe")).willReturn(okJson("""{"job_id":"td-msgid-1"}""")))
+        wireMock.stubFor(get(urlEqualTo("/jobs/td-msgid-1")).willReturn(okJson("""{"status":"processing"}""")))
+        val jobId = UUID.fromString(
+            rest.postForEntity("/transcribe?model=fast&diarize=false&summary_mode=off",
+                HttpEntity(body, headers), Map::class.java).body!!["job_id"] as String
+        )
+        val delivery = telegramDeliveryRepo.findById(jobId).orElseThrow()
+        assertThat(delivery.telegramMessageId).isEqualTo(42)
     }
 
     @Test
@@ -110,6 +130,7 @@ class TelegramDeliveryIntegrationTest {
             contentType = MediaType.MULTIPART_FORM_DATA
             set("X-Telegram-User-Id", "999")
             set("X-Telegram-Chat-Id", "200")
+            set("X-Telegram-Message-Id", "77")
         }
         val jobId = UUID.fromString(
             rest.postForEntity("/transcribe?model=fast&diarize=false&summary_mode=off",
@@ -121,6 +142,7 @@ class TelegramDeliveryIntegrationTest {
         val entry = deliveries.find { it["job_id"] == jobId.toString() }
         assertThat(entry).isNotNull
         assertThat(entry!!["chat_id"]).isEqualTo(200)
+        assertThat(entry["telegram_message_id"]).isEqualTo(77)
         assertThat(entry["status"]).isEqualTo("done")
         assertThat(entry["error"]).isNull()
     }
