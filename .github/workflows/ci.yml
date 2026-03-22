@@ -54,6 +54,8 @@ jobs:
               - 'app/**'
             transcriber:
               - 'transcriber/**'
+            monitoring:
+              - 'monitoring/**'
 
       - uses: appleboy/ssh-action@v1
         with:
@@ -61,7 +63,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           command_timeout: 45m
-          envs: GATEWAY_CHANGED,BOT_CHANGED,APP_CHANGED,TRANSCRIBER_CHANGED
+          envs: GATEWAY_CHANGED,BOT_CHANGED,APP_CHANGED,TRANSCRIBER_CHANGED,MONITORING_CHANGED
           script: |
             cd ~/dictara
             git pull
@@ -79,8 +81,12 @@ jobs:
             if [ "$TRANSCRIBER_CHANGED" = "true" ]; then
               docker compose build transcriber && docker compose up -d --remove-orphans --force-recreate transcriber
             fi
+            if [ "$MONITORING_CHANGED" = "true" ]; then
+              docker compose up -d --force-recreate prometheus loki promtail
+            fi
         env:
           GATEWAY_CHANGED: ${{ steps.changes.outputs.gateway }}
           BOT_CHANGED: ${{ steps.changes.outputs.tg_bot }}
           APP_CHANGED: ${{ steps.changes.outputs.app }}
           TRANSCRIBER_CHANGED: ${{ steps.changes.outputs.transcriber }}
+          MONITORING_CHANGED: ${{ steps.changes.outputs.monitoring }}

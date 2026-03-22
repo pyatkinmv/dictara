@@ -40,4 +40,10 @@ interface TelegramDeliveryRepository : JpaRepository<TelegramDeliveryEntity, UUI
         WHERE job_id = :jobId
     """, nativeQuery = true)
     fun scheduleRetry(@Param("jobId") jobId: UUID, @Param("retryAfterTs") retryAfterTs: Instant)
+
+    @Query(value = "SELECT COUNT(*) FROM telegram_deliveries WHERE delivered_at IS NULL AND attempt_count < 10", nativeQuery = true)
+    fun countUndelivered(): Long
+
+    @Query(value = "SELECT COUNT(*) FROM telegram_deliveries WHERE delivered_at IS NULL AND attempt_count >= 10", nativeQuery = true)
+    fun countExhausted(): Long
 }

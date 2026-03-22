@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.jpa.repository.QueryHints
+import org.springframework.data.repository.query.Param
 import java.time.Instant
 import java.util.UUID
 
@@ -23,4 +24,7 @@ interface SubmissionRepository : JpaRepository<SubmissionEntity, UUID> {
 
     @Query("SELECT COUNT(s) FROM SubmissionEntity s WHERE s.status = 'pending' AND s.createdAt < :createdAt")
     fun countPendingSubmissionsBefore(createdAt: Instant): Long
+
+    @Query("SELECT COUNT(s) FROM SubmissionEntity s WHERE s.status = :status")
+    fun countByStatus(@Param("status") status: String): Long
 }
