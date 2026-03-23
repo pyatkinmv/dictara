@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Query
 from jobs import job_store
 from transcriber import Transcriber, Diarizer, merge_diarization
 
-from prometheus_client import Gauge
+from prometheus_client import Gauge, REGISTRY
 from prometheus_fastapi_instrumentator import Instrumentator
 
 logging.basicConfig(level=logging.INFO)
@@ -52,7 +52,7 @@ _build_info.labels(
     build_time=os.environ.get("BUILD_TIME", "unknown"),
 ).set(1)
 
-Instrumentator().instrument(app).expose(app)
+Instrumentator(registry=REGISTRY).instrument(app).expose(app)
 
 
 # ── worker ────────────────────────────────────────────────────────────────────

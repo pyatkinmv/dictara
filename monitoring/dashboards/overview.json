@@ -205,11 +205,30 @@
       "fieldConfig": { "defaults": { "unit": "bytes" } }
     },
 
-    { "id": 40, "type": "row", "title": "Logs", "gridPos": { "x": 0, "y": 54, "w": 24, "h": 1 }, "collapsed": false },
+    {
+      "id": 67, "title": "Process memory RSS", "type": "timeseries",
+      "gridPos": { "x": 0, "y": 54, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "process_resident_memory_bytes{job=~\"gateway|transcriber|tg-bot\"}", "legendFormat": "{{job}}" }],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+
+    {
+      "id": 68, "title": "Process CPU", "type": "timeseries",
+      "gridPos": { "x": 12, "y": 54, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "rate(process_cpu_seconds_total{job=\"transcriber\"}[2m])", "legendFormat": "transcriber" },
+        { "expr": "process_cpu_usage{job=~\"gateway|tg-bot\"}", "legendFormat": "{{job}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit" } }
+    },
+
+    { "id": 40, "type": "row", "title": "Logs", "gridPos": { "x": 0, "y": 62, "w": 24, "h": 1 }, "collapsed": false },
 
     {
       "id": 41, "title": "All service logs", "type": "logs",
-      "gridPos": { "x": 0, "y": 55, "w": 24, "h": 12 },
+      "gridPos": { "x": 0, "y": 63, "w": 24, "h": 12 },
       "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
       "targets": [{ "expr": "{service=~\"gateway|tg-bot|transcriber\"} | line_format \"[{{.service}}] {{__line__}}\"", "legendFormat": "" }],
       "options": {
