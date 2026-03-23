@@ -205,27 +205,11 @@
       "fieldConfig": { "defaults": { "unit": "bytes" } }
     },
 
-    {
-      "id": 65, "title": "Container memory", "type": "timeseries",
-      "gridPos": { "x": 0, "y": 54, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "container_memory_rss{name=~\"dictara-.*\",name!=\"\"}", "legendFormat": "{{name}}" }],
-      "fieldConfig": { "defaults": { "unit": "bytes" } }
-    },
-
-    {
-      "id": 66, "title": "Container CPU %", "type": "timeseries",
-      "gridPos": { "x": 12, "y": 54, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "rate(container_cpu_usage_seconds_total{name=~\"dictara-.*\",name!=\"\"}[2m]) * 100", "legendFormat": "{{name}}" }],
-      "fieldConfig": { "defaults": { "unit": "percent" } }
-    },
-
-    { "id": 40, "type": "row", "title": "Logs", "gridPos": { "x": 0, "y": 62, "w": 24, "h": 1 }, "collapsed": false },
+    { "id": 40, "type": "row", "title": "Logs", "gridPos": { "x": 0, "y": 54, "w": 24, "h": 1 }, "collapsed": false },
 
     {
       "id": 41, "title": "All service logs", "type": "logs",
-      "gridPos": { "x": 0, "y": 63, "w": 24, "h": 12 },
+      "gridPos": { "x": 0, "y": 55, "w": 24, "h": 12 },
       "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
       "targets": [{ "expr": "{service=~\"gateway|tg-bot|transcriber\"} | line_format \"[{{.service}}] {{__line__}}\"", "legendFormat": "" }],
       "options": {
