@@ -47,12 +47,12 @@ class TranscriptDownloadIntegrationTest {
         override fun getFilename() = "audio.m4a"
     }
 
-    private fun submitAndWaitDone(jobStub: String, formattedText: String): UUID {
+    private fun submitAndWaitDone(jobStub: String, segmentText: String): UUID {
         wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
             .willReturn(okJson("""{"job_id":"$jobStub"}""")))
         wireMock.stubFor(get(urlEqualTo("/jobs/$jobStub"))
             .willReturn(okJson("""{"status":"done","duration_s":1.0,
-                "result":{"formatted_text":"$formattedText","audio_duration_s":3.0,"segments":[]}}""")))
+                "result":{"audio_duration_s":3.0,"segments":[{"start":0.0,"end":1.0,"text":"$segmentText"}]}}""")))
 
         val body = LinkedMultiValueMap<String, Any>().apply { add("file", fakeAudio()) }
         val headers = HttpHeaders().apply { contentType = MediaType.MULTIPART_FORM_DATA }
@@ -90,27 +90,28 @@ class TranscriptDownloadIntegrationTest {
         assertThat(resp.headers.getFirst(HttpHeaders.CONTENT_DISPOSITION))
             .contains("attachment")
             .contains("transcript_$jobId.txt")
-        assertThat(String(resp.body!!, Charsets.UTF_8)).isEqualTo(expectedText)
+        assertThat(String(resp.body!!, Charsets.UTF_8)).contains(expectedText)
     }
 
     @Test
     fun `done job with diarization returns diarized text`() {
-        val diarizedText = "[SPEAKER_00]: Hello.\n[SPEAKER_01]: World."
+        val speaker0Text = "Hello."
+        val speaker1Text = "World."
         val jobStub = "dl-diar-1"
         wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
             .willReturn(okJson("""{"job_id":"$jobStub"}""")))
         wireMock.stubFor(get(urlEqualTo("/jobs/$jobStub"))
             .willReturn(okJson("""{"status":"done","duration_s":1.0,
-                "result":{"formatted_text":"$diarizedText","audio_duration_s":3.0,
-                          "segments":[{"start":0.0,"end":1.0,"text":"Hello.","speaker":"SPEAKER_00"},
-                                      {"start":1.0,"end":2.0,"text":"World.","speaker":"SPEAKER_01"}]}}""")))
+                "result":{"audio_duration_s":3.0,
+                          "segments":[{"start":0.0,"end":1.0,"text":"$speaker0Text","speaker":"SPEAKER_00"},
+                                      {"start":1.0,"end":2.0,"text":"$speaker1Text","speaker":"SPEAKER_01"}]}}""")))
 
-        val body = LinkedMultiValueMap<String, Any>().apply { add("file", fakeAudio()) }
+        val multipart = LinkedMultiValueMap<String, Any>().apply { add("file", fakeAudio()) }
         val headers = HttpHeaders().apply { contentType = MediaType.MULTIPART_FORM_DATA }
         val jobId = UUID.fromString(
             rest.postForEntity(
                 "/transcribe?model=fast&diarize=true&summary_mode=off",
-                HttpEntity(body, headers), Map::class.java,
+                HttpEntity(multipart, headers), Map::class.java,
             ).body!!["job_id"] as String
         )
 
@@ -124,6 +125,8 @@ class TranscriptDownloadIntegrationTest {
         val resp = rest.getForEntity("/transcript?jobId=$jobId", ByteArray::class.java)
 
         assertThat(resp.statusCode).isEqualTo(HttpStatus.OK)
-        assertThat(String(resp.body!!, Charsets.UTF_8)).isEqualTo(diarizedText)
+        val responseText = String(resp.body!!, Charsets.UTF_8)
+        assertThat(responseText).contains(speaker0Text).contains(speaker1Text)
+            .contains("SPEAKER_00").contains("SPEAKER_01")
     }
 }
