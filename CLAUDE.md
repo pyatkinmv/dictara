@@ -34,7 +34,7 @@ dictara/
 | `TELEGRAM_API_HASH` | telegram-bot-api | — | Telegram API hash (large file support) |
 | `HF_TOKEN` | transcriber | — | HuggingFace token — required for diarization |
 | `HF_HOME` | transcriber | `/models` | HF model cache path (mapped to `model-cache` volume) |
-| `WHISPER_MODELS` | transcriber | `small,large-v3` | Comma-separated list of Whisper models to load |
+| `WHISPER_MODELS` | transcriber | `small,turbo` | Comma-separated list of Whisper models to load |
 | `GATEWAY_URL` | tg-bot | `http://gateway:8080` | Gateway URL (auto-set in Docker) |
 | `TRANSCRIBER_URL` | gateway | `http://transcriber:8000` | Transcriber URL (auto-set in Docker) |
 | `GEMINI_API_KEY` | gateway | — | Google Gemini key — enables summarization |
@@ -70,3 +70,15 @@ curl http://localhost:8080/health
 | `app-material` | `./app` | `:3000` | Flutter web — Material 3 |
 
 Model downloads cache to the `model-cache` Docker volume. `docker compose down` keeps volumes; only `docker compose down -v` deletes them.
+
+## Resource limits
+
+`scripts/set-limits.sh` calculates transcriber memory/CPU limits as a percentage of the host machine's resources and writes them to `.env.limits`. Run it before `docker compose up` to apply dynamic limits:
+
+```bash
+bash scripts/set-limits.sh
+set -a; source .env.limits; set +a
+docker compose up -d transcriber
+```
+
+CI runs this automatically on every deploy. Without it, `docker-compose.yml` falls back to hardcoded defaults.
