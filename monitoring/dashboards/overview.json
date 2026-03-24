@@ -71,7 +71,8 @@
       "gridPos": { "x": 12, "y": 9, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
-        { "expr": "dictara_jobs{status=\"processing\"}",   "legendFormat": "processing" },
+        { "expr": "dictara_jobs{status=\"pending\"}",     "legendFormat": "pending" },
+        { "expr": "dictara_jobs{status=\"processing\"}",  "legendFormat": "processing" },
         { "expr": "dictara_jobs{status=\"summarizing\"}", "legendFormat": "summarizing" },
         { "expr": "dictara_jobs{status=\"done\"}",        "legendFormat": "done" },
         { "expr": "dictara_jobs{status=\"failed\"}",      "legendFormat": "failed" }
@@ -79,6 +80,7 @@
       "fieldConfig": {
         "defaults": { "unit": "short" },
         "overrides": [
+          { "matcher": { "id": "byName", "options": "pending" },     "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } }] },
           { "matcher": { "id": "byName", "options": "processing" },  "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }] },
           { "matcher": { "id": "byName", "options": "summarizing" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }] },
           { "matcher": { "id": "byName", "options": "done" },        "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] },
