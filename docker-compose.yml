@@ -13,6 +13,9 @@ services:
       HF_HOME: /models
       WHISPER_MODELS: ${WHISPER_MODELS:-small,turbo}
       HF_TOKEN: ${HF_TOKEN:-}
+    mem_limit: ${TRANSCRIBER_MEM_LIMIT:-2000m}
+    memswap_limit: ${TRANSCRIBER_MEMSWAP_LIMIT:-3000m}
+    cpus: ${TRANSCRIBER_CPUS:-1.5}
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
       interval: 10s

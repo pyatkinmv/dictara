@@ -1,0 +1,19 @@
+#!/bin/bash
+set -e
+
+TOTAL_RAM=$(free -m | awk '/^Mem:/{print $2}')
+TOTAL_SWAP=$(free -m | awk '/^Swap:/{print $2}')
+TOTAL=$(( TOTAL_RAM + TOTAL_SWAP ))
+TOTAL_CPUS=$(nproc)
+
+TRANSCRIBER_MEM_LIMIT="$(( TOTAL_RAM * 50 / 100 ))m"
+TRANSCRIBER_MEMSWAP_LIMIT="$(( TOTAL * 50 / 100 ))m"
+TRANSCRIBER_CPUS=$(echo "scale=2; $TOTAL_CPUS * 75 / 100" | bc)
+
+cat > .env.limits <<EOF
+TRANSCRIBER_MEM_LIMIT=${TRANSCRIBER_MEM_LIMIT}
+TRANSCRIBER_MEMSWAP_LIMIT=${TRANSCRIBER_MEMSWAP_LIMIT}
+TRANSCRIBER_CPUS=${TRANSCRIBER_CPUS}
+EOF
+
+echo "[set-limits] RAM=${TOTAL_RAM}m SWAP=${TOTAL_SWAP}m CPUs=${TOTAL_CPUS} → transcriber mem=${TRANSCRIBER_MEM_LIMIT} memswap=${TRANSCRIBER_MEMSWAP_LIMIT} cpus=${TRANSCRIBER_CPUS}"

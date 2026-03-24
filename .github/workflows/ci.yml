@@ -70,6 +70,8 @@ jobs:
             git pull
             export GIT_COMMIT=$(git rev-parse --short HEAD)
             export BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            bash scripts/set-limits.sh
+            set -a; source .env.limits; set +a
             if [ "$GATEWAY_CHANGED" = "true" ]; then
               docker compose build gateway && docker compose up -d --remove-orphans --force-recreate gateway
             fi
