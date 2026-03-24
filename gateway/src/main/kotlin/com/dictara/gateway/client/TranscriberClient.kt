@@ -33,7 +33,7 @@ data class TranscriberJobSnapshot(
     val retryable: Boolean = true,
 )
 
-private val MODEL_ALIASES = mapOf("fast" to "small", "accurate" to "large-v3")
+private val MODEL_ALIASES = mapOf("fast" to "small", "accurate" to "turbo")
 
 @Component
 class TranscriberClient(private val props: DictaraProperties) {

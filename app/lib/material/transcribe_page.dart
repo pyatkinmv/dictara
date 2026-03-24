@@ -333,7 +333,7 @@ class _TranscribePageState extends State<TranscribePage> {
 
 // ── Settings bar ─────────────────────────────────────────────────────────────
 
-const _kModels = {'small': 'Fast (small)', 'large-v3': 'Accurate (large-v3)'};
+const _kModels = {'small': 'Fast (small)', 'turbo': 'Accurate (turbo)'};
 
 const _kSummaryModes = {
   'off': 'Off',

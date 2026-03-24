@@ -26,7 +26,7 @@ _executor = ThreadPoolExecutor(max_workers=1)
 async def lifespan(app: FastAPI):
     app.state.transcribers = {}
     app.state.diarizer = None
-    models_env = os.environ.get("WHISPER_MODELS", "small,large-v3")
+    models_env = os.environ.get("WHISPER_MODELS", "small,turbo")
     for model_size in [m.strip() for m in models_env.split(",") if m.strip()]:
         try:
             app.state.transcribers[model_size] = Transcriber(model_size=model_size)

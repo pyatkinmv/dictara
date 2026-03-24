@@ -97,13 +97,13 @@ class SubmitIntegrationTest {
     }
 
     @Test
-    fun `model alias accurate is normalized to large-v3`() {
-        assertThat(submitAndGetSubmission(model = "accurate").model).isEqualTo("large-v3")
+    fun `model alias accurate is normalized to turbo`() {
+        assertThat(submitAndGetSubmission(model = "accurate").model).isEqualTo("turbo")
     }
 
     @Test
     fun `raw model name passes through unchanged`() {
-        assertThat(submitAndGetSubmission(model = "large-v3").model).isEqualTo("large-v3")
+        assertThat(submitAndGetSubmission(model = "turbo").model).isEqualTo("turbo")
     }
 
     @Test

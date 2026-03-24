@@ -138,7 +138,7 @@ class TranscribeController(
             else -> userService.resolveAnonymous()
         }
         val audio = saveAudio(file, user)
-        val resolvedModel = mapOf("fast" to "small", "accurate" to "large-v3")[model] ?: model
+        val resolvedModel = mapOf("fast" to "small", "accurate" to "turbo")[model] ?: model
         val source = if (telegramUserId != null) "telegram" else "web"
         val submission = submissionRepo.save(SubmissionEntity(
             user = user, audio = audio, model = resolvedModel, language = language,

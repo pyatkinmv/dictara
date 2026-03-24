@@ -11,7 +11,7 @@ services:
       - model-cache:/models
     environment:
       HF_HOME: /models
-      WHISPER_MODELS: ${WHISPER_MODELS:-small,large-v3}
+      WHISPER_MODELS: ${WHISPER_MODELS:-small,turbo}
       HF_TOKEN: ${HF_TOKEN:-}
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
