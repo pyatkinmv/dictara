@@ -6,8 +6,8 @@ TOTAL_SWAP=$(free -m | awk '/^Swap:/{print $2}')
 TOTAL=$(( TOTAL_RAM + TOTAL_SWAP ))
 TOTAL_CPUS=$(nproc)
 
-TRANSCRIBER_MEM_LIMIT="$(( TOTAL_RAM * 50 / 100 ))m"
-TRANSCRIBER_MEMSWAP_LIMIT="$(( TOTAL * 50 / 100 ))m"
+TRANSCRIBER_MEM_LIMIT="$(( TOTAL_RAM * 60 / 100 ))m"
+TRANSCRIBER_MEMSWAP_LIMIT="$(( TOTAL * 60 / 100 ))m"
 TRANSCRIBER_CPUS=$(awk "BEGIN {printf \"%.2f\", $TOTAL_CPUS * 75 / 100}")
 
 cat > .env.limits <<EOF
