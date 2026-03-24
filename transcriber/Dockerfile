@@ -7,6 +7,7 @@ ENV GIT_COMMIT=$GIT_COMMIT
 ENV BUILD_TIME=$BUILD_TIME
 
 COPY --from=ffmpeg /ffmpeg /usr/local/bin/ffmpeg
+COPY --from=ffmpeg /ffprobe /usr/local/bin/ffprobe
 
 WORKDIR /app
 
