@@ -958,7 +958,7 @@
         "includeAll": false,
         "multi": false,
         "skipUrlSync": false,
-        "query": "Hide /health & /metrics : != \"/health\" != \"/metrics\",All : ",
+        "query": "Hide /health & /metrics : != \"/health\" != \"/metrics\",All : |~ \".\"",
         "options": [
           {
             "text": "Hide /health & /metrics",
