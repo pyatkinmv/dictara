@@ -109,14 +109,10 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "${DS_PROMETHEUS}"
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
           "expr": "up{job=~\"gateway|transcriber|tg-bot|app-material\"}",
           "legendFormat": "{{job}}",
           "refId": "A"
