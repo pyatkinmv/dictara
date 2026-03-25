@@ -967,7 +967,7 @@
           },
           {
             "text": "All",
-            "value": "",
+            "value": "|~ \".\"",
             "selected": false
           }
         ],
