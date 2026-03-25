@@ -935,7 +935,7 @@
       },
       "targets": [
         {
-          "expr": "{service=~\"gateway|tg-bot|transcriber\"} | line_format \"[{{.service}}] {{__line__}}\"",
+          "expr": "{service=~\"gateway|tg-bot|transcriber\"} ${log_filter} | line_format \"[{{.service}}] {{__line__}}\"",
           "legendFormat": ""
         }
       ],
@@ -947,5 +947,35 @@
         "wrapLogMessage": false
       }
     }
-  ]
+  ],
+  "templating": {
+    "list": [
+      {
+        "type": "custom",
+        "name": "log_filter",
+        "label": "Log filter",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "skipUrlSync": false,
+        "query": "Hide /health & /metrics : != \"/health\" != \"/metrics\",All : ",
+        "options": [
+          {
+            "text": "Hide /health & /metrics",
+            "value": "!= \"/health\" != \"/metrics\"",
+            "selected": true
+          },
+          {
+            "text": "All",
+            "value": "",
+            "selected": false
+          }
+        ],
+        "current": {
+          "text": "Hide /health & /metrics",
+          "value": "!= \"/health\" != \"/metrics\""
+        }
+      }
+    ]
+  }
 }
