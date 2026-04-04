@@ -320,25 +320,8 @@ class DictaraBot(
         log.info("Audio received: fileId={} chatId={} prefs={}/{}/{}/{}", fileId, chatId, prefs.model, if (prefs.diarize) "diarize" else "nodiarize", prefs.language, prefs.summaryMode)
         executor.submit {
             try {
-                log.debug("GetFile start: fileId={}", fileId)
-                val tgFile = execute(GetFile().apply { this.fileId = fileId })
-                log.debug("GetFile result: fileId={} localPath={}", fileId, tgFile.filePath)
-                val ext = tgFile.filePath.substringAfterLast('.', "bin")
-                val audioTmp = Files.createTempFile("dictara-", ".$ext").toFile()
+                val audioTmp = downloadAudioFile(fileId)
                 try {
-                    val localPath = tgFile.filePath
-                    if (fileBaseUrl != "https://api.telegram.org" && localPath.startsWith("/")) {
-                        log.debug("Copying local file: localPath={}", localPath)
-                        File(localPath).inputStream().use { input ->
-                            audioTmp.outputStream().use { input.copyTo(it) }
-                        }
-                        log.debug("File copied: localPath={} audioTmp={}", localPath, audioTmp)
-                    } else {
-                        URL("$fileBaseUrl/file/bot$token/${localPath.trimStart('/')}")
-                            .openStream().use { input ->
-                                audioTmp.outputStream().use { input.copyTo(it) }
-                            }
-                    }
 
                     // Phase 1: transcribe (with live progress updates)
                     log.info("Submitting to gateway: chatId={} fileId={} size={}b", chatId, fileId, audioTmp.length())
@@ -436,9 +419,48 @@ class DictaraBot(
                 }
             } catch (e: Exception) {
                 log.error("Failed to process audio: chatId={} fileId={} error={}", chatId, fileId, e.message, e)
-                send(chatId, if (senderTag != null) "Error transcribing $senderTag's audio: ${e.message}" else "Error: ${e.message}", replyToMessageId = originalMessageId)
+                send(chatId, "Something went wrong, please try again later", replyToMessageId = originalMessageId)
             }
         }
+    }
+
+    private fun downloadAudioFile(fileId: String): File {
+        val maxAttempts = 5
+        var delayMs = 2000L
+        var lastException: Exception? = null
+        for (attempt in 1..maxAttempts) {
+            try {
+                if (attempt > 1) {
+                    log.warn("GetFile retry {}/{}: fileId={} waitMs={}", attempt, maxAttempts, fileId, delayMs)
+                    Thread.sleep(delayMs)
+                    delayMs *= 2
+                }
+                log.debug("GetFile attempt {}/{}: fileId={}", attempt, maxAttempts, fileId)
+                val tgFile = execute(GetFile().apply { this.fileId = fileId })
+                log.debug("GetFile success: fileId={} localPath={} attempt={}", fileId, tgFile.filePath, attempt)
+                val ext = tgFile.filePath.substringAfterLast('.', "bin")
+                val audioTmp = Files.createTempFile("dictara-", ".$ext").toFile()
+                val localPath = tgFile.filePath
+                if (fileBaseUrl != "https://api.telegram.org" && localPath.startsWith("/")) {
+                    log.debug("Copying local file: localPath={}", localPath)
+                    File(localPath).inputStream().use { input ->
+                        audioTmp.outputStream().use { input.copyTo(it) }
+                    }
+                    log.debug("File copied: localPath={} size={}b", localPath, audioTmp.length())
+                } else {
+                    URL("$fileBaseUrl/file/bot$token/${localPath.trimStart('/')}")
+                        .openStream().use { input ->
+                            audioTmp.outputStream().use { input.copyTo(it) }
+                        }
+                }
+                return audioTmp
+            } catch (e: Exception) {
+                lastException = e
+                log.warn("GetFile attempt {}/{} failed: fileId={} error={}", attempt, maxAttempts, fileId, e.message)
+            }
+        }
+        log.error("GetFile exhausted all {} attempts: fileId={} lastError={}", maxAttempts, fileId, lastException?.message)
+        throw lastException!!
     }
 
     private fun sendTranscript(chatId: Long, result: TranscriptResult, replyToMessageId: Long? = null): Message {

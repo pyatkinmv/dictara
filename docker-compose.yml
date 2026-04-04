@@ -25,13 +25,20 @@ services:
     restart: unless-stopped
 
   telegram-bot-api:
-    image: aiogram/telegram-bot-api:latest
+    image: aiogram/telegram-bot-api:9.6
     environment:
       TELEGRAM_API_ID: ${TELEGRAM_API_ID}
       TELEGRAM_API_HASH: ${TELEGRAM_API_HASH}
+      TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
       TELEGRAM_LOCAL: "true"
     volumes:
       - bot-api-data:/var/lib/telegram-bot-api
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8081/bot${TELEGRAM_TOKEN}/getMe | grep -q '\"ok\":true'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     restart: unless-stopped
 
   postgres:
@@ -101,7 +108,7 @@ services:
       gateway:
         condition: service_healthy
       telegram-bot-api:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
 
   app-material:
