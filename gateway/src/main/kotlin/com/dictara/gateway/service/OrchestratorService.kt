@@ -12,6 +12,7 @@ import com.dictara.gateway.repository.TranscriptRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import jakarta.annotation.PostConstruct
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -26,6 +27,8 @@ class OrchestratorService(
     private val audioContentRepo: AudioContentRepository,
     private val transcriptRepo: TranscriptRepository,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
+
     private val executor = Executors.newCachedThreadPool()
     // Single-threaded: serializes all dispatch decisions so only one claim runs at a time
     private val dispatchExecutor = Executors.newSingleThreadExecutor()
@@ -46,11 +49,18 @@ class OrchestratorService(
         executor.submit {
             try {
                 val inFlight = stateService.claimInFlightAttempts()
+                if (inFlight.isEmpty()) {
+                    log.info("Startup: no in-flight attempts to recover")
+                } else {
+                    log.info("Startup: found ${inFlight.size} in-flight attempt(s) to recover")
+                }
                 inFlight.forEach { attempt ->
                     if (attempt.externalJobId == null) {
                         // Gateway crashed after claiming but before submitting to transcriber — reset to queue
+                        log.warn("Resetting submission ${attempt.submissionId} to pending (crashed before transcriber submit)")
                         stateService.resetToQueue(attempt)
                     } else {
+                        log.info("Resuming transcription for submission ${attempt.submissionId} (externalJobId=${attempt.externalJobId})")
                         liveProgress[attempt.submissionId] = ProgressInfo("transcribing")
                         executor.submit { resumeTranscription(attempt) }
                     }
@@ -58,7 +68,7 @@ class OrchestratorService(
                 // After recovery, dispatch the next pending job if nothing is running
                 dispatchNext()
             } catch (e: Exception) {
-                System.err.println("Crash recovery error: ${e.message}")
+                log.error("Crash recovery error: ${e.message}", e)
             }
         }
     }
@@ -72,6 +82,7 @@ class OrchestratorService(
     /** Runs on dispatchExecutor only — serialized so no concurrent claims are possible. */
     private fun doDispatch() {
         val submission = stateService.claimNextPendingSubmission() ?: return
+        log.info("Dispatching submission ${submission.id} (file=${submission.audio.originalName}, model=${submission.model}, language=${submission.language}, diarize=${submission.diarize}, summaryMode=${submission.summaryMode})")
         executor.submit { runTranscription(submission) }
     }
 
@@ -80,6 +91,7 @@ class OrchestratorService(
     private fun runTranscription(submission: SubmissionEntity) {
         val submissionId = submission.id!!
         val attempt = stateService.createAttempt(submissionId, "transcription")
+        log.info("Transcription attempt ${attempt.attemptNum} started for submission $submissionId")
 
         try {
             val audioContent = audioContentRepo.findById(submission.audio.id!!).orElseThrow()
@@ -93,6 +105,7 @@ class OrchestratorService(
 
             val transcriberJobId = transcriberClient.submit(audioContent.data, submission.audio.originalName, params)
             stateService.setAttemptExternalJobId(attempt.id!!, transcriberJobId)
+            log.info("Submission $submissionId submitted to transcriber (externalJobId=$transcriberJobId)")
 
             val snapshot = pollTranscriber(submissionId, transcriberJobId)
             val segmentsJson = mapper.writeValueAsString(snapshot.segments ?: emptyList<Any>())
@@ -102,22 +115,26 @@ class OrchestratorService(
                 submissionId, attempt.id, segmentsJson, formattedText, snapshot.audioDurationS,
             )
             liveProgress.remove(submissionId)
+            log.info("Transcription complete for submission $submissionId (duration=${snapshot.audioDurationS?.let { "%.1fs".format(it) } ?: "unknown"}, segments=${snapshot.segments?.size ?: 0})")
             advanceToSummarization(submission, formattedText)
 
         } catch (e: Exception) {
             stateService.failAttempt(attempt.id!!, e.message)
             liveProgress.remove(submissionId)
             if (e is PermanentJobFailureException) {
+                log.error("Transcription permanently failed for submission $submissionId: ${e.message}")
                 stateService.failSubmission(submissionId)
                 dispatchNext()
                 return
             }
             val totalAttempts = stateService.countAttempts(submissionId, "transcription")
             if (totalAttempts < 3) {
+                log.warn("Transcription attempt ${attempt.attemptNum} failed for submission $submissionId: ${e.message} — retrying ($totalAttempts/3)")
                 // Retrying — job stays in 'processing', do NOT dispatch next
                 Thread.sleep(props.transcriber.pollIntervalMs * 2)
                 runTranscription(submission)
             } else {
+                log.error("Transcription failed for submission $submissionId after $totalAttempts attempts: ${e.message}")
                 stateService.failSubmission(submissionId)
                 dispatchNext()
             }
@@ -135,6 +152,7 @@ class OrchestratorService(
                 submissionId, attempt.id!!, segmentsJson, formattedText, snapshot.audioDurationS,
             )
             liveProgress.remove(submissionId)
+            log.info("Resumed transcription complete for submission $submissionId (duration=${snapshot.audioDurationS?.let { "%.1fs".format(it) } ?: "unknown"}, segments=${snapshot.segments?.size ?: 0})")
 
             val freshSubmission = stateService.loadSubmission(submissionId)
             advanceToSummarization(freshSubmission, formattedText)
@@ -144,8 +162,11 @@ class OrchestratorService(
             liveProgress.remove(submissionId)
             val totalAttempts = stateService.countAttempts(submissionId, "transcription")
             if (totalAttempts >= 3) {
+                log.error("Transcription failed for submission $submissionId after $totalAttempts attempts (resumed): ${e.message}")
                 stateService.failSubmission(submissionId)
                 dispatchNext()
+            } else {
+                log.warn("Resumed transcription failed for submission $submissionId ($totalAttempts/3 attempts): ${e.message}")
             }
             // If < 3, submission stays 'processing' and will be retried on next signalPending
         }
@@ -155,11 +176,19 @@ class OrchestratorService(
 
     private fun advanceToSummarization(submission: SubmissionEntity, formattedText: String) {
         val summaryMode = SummaryMode.valueOf(submission.summaryMode.uppercase())
-        if (summaryMode == SummaryMode.OFF || !summarizer.isAvailable()) {
+        if (summaryMode == SummaryMode.OFF) {
+            log.info("Summarization skipped for submission ${submission.id} (mode=off)")
             stateService.completeSubmission(submission.id!!)
             dispatchNext()  // transcriber is now free
             return
         }
+        if (!summarizer.isAvailable()) {
+            log.warn("Summarization skipped for submission ${submission.id} (summarizer not available — check GEMINI_API_KEY)")
+            stateService.completeSubmission(submission.id!!)
+            dispatchNext()  // transcriber is now free
+            return
+        }
+        log.info("Starting summarization for submission ${submission.id} (mode=$summaryMode, language=${submission.language})")
         stateService.startSummarizing(submission.id!!)
         dispatchNext()  // transcriber is now free — next job starts while summarization runs
         executor.submit { runSummarization(submission.id!!, submission.language, formattedText, summaryMode) }
@@ -167,6 +196,7 @@ class OrchestratorService(
 
     private fun runSummarization(submissionId: UUID, language: String, formattedText: String, mode: SummaryMode) {
         val attempt = stateService.createAttempt(submissionId, "summarization")
+        log.info("Summarization attempt ${attempt.attemptNum} started for submission $submissionId")
 
         try {
             val transcript = transcriptRepo.findBySubmissionId(submissionId)
@@ -178,8 +208,10 @@ class OrchestratorService(
             )
             stateService.saveSummaryAndCompleteAttempt(submissionId, attempt.id!!, summaryText)
             stateService.completeSubmission(submissionId)
+            log.info("Summarization complete for submission $submissionId (${summaryText.length} chars)")
 
         } catch (e: Exception) {
+            log.warn("Summarization attempt ${attempt.attemptNum} failed for submission $submissionId: ${e.message}")
             stateService.failAttempt(attempt.id!!, e.message)
             val totalAttempts = stateService.countAttempts(submissionId, "summarization")
             if (totalAttempts < 3) {
@@ -187,6 +219,7 @@ class OrchestratorService(
                 runSummarization(submissionId, language, formattedText, mode)
             } else {
                 // Summarization failed — submission is still done (transcript is usable)
+                log.error("Summarization permanently failed for submission $submissionId after $totalAttempts attempts — completing without summary")
                 stateService.completeSubmission(submissionId)
             }
         }

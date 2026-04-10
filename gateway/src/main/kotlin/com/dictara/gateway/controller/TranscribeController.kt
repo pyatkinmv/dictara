@@ -7,6 +7,7 @@ import com.dictara.gateway.service.UserService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import jakarta.servlet.http.HttpServletRequest
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -35,6 +36,7 @@ class TranscribeController(
     private val telegramDeliveryRepo: TelegramDeliveryRepository,
 ) {
     companion object {
+        private val log = LoggerFactory.getLogger(TranscribeController::class.java)
         val SUPPORTED_EXTENSIONS = setOf("mp3", "mp4", "m4a", "wav", "ogg", "oga", "opus", "flac", "webm", "mkv", "avi", "mov")
 
         // Magic byte signatures for common image formats that must be rejected
@@ -121,12 +123,14 @@ class TranscribeController(
     ): SubmitResponse {
         val ext = file.originalFilename?.substringAfterLast('.', "")?.lowercase() ?: ""
         if (ext !in SUPPORTED_EXTENSIONS) {
+            log.warn("Rejected upload: unsupported extension '.$ext' (file=${file.originalFilename})")
             throw ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Unsupported format: .$ext. Supported: ${SUPPORTED_EXTENSIONS.sorted().joinToString(", ")}")
         }
         val header = file.inputStream.readNBytes(16)
         val imageFormat = detectImageFormat(header)
         if (imageFormat != null) {
+            log.warn("Rejected upload: file appears to be a $imageFormat image (file=${file.originalFilename})")
             throw ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "File appears to be a $imageFormat image, not an audio/video file.")
         }
@@ -147,6 +151,7 @@ class TranscribeController(
         if (telegramChatId != null) {
             telegramDeliveryRepo.save(TelegramDeliveryEntity(jobId = submission.id!!, chatId = telegramChatId, telegramMessageId = telegramMessageId))
         }
+        log.info("Submission accepted: id=${submission.id}, file=${file.originalFilename}, size=${file.size}B, model=$resolvedModel, language=$language, diarize=$diarize, summaryMode=$summaryMode, source=$source, user=${user.id}")
         org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
             object : org.springframework.transaction.support.TransactionSynchronization {
                 override fun afterCommit() { orchestrator.signalPending() }
