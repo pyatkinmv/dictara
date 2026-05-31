@@ -1,3 +1,10 @@
+x-logging: &default-logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "50m"
+      max-file: "3"
+
 services:
   transcriber:
     build:
@@ -23,6 +30,7 @@ services:
       retries: 5
       start_period: 120s
     restart: unless-stopped
+    <<: *default-logging
 
   telegram-bot-api:
     image: aiogram/telegram-bot-api:9.6
@@ -40,6 +48,7 @@ services:
       retries: 10
       start_period: 30s
     restart: unless-stopped
+    <<: *default-logging
 
   postgres:
     image: postgres:16
@@ -56,6 +65,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    <<: *default-logging
 
   gateway:
     build:
@@ -87,6 +97,7 @@ services:
       transcriber:
         condition: service_healthy
     restart: unless-stopped
+    <<: *default-logging
 
   tg-bot:
     build:
@@ -110,6 +121,7 @@ services:
       telegram-bot-api:
         condition: service_healthy
     restart: unless-stopped
+    <<: *default-logging
 
   app-material:
     build:
@@ -123,7 +135,7 @@ services:
     depends_on:
       - gateway
     restart: unless-stopped
-
+    <<: *default-logging
 
   prometheus:
     image: prom/prometheus:v3.3.0
@@ -133,6 +145,7 @@ services:
     ports:
       - "127.0.0.1:9091:9090"
     restart: unless-stopped
+    <<: *default-logging
 
   loki:
     image: grafana/loki:3.4.2
@@ -143,6 +156,7 @@ services:
     ports:
       - "127.0.0.1:3100:3100"
     restart: unless-stopped
+    <<: *default-logging
 
   promtail:
     image: grafana/promtail:3.4.2
@@ -154,6 +168,7 @@ services:
     depends_on:
       - loki
     restart: unless-stopped
+    <<: *default-logging
 
   node-exporter:
     image: prom/node-exporter:v1.8.2
@@ -167,6 +182,7 @@ services:
       - '--path.sysfs=/host/sys'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
     restart: unless-stopped
+    <<: *default-logging
 
 volumes:
   model-cache:
