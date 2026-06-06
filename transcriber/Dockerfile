@@ -14,7 +14,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements.txt \
-        --index-url https://download.pytorch.org/whl/cpu \
+        --index-url https://download.pytorch.org/whl/cu121 \
         --extra-index-url https://pypi.org/simple/
 
 COPY transcriber.py jobs.py app.py ./
