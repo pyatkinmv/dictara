@@ -6,6 +6,9 @@ import com.dictara.gateway.model.Segment
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import com.google.auth.oauth2.GoogleCredentials
+import com.google.auth.oauth2.IdTokenCredentials
+import com.google.auth.oauth2.IdTokenProvider
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
@@ -38,10 +41,32 @@ private val MODEL_ALIASES = mapOf("fast" to "small", "accurate" to "turbo")
 @Component
 class TranscriberClient(private val props: DictaraProperties) {
 
+    private val idTokenCredentials: IdTokenCredentials? =
+        if (props.transcriber.url.startsWith("https://")) {
+            val base = props.transcriber.url.trimEnd('/')
+            val creds = GoogleCredentials.getApplicationDefault()
+            IdTokenCredentials.newBuilder()
+                .setIdTokenProvider(creds as IdTokenProvider)
+                .setTargetAudience(base)
+                .build()
+        } else null
+
     private val http = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
         .writeTimeout(300, TimeUnit.SECONDS)
+        .apply {
+            if (idTokenCredentials != null) {
+                addInterceptor { chain ->
+                    idTokenCredentials.refreshIfExpired()
+                    chain.proceed(
+                        chain.request().newBuilder()
+                            .header("Authorization", "Bearer ${idTokenCredentials.idToken.tokenValue}")
+                            .build()
+                    )
+                }
+            }
+        }
         .build()
     private val mapper = ObjectMapper().registerKotlinModule()
 

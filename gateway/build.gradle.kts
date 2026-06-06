@@ -33,6 +33,7 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("io.micrometer:micrometer-registry-prometheus")
+    implementation("com.google.auth:google-auth-library-oauth2-http:1.23.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
