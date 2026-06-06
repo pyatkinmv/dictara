@@ -6,7 +6,10 @@ x-logging: &default-logging
       max-file: "3"
 
 services:
+  # Profile "local": run only when transcriber is needed locally (default: Cloud Run via TRANSCRIBER_URL).
+  # Start with: docker compose --profile local up -d transcriber
   transcriber:
+    profiles: [local]
     build:
       context: ./transcriber
       args:
@@ -93,8 +96,6 @@ services:
       start_period: 30s
     depends_on:
       postgres:
-        condition: service_healthy
-      transcriber:
         condition: service_healthy
     restart: unless-stopped
     <<: *default-logging
