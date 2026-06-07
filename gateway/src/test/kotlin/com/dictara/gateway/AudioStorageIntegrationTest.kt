@@ -11,7 +11,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
-import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers
 import org.mockito.BDDMockito.given
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -27,6 +27,17 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.util.UUID
+
+/** Plain `ArgumentMatchers.any()` returns `null`, and Kotlin inserts a not-null check
+ *  on the result before passing it to [AudioStorageClient.upload]'s non-null
+ *  parameters, throwing NPE while the stub is being recorded. Routing through a
+ *  generic helper avoids the check — the compiler trusts the (erased) type parameter
+ *  rather than the platform-typed Java return value. */
+private fun <T> any(): T {
+    ArgumentMatchers.any<T>()
+    @Suppress("UNCHECKED_CAST")
+    return null as T
+}
 
 /** Verifies the GCS-reference upload path (gateway → bucket → transcriber by URI),
  *  added to work around Cloud Run's hard 32 MiB HTTP request body limit — see

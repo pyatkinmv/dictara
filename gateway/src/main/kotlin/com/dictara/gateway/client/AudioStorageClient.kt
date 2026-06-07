@@ -6,9 +6,22 @@ import com.google.cloud.storage.BlobInfo
 import com.google.cloud.storage.Storage
 import com.google.cloud.storage.StorageOptions
 import org.slf4j.LoggerFactory
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
+import org.springframework.context.annotation.Condition
+import org.springframework.context.annotation.ConditionContext
+import org.springframework.context.annotation.Conditional
+import org.springframework.core.type.AnnotatedTypeMetadata
 import org.springframework.stereotype.Component
 import java.util.UUID
+
+/** Matches only when `dictara.storage.gcs.bucket` resolves to a non-blank value.
+ *  A plain `@ConditionalOnProperty` would also match the empty string that
+ *  `${GCS_UPLOADS_BUCKET:}` resolves to when the env var is unset (its default
+ *  "not equal to false" check treats "" as present), creating this bean — and
+ *  making it issue real GCS calls — even when no bucket is configured. */
+internal class GcsBucketConfiguredCondition : Condition {
+    override fun matches(context: ConditionContext, metadata: AnnotatedTypeMetadata) =
+        !context.environment.getProperty("dictara.storage.gcs.bucket").isNullOrBlank()
+}
 
 /** Uploads submitted audio files to a GCS bucket so they can be referenced by URI
  *  instead of streamed over HTTP (Cloud Run enforces a hard 32 MiB request body
@@ -20,7 +33,7 @@ import java.util.UUID
  *  lifecycle rule that expires them automatically (see docs/cloud-run-migration.md,
  *  infra setup). This keeps the gateway free of cleanup bookkeeping/retry logic. */
 @Component
-@ConditionalOnProperty("dictara.storage.gcs.bucket")
+@Conditional(GcsBucketConfiguredCondition::class)
 class AudioStorageClient(props: DictaraProperties) {
 
     private val log = LoggerFactory.getLogger(javaClass)
