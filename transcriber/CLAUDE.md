@@ -5,7 +5,8 @@
 The transcriber is an internal service — it is not exposed directly to the browser or Telegram. All requests come through the gateway.
 
 ```
-gateway  ──HTTP──>  POST /transcribe  →  saves file to /tmp  →  creates job  →  ThreadPoolExecutor
+gateway  ──HTTP──>  POST /transcribe  →  saves file to /tmp (upload bytes or download from GCS)
+                                       →  creates job  →  ThreadPoolExecutor
                                                                                         ↓
                                                                             _run_transcription()
                                                                             1. ffmpeg: any format → WAV (16kHz mono)
@@ -31,10 +32,16 @@ Single-worker executor — WhisperModel is not thread-safe for concurrent infere
 ## API
 
 ```bash
-# Submit job (returns job_id immediately, HTTP 202)
+# Submit job by uploading bytes (returns job_id immediately, HTTP 202)
 curl -X POST "http://localhost:8000/transcribe?language=ru&diarize=true&model=large-v3" \
   -F "file=@audio.m4a"
 # → {"job_id": "abc-123"}
+
+# Submit job by GCS reference instead — used by the gateway on Cloud Run, where the
+# 32 MiB HTTP request body limit makes uploading large files directly impossible.
+# The transcriber downloads the object straight from the bucket via the GCS client (ADC).
+curl -X POST "http://localhost:8000/transcribe?language=ru&model=large-v3&storage_uri=gs://my-bucket/audio/abc-123/recording.m4a"
+# → {"job_id": "abc-124"}
 
 # Poll result (while processing)
 curl http://localhost:8000/jobs/{job_id}
@@ -58,6 +65,8 @@ curl http://localhost:8000/health
 
 | Param | Default | Description |
 |-------|---------|-------------|
+| `file` | — | Audio file upload (multipart). Mutually exclusive with `storage_uri` — exactly one is required |
+| `storage_uri` | — | `gs://bucket/key` reference; the transcriber downloads it directly from GCS instead of receiving bytes over HTTP. Mutually exclusive with `file` |
 | `language` | auto-detect | Language code e.g. `ru`, `en`. Explicit is faster and more accurate |
 | `diarize` | `false` | Add speaker labels (SPEAKER_00, SPEAKER_01, ...) |
 | `model` | `small` | Which Whisper model to use: `small` or `large-v3` |

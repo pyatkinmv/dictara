@@ -7,5 +7,6 @@ for mod in [
     "pyannote", "pyannote.audio", "pyannote.audio.pipelines",
     "torch", "torchaudio",
     "ctranslate2",
+    "google", "google.cloud", "google.cloud.storage",
 ]:
     sys.modules.setdefault(mod, MagicMock())

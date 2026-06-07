@@ -1,5 +1,6 @@
 package com.dictara.gateway.controller
 
+import com.dictara.gateway.client.AudioStorageClient
 import com.dictara.gateway.entity.*
 import com.dictara.gateway.repository.*
 import com.dictara.gateway.service.OrchestratorService
@@ -34,6 +35,7 @@ class TranscribeController(
     private val stageAttemptRepo: StageAttemptRepository,
     private val tagRepo: SubmissionTagRepository,
     private val telegramDeliveryRepo: TelegramDeliveryRepository,
+    private val audioStorage: AudioStorageClient? = null,
 ) {
     companion object {
         private val log = LoggerFactory.getLogger(TranscribeController::class.java)
@@ -374,13 +376,24 @@ class TranscribeController(
     }
 
     private fun saveAudio(file: MultipartFile, user: UserEntity): AudioMetaEntity {
+        val originalName = file.originalFilename ?: "upload"
+        val contentType = file.contentType ?: "application/octet-stream"
+        // GCS object key namespace — independent of AudioMetaEntity.id, which Hibernate
+        // assigns on insert (GenerationType.UUID generators ignore pre-assigned values).
+        val storageUri = audioStorage?.upload(UUID.randomUUID(), originalName, file.bytes, contentType)
+
         val meta = audioMetaRepo.save(AudioMetaEntity(
             user = user,
-            originalName = file.originalFilename ?: "upload",
-            contentType = file.contentType ?: "application/octet-stream",
+            originalName = originalName,
+            contentType = contentType,
             sizeBytes = file.size,
+            storageUri = storageUri,
         ))
-        audioContentRepo.save(AudioContentEntity(audioId = meta.id!!, data = file.bytes))
+        if (storageUri == null) {
+            audioContentRepo.save(AudioContentEntity(audioId = meta.id!!, data = file.bytes))
+        } else {
+            log.info("Audio {} stored in GCS at {}, skipping BLOB storage", meta.id, storageUri)
+        }
         return meta
     }
 }

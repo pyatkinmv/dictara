@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Query
+from google.cloud import storage
 
 from jobs import job_store
 from transcriber import Transcriber, Diarizer, merge_diarization
@@ -21,6 +22,29 @@ logger = logging.getLogger(__name__)
 
 # Single worker — WhisperModel is not thread-safe for concurrent inference
 _executor = ThreadPoolExecutor(max_workers=1)
+
+# Lazily initialized so import/startup doesn't require GCS credentials when no
+# gateway ever submits a storage_uri (e.g. local docker-compose without a bucket).
+_gcs_client: storage.Client | None = None
+
+
+def _download_from_gcs(gcs_uri: str) -> str:
+    """Downloads gs://bucket/key to a local temp file, returns its path.
+    Mirrors the NamedTemporaryFile pattern used for uploaded files in transcribe()
+    so the rest of the pipeline (ffmpeg/whisper/diarize/cleanup) stays unchanged."""
+    global _gcs_client
+    if _gcs_client is None:
+        _gcs_client = storage.Client()
+
+    bucket_name, _, blob_name = gcs_uri.removeprefix("gs://").partition("/")
+    suffix = os.path.splitext(blob_name)[1] or ".tmp"
+    blob = _gcs_client.bucket(bucket_name).blob(blob_name)
+    with tempfile.NamedTemporaryFile(dir="/tmp", suffix=suffix, delete=False) as tmp:
+        blob.download_to_filename(tmp.name)
+        tmp_path = tmp.name
+
+    logger.info("Downloaded %s to %s", gcs_uri, tmp_path)
+    return tmp_path
 
 _CHUNK_THRESHOLD_S = 2400   # 40 min — only chunk if longer than this
 _CHUNK_SIZE_S      = 1200   # 20 min per chunk
@@ -189,21 +213,31 @@ async def _dispatch(job_id: str, tmp_path: str, language: str | None, diarize: b
 
 @app.post("/transcribe", status_code=202)
 async def transcribe(
-    file: UploadFile = File(...),
+    file: UploadFile | None = File(default=None),
+    storage_uri: str | None = Query(default=None),
     language: str | None = Query(default=None),
     diarize: bool = Query(default=False),
     model: str = Query(default="small"),
     num_speakers: int | None = Query(default=None),
 ):
+    if not file and not storage_uri:
+        raise HTTPException(status_code=400, detail="Provide either 'file' or 'storage_uri'")
+    if file and storage_uri:
+        raise HTTPException(status_code=400, detail="Provide only one of 'file' or 'storage_uri'")
     if model not in app.state.transcribers:
         raise HTTPException(status_code=400, detail=f"Model '{model}' not loaded. Available: {list(app.state.transcribers)}")
     if diarize and app.state.diarizer is None:
         raise HTTPException(status_code=503, detail="Diarization unavailable: HF_TOKEN not configured or pipeline failed to load")
 
-    suffix = os.path.splitext(file.filename or "audio")[1] or ".tmp"
-    with tempfile.NamedTemporaryFile(dir="/tmp", suffix=suffix, delete=False) as tmp:
-        tmp.write(await file.read())
-        tmp_path = tmp.name
+    if storage_uri:
+        # Reference path — gateway uploaded the file to GCS instead of streaming it over
+        # HTTP, which Cloud Run caps at 32 MiB request bodies (see docs/cloud-run-migration.md).
+        tmp_path = _download_from_gcs(storage_uri)
+    else:
+        suffix = os.path.splitext(file.filename or "audio")[1] or ".tmp"
+        with tempfile.NamedTemporaryFile(dir="/tmp", suffix=suffix, delete=False) as tmp:
+            tmp.write(await file.read())
+            tmp_path = tmp.name
 
     job_id = job_store.create(tmp_path)
     asyncio.create_task(_dispatch(job_id, tmp_path, language, diarize, model, num_speakers))

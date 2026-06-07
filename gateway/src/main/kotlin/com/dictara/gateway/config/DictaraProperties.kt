@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 data class DictaraProperties(
     val transcriber: TranscriberProps = TranscriberProps(),
     val summarizer: SummarizerProps = SummarizerProps(),
+    val storage: StorageProps = StorageProps(),
 ) {
     data class TranscriberProps(
         val url: String = "http://localhost:8000",
@@ -21,5 +22,16 @@ data class DictaraProperties(
     data class GeminiProps(
         val apiKey: String = "",
         val model: String = "gemini-2.5-flash",
+    )
+
+    data class StorageProps(
+        val gcs: GcsProps = GcsProps(),
+    )
+
+    /** Empty bucket = GCS audio storage disabled — gateway falls back to storing
+     *  audio as a BLOB in Postgres and streaming it to the transcriber over HTTP
+     *  (see AudioStorageClient for why this matters on Cloud Run). */
+    data class GcsProps(
+        val bucket: String = "",
     )
 }

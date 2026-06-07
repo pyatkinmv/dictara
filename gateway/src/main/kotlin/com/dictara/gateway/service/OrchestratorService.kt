@@ -94,7 +94,6 @@ class OrchestratorService(
         log.info("Transcription attempt ${attempt.attemptNum} started for submission $submissionId")
 
         try {
-            val audioContent = audioContentRepo.findById(submission.audio.id!!).orElseThrow()
             val params = TranscribeParams(
                 model = submission.model,
                 language = submission.language,
@@ -103,7 +102,15 @@ class OrchestratorService(
                 originalFileName = submission.audio.originalName,
             )
 
-            val transcriberJobId = transcriberClient.submit(audioContent.data, submission.audio.originalName, params)
+            // GCS-reference path (Cloud Run — avoids the 32 MiB request body limit) when the
+            // audio was uploaded to a bucket; otherwise fall back to streaming bytes directly.
+            val storageUri = submission.audio.storageUri
+            val transcriberJobId = if (storageUri != null) {
+                transcriberClient.submitByReference(storageUri, params)
+            } else {
+                val audioContent = audioContentRepo.findById(submission.audio.id!!).orElseThrow()
+                transcriberClient.submit(audioContent.data, submission.audio.originalName, params)
+            }
             stateService.setAttemptExternalJobId(attempt.id!!, transcriberJobId)
             log.info("Submission $submissionId submitted to transcriber (externalJobId=$transcriberJobId)")
 

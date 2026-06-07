@@ -37,6 +37,7 @@ dictara/
 | `WHISPER_MODELS` | transcriber | `small,turbo` | Comma-separated list of Whisper models to load |
 | `GATEWAY_URL` | tg-bot | `http://gateway:8080` | Gateway URL (auto-set in Docker) |
 | `TRANSCRIBER_URL` | gateway | `http://transcriber:8000` | Transcriber URL (auto-set in Docker) |
+| `GCS_UPLOADS_BUCKET` | gateway | — | GCS bucket for audio uploads — when set, large files are sent to the transcriber by `gs://` reference instead of streamed over HTTP (works around Cloud Run's 32 MiB request body limit). Empty = legacy in-DB BLOB path, used locally |
 | `GEMINI_API_KEY` | gateway | — | Google Gemini key — enables summarization |
 | `GEMINI_MODEL` | gateway | `gemini-2.5-flash` | Gemini model to use |
 | `SUMMARIZER_PROVIDER` | gateway | `gemini` | Summarization backend |

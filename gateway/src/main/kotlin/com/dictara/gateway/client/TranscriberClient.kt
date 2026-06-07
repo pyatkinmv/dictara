@@ -15,6 +15,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.springframework.stereotype.Component
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 data class TranscribeParams(
@@ -70,6 +71,9 @@ class TranscriberClient(private val props: DictaraProperties) {
         .build()
     private val mapper = ObjectMapper().registerKotlinModule()
 
+    /** Submits a job by streaming the raw file bytes — the local-dev fallback path used
+     *  when no GCS bucket is configured (`dictara.storage.gcs.bucket` empty). On Cloud Run
+     *  this hits a hard 32 MiB request body limit; see [submitByReference] for the GCS path. */
     fun submit(fileBytes: ByteArray, fileName: String, params: TranscribeParams): String {
         val modelName = MODEL_ALIASES[params.model] ?: params.model
         val url = buildString {
@@ -84,6 +88,27 @@ class TranscriberClient(private val props: DictaraProperties) {
             .build()
 
         val response = http.newCall(Request.Builder().url(url).post(body).build()).execute()
+        val responseBody = response.body?.string() ?: ""
+        if (!response.isSuccessful) throw RuntimeException("Transcriber submit failed (${response.code}): $responseBody")
+        return mapper.readTree(responseBody)["job_id"].asText()
+    }
+
+    /** Submits a job by GCS reference instead of streaming bytes — required when the
+     *  transcriber runs on Cloud Run, which enforces a hard 32 MiB request body limit
+     *  (see docs/cloud-run-migration.md). The transcriber downloads the object directly
+     *  from GCS via [storageUri], so the request body stays empty regardless of file size.
+     *  See [submit] for the legacy multipart path used as a local-dev fallback when no
+     *  GCS bucket is configured. */
+    fun submitByReference(storageUri: String, params: TranscribeParams): String {
+        val modelName = MODEL_ALIASES[params.model] ?: params.model
+        val url = buildString {
+            append("${props.transcriber.url}/transcribe?model=$modelName&diarize=${params.diarize}")
+            append("&storage_uri=${URLEncoder.encode(storageUri, "UTF-8")}")
+            if (params.language != "auto") append("&language=${params.language}")
+            if (params.numSpeakers != null) append("&num_speakers=${params.numSpeakers}")
+        }
+
+        val response = http.newCall(Request.Builder().url(url).post("".toRequestBody(null)).build()).execute()
         val responseBody = response.body?.string() ?: ""
         if (!response.isSuccessful) throw RuntimeException("Transcriber submit failed (${response.code}): $responseBody")
         return mapper.readTree(responseBody)["job_id"].asText()

@@ -14,4 +14,7 @@ class AudioMetaEntity(
     @Column(name = "content_type", nullable = false) val contentType: String,
     @Column(name = "size_bytes", nullable = false) val sizeBytes: Long,
     @Column(name = "created_at", nullable = false, updatable = false) val createdAt: Instant = Instant.now(),
+    /** gs://bucket/key when the audio is held in GCS (Cloud Run path); null when
+     *  stored as a BLOB in [AudioContentEntity] (legacy/local-dev fallback path). */
+    @Column(name = "storage_uri") val storageUri: String? = null,
 )

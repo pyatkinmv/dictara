@@ -34,6 +34,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("io.micrometer:micrometer-registry-prometheus")
     implementation("com.google.auth:google-auth-library-oauth2-http:1.23.0")
+    implementation("com.google.cloud:google-cloud-storage:2.+")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
