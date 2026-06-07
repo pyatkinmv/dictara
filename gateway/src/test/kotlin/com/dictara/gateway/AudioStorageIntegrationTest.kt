@@ -96,8 +96,20 @@ class AudioStorageIntegrationTest {
         assertThat(meta.storageUri).isEqualTo(FAKE_URI)
         assertThat(audioContentRepo.findById(meta.id!!).isPresent).isFalse()
 
-        wireMock.verify(postRequestedFor(urlPathEqualTo("/transcribe"))
-            .withQueryParam("storage_uri", equalTo(FAKE_URI)))
+        awaitTranscriberSubmission(FAKE_URI)
+    }
+
+    /** The orchestrator dispatches jobs on a background thread, so the (mocked)
+     *  transcriber may not have received the request yet right after the submit
+     *  response returns — poll until it does, mirroring
+     *  [TranscriptionIntegrationTest.pollUntilDone]'s pattern. */
+    private fun awaitTranscriberSubmission(storageUri: String) {
+        val request = postRequestedFor(urlPathEqualTo("/transcribe")).withQueryParam("storage_uri", equalTo(storageUri))
+        repeat(50) {
+            if (wireMock.findAll(request).isNotEmpty()) return
+            Thread.sleep(200)
+        }
+        wireMock.verify(request)
     }
 
     private fun submit(): ResponseEntity<Map<*, *>> {
