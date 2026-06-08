@@ -112,7 +112,7 @@ class DictaraBot(
                                     val sentMsg = sendTranscript(d.chatId, result, d.telegramMessageId)
                                     client.confirmDelivery(d.jobId)
                                     log.info("Poller: transcript sent for jobId={}", d.jobId)
-                                    if (result.summary != null) {
+                                    if (result.text.isNotBlank() && result.summary != null) {
                                         try {
                                             val doneText = formatDoneText(result.durationSeconds)
                                             val caption = "$doneText\n\n${result.summary}"
@@ -394,7 +394,7 @@ class DictaraBot(
                     } catch (_: Exception) {}
 
                     // Phase 3: update caption with summary (already computed by gateway)
-                    if (result.summary != null) {
+                    if (result.text.isNotBlank() && result.summary != null) {
                         try {
                             val doneText = formatDoneText(result.durationSeconds)
                             val caption = "$doneText\n\n${result.summary}"
@@ -464,6 +464,15 @@ class DictaraBot(
     }
 
     private fun sendTranscript(chatId: Long, result: TranscriptResult, replyToMessageId: Long? = null): Message {
+        if (result.text.isBlank()) {
+            // No speech detected (e.g. silent or sub-second recordings) — Telegram rejects
+            // empty documents with "file must be non-empty", so send plain text instead.
+            val text = buildString {
+                append("🔇 No speech detected in this recording.")
+                result.summary?.let { append("\n\n").append(it) }
+            }
+            return send(chatId, text, replyToMessageId)
+        }
         val dateStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"))
         val txtFile = Files.createTempFile("transcript-", ".txt").toFile()
         try {
