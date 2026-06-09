@@ -11,6 +11,8 @@ import org.springframework.context.annotation.ConditionContext
 import org.springframework.context.annotation.Conditional
 import org.springframework.core.type.AnnotatedTypeMetadata
 import org.springframework.stereotype.Component
+import java.io.InputStream
+import java.nio.channels.Channels
 import java.util.UUID
 
 /** Matches only when `dictara.storage.gcs.bucket` resolves to a non-blank value.
@@ -51,5 +53,15 @@ class AudioStorageClient(props: DictaraProperties) {
         val uri = "gs://$bucket/$objectName"
         log.info("Uploaded audio to {} ({} bytes)", uri, sizeBytes)
         return uri
+    }
+
+    /** Downloads the object at [storageUri] and returns a readable [InputStream], or `null` if
+     *  the object is unavailable (expired by lifecycle rule, missing, or access denied). */
+    fun download(storageUri: String): InputStream? = try {
+        val path = storageUri.removePrefix("gs://$bucket/")
+        Channels.newInputStream(storage.reader(BlobId.of(bucket, path)))
+    } catch (e: Exception) {
+        log.warn("Audio download failed for {}: {}", storageUri, e.message)
+        null
     }
 }

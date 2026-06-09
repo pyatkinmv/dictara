@@ -15,6 +15,8 @@ interface SubmissionRepository : JpaRepository<SubmissionEntity, UUID> {
 
     fun findByUser_IdOrderByCreatedAtDesc(userId: UUID): List<SubmissionEntity>
 
+    fun findByUser_IdAndStatusOrderByCreatedAtAsc(userId: UUID, status: String): List<SubmissionEntity>
+
     fun existsByStatus(status: String): Boolean
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
