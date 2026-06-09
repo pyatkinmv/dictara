@@ -40,14 +40,16 @@ class AudioStorageClient(props: DictaraProperties) {
     private val bucket = props.storage.gcs.bucket
     private val storage: Storage = StorageOptions.getDefaultInstance().service
 
-    /** Uploads [bytes] to `gs://{bucket}/audio/{objectKey}/{fileName}` and returns the gs:// URI.
+    /** Uploads [inputStream] to `gs://{bucket}/audio/{objectKey}/{fileName}` and returns the gs:// URI.
+     *  Uses a resumable streaming upload (no full-file direct-buffer allocation) — required
+     *  to avoid OOM when many large files are uploaded concurrently.
      *  [objectKey] only namespaces the object path — it need not match any DB id. */
-    fun upload(objectKey: UUID, fileName: String, bytes: ByteArray, contentType: String): String {
+    fun upload(objectKey: UUID, fileName: String, inputStream: java.io.InputStream, sizeBytes: Long, contentType: String): String {
         val objectName = "audio/$objectKey/$fileName"
         val blobInfo = BlobInfo.newBuilder(BlobId.of(bucket, objectName)).setContentType(contentType).build()
-        storage.create(blobInfo, bytes)
+        storage.createFrom(blobInfo, inputStream)
         val uri = "gs://$bucket/$objectName"
-        log.info("Uploaded audio to {} ({} bytes)", uri, bytes.size)
+        log.info("Uploaded audio to {} ({} bytes)", uri, sizeBytes)
         return uri
     }
 }

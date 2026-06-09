@@ -380,7 +380,7 @@ class TranscribeController(
         val contentType = file.contentType ?: "application/octet-stream"
         // GCS object key namespace — independent of AudioMetaEntity.id, which Hibernate
         // assigns on insert (GenerationType.UUID generators ignore pre-assigned values).
-        val storageUri = audioStorage?.upload(UUID.randomUUID(), originalName, file.bytes, contentType)
+        val storageUri = audioStorage?.upload(UUID.randomUUID(), originalName, file.inputStream, file.size, contentType)
 
         val meta = audioMetaRepo.save(AudioMetaEntity(
             user = user,
