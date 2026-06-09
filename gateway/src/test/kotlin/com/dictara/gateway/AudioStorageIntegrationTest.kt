@@ -76,7 +76,7 @@ class AudioStorageIntegrationTest {
 
     @BeforeEach
     fun stubUpload() {
-        given(audioStorage.upload(any(), any(), any(), any(), any())).willReturn(FAKE_URI)
+        given(audioStorage.upload(any(), any(), any(), ArgumentMatchers.anyLong(), any())).willReturn(FAKE_URI)
     }
 
     @Test
