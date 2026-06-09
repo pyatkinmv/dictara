@@ -45,6 +45,7 @@ class HistorySectionState extends State<HistorySection> {
   final Map<String, JobResult> _cache = {};
   Timer? _pollTimer;
   bool _loading = false;
+  bool _downloading = false;
 
   @override
   void initState() {
@@ -147,6 +148,23 @@ class HistorySectionState extends State<HistorySection> {
     html.Url.revokeObjectUrl(url);
   }
 
+  Future<void> _downloadAll({required bool includeAudio}) async {
+    if (_downloading) return;
+    setState(() => _downloading = true);
+    try {
+      final bytes = await widget.api.downloadExport(includeAudio: includeAudio);
+      final blob = html.Blob([bytes], 'application/zip');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final date = DateTime.now().toIso8601String().substring(0, 10);
+      html.AnchorElement(href: url)
+        ..setAttribute('download', 'dictara_export_$date.zip')
+        ..click();
+      html.Url.revokeObjectUrl(url);
+    } catch (_) {} finally {
+      if (mounted) setState(() => _downloading = false);
+    }
+  }
+
   Future<void> _onAddTag(String jobId, String tag) async {
     try {
       final tags = await widget.api.addTag(jobId, tag);
@@ -186,6 +204,21 @@ class HistorySectionState extends State<HistorySection> {
           children: [
             Text('History', style: Theme.of(context).textTheme.titleSmall),
             const Spacer(),
+            if (_downloading)
+              const SizedBox(
+                width: 16, height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              PopupMenuButton<bool>(
+                icon: const Icon(Icons.download, size: 18),
+                tooltip: 'Download all',
+                onSelected: (includeAudio) => _downloadAll(includeAudio: includeAudio),
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: false, child: Text('Transcripts only')),
+                  PopupMenuItem(value: true,  child: Text('With audio')),
+                ],
+              ),
             if (_loading)
               const SizedBox(
                 width: 16, height: 16,

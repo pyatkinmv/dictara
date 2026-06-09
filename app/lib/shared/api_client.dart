@@ -110,6 +110,15 @@ class ApiClient {
     return (jsonDecode(res.body)['tags'] as List).cast<String>();
   }
 
+  Future<Uint8List> downloadExport({bool includeAudio = false}) async {
+    final res = await http.get(
+      Uri.parse('$_base/export?include_audio=$includeAudio'),
+      headers: _authHeaders,
+    );
+    if (res.statusCode != 200) throw Exception('Export failed (${res.statusCode})');
+    return res.bodyBytes;
+  }
+
   Future<Map<String, dynamic>> loginByUsername(String username) async {
     final res = await http.post(
       Uri.parse('$_base/auth/login-by-username'),
