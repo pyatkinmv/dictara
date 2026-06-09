@@ -41,6 +41,8 @@ dictara/
 | `GEMINI_API_KEY` | gateway | — | Google Gemini key — enables summarization |
 | `GEMINI_MODEL` | gateway | `gemini-2.5-flash` | Gemini model to use |
 | `SUMMARIZER_PROVIDER` | gateway | `gemini` | Summarization backend |
+| `CF_ZONE_ID` | CI only | — | CloudFlare Zone ID for dictary.app — used by CI to purge CDN cache after `app-material` deploys |
+| `CF_API_TOKEN` | CI only | — | CloudFlare API token with Zone / Cache Purge right — stored as GitHub Actions secret |
 
 ## Build & run
 
