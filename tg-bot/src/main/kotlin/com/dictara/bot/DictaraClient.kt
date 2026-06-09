@@ -287,6 +287,19 @@ class DictaraClient(private val baseUrl: String) {
         val deadline = System.currentTimeMillis() + 8 * 60 * 60 * 1000L
         var pollInterval = 5_000L
         var failureStartMs: Long? = null
+        // Rate-limit EditMessageText: only update on phase transitions or every 30 s within a phase.
+        // Prevents Telegram flood-lock (429) when many files are submitted in parallel.
+        var lastProgressPhase: String? = null
+        var lastProgressUpdateMs = 0L
+
+        fun maybeProgress(phase: String, text: String) {
+            val now = System.currentTimeMillis()
+            if (phase != lastProgressPhase || now - lastProgressUpdateMs >= 30_000L) {
+                onProgress?.invoke(text)
+                lastProgressPhase = phase
+                lastProgressUpdateMs = now
+            }
+        }
 
         while (System.currentTimeMillis() < deadline) {
             Thread.sleep(pollInterval)
@@ -300,7 +313,7 @@ class DictaraClient(private val baseUrl: String) {
                     "pending" -> {
                         val pos = root["queue_position"]?.takeIf { !it.isNull }?.asInt()
                         val posStr = if (pos != null) " Position: $pos." else ""
-                        onProgress?.invoke("⏳ Waiting in queue...$posStr")
+                        maybeProgress("pending", "⏳ Waiting in queue...$posStr")
                     }
                     "processing" -> {
                         val elapsed = root["elapsed_s"]?.takeIf { !it.isNull }?.asDouble()
@@ -315,7 +328,7 @@ class DictaraClient(private val baseUrl: String) {
                                     val bar = if (diarizeProgress != null)
                                         "\n${progressBar(diarizeProgress)} ${(diarizeProgress * 100).toInt()}%"
                                     else ""
-                                    onProgress?.invoke("👥 Detecting speakers...$bar$summarizeNote$elapsedStr")
+                                    maybeProgress("diarizing", "👥 Detecting speakers...$bar$summarizeNote$elapsedStr")
                                 }
                                 else -> {
                                     val processed = prog["processed_s"]?.asDouble()
@@ -324,20 +337,20 @@ class DictaraClient(private val baseUrl: String) {
                                         val pct = (processed / total * 100).toInt()
                                         val bar = progressBar(processed / total)
                                         val diarizeNote = if (diarize) "\n👥 Speaker detection to follow" else ""
-                                        onProgress?.invoke("🎙 Transcribing audio...\n$bar $pct% (${fmtTime(processed)} / ${fmtTime(total)})$diarizeNote$summarizeNote$elapsedStr")
+                                        maybeProgress("transcribing", "🎙 Transcribing audio...\n$bar $pct% (${fmtTime(processed)} / ${fmtTime(total)})$diarizeNote$summarizeNote$elapsedStr")
                                     }
                                 }
                             }
                         } else {
                             val pos = root["queue_position"]?.takeIf { !it.isNull }?.asInt()
                             if (pos != null) {
-                                onProgress?.invoke("⏳ Waiting in queue... Position: $pos.")
+                                maybeProgress("pending", "⏳ Waiting in queue... Position: $pos.")
                             } else {
-                                onProgress?.invoke("🎙 Transcribing...")
+                                maybeProgress("processing", "🎙 Transcribing...")
                             }
                         }
                     }
-                    "summarizing" -> onProgress?.invoke("✍️ Summarizing...")
+                    "summarizing" -> maybeProgress("summarizing", "✍️ Summarizing...")
                     "done" -> {
                         val result = root["result"]
                         val text = result["formatted_text"]?.asText() ?: ""
