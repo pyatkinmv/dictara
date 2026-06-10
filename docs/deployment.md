@@ -80,6 +80,24 @@ When unset (local dev), the gateway falls back to storing audio as a BLOB in the
 
 ---
 
+## CI/CD for the transcriber
+
+When `transcriber/**` changes, GitHub Actions automatically:
+
+1. Authenticates to GCP using the `github-ci` service account (key stored as `GCP_SA_KEY` secret)
+2. Builds and pushes the Docker image to Artifact Registry — tagged both `:latest` and `:<git-sha>`
+3. Runs `gcloud run deploy transcriber --image ... --region europe-west4` — updates only the image; all other Cloud Run settings (GPU, memory, env vars, GCS mount) are preserved
+
+**Service account**: `github-ci@gen-lang-client-0721625814.iam.gserviceaccount.com`
+**Roles**: `artifactregistry.writer`, `run.developer`, `iam.serviceAccountUser` (on the Compute Engine default SA)
+
+To verify a deploy succeeded, check that a new revision with the expected image SHA appeared:
+```bash
+gcloud run revisions list --service transcriber --region europe-west4 --limit 5
+```
+
+---
+
 ## Running transcriber locally
 
 Use the `local` Docker Compose profile to start the transcriber container alongside the other services. The gateway's default `TRANSCRIBER_URL=http://transcriber:8000` picks it up automatically.

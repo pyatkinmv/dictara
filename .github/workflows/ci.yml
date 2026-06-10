@@ -64,7 +64,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           command_timeout: 45m
-          envs: GATEWAY_CHANGED,BOT_CHANGED,APP_CHANGED,TRANSCRIBER_CHANGED,MONITORING_CHANGED
+          envs: GATEWAY_CHANGED,BOT_CHANGED,APP_CHANGED,MONITORING_CHANGED
           script: |
             cd ~/dictara
             git pull
@@ -81,9 +81,6 @@ jobs:
             if [ "$APP_CHANGED" = "true" ]; then
               docker compose build app-material && docker compose up -d --remove-orphans --force-recreate app-material
             fi
-            if [ "$TRANSCRIBER_CHANGED" = "true" ]; then
-              docker compose build transcriber && docker compose up -d --remove-orphans --force-recreate transcriber
-            fi
             if [ "$MONITORING_CHANGED" = "true" ]; then
               docker compose up -d --force-recreate prometheus loki promtail
             fi
@@ -91,8 +88,33 @@ jobs:
           GATEWAY_CHANGED: ${{ steps.changes.outputs.gateway }}
           BOT_CHANGED: ${{ steps.changes.outputs.tg_bot }}
           APP_CHANGED: ${{ steps.changes.outputs.app }}
-          TRANSCRIBER_CHANGED: ${{ steps.changes.outputs.transcriber }}
           MONITORING_CHANGED: ${{ steps.changes.outputs.monitoring }}
+
+      - name: Authenticate to GCP
+        if: steps.changes.outputs.transcriber == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Build and push transcriber image
+        if: steps.changes.outputs.transcriber == 'true'
+        run: |
+          IMAGE=europe-west4-docker.pkg.dev/gen-lang-client-0721625814/dictara/transcriber
+          gcloud auth configure-docker europe-west4-docker.pkg.dev --quiet
+          docker build \
+            --build-arg GIT_COMMIT=${{ github.sha }} \
+            --build-arg BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+            -t $IMAGE:latest -t $IMAGE:${{ github.sha }} \
+            ./transcriber
+          docker push $IMAGE:latest
+          docker push $IMAGE:${{ github.sha }}
+
+      - name: Deploy transcriber to Cloud Run
+        if: steps.changes.outputs.transcriber == 'true'
+        run: |
+          gcloud run deploy transcriber \
+            --image europe-west4-docker.pkg.dev/gen-lang-client-0721625814/dictara/transcriber:latest \
+            --region europe-west4
 
       - name: Purge CloudFlare cache
         if: steps.changes.outputs.app == 'true'

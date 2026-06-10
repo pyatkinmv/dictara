@@ -268,4 +268,5 @@ async def health():
         "status": "ok",
         "models_loaded": list(getattr(app.state, "transcribers", {}).keys()),
         "diarization_available": getattr(app.state, "diarizer", None) is not None,
+        "git_commit": os.environ.get("GIT_COMMIT", "unknown"),
     }
