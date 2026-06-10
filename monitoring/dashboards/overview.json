@@ -11,6 +11,12 @@
       "label": "Loki",
       "type": "datasource",
       "pluginId": "loki"
+    },
+    {
+      "name": "DS_GCM",
+      "label": "Google Cloud Monitoring",
+      "type": "datasource",
+      "pluginId": "stackdriver"
     }
   ],
   "title": "Dictara Overview",
@@ -52,7 +58,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "up{job=~\"gateway|transcriber|tg-bot|app-material\"}",
+          "expr": "up{job=~\"gateway|tg-bot|app-material\"}",
           "instant": true,
           "legendFormat": "{{job}}"
         }
@@ -113,7 +119,7 @@
       },
       "targets": [
         {
-          "expr": "up{job=~\"gateway|transcriber|tg-bot|app-material\"}",
+          "expr": "up{job=~\"gateway|tg-bot|app-material\"}",
           "legendFormat": "{{job}}",
           "refId": "A"
         }
@@ -190,12 +196,6 @@
         {
           "refId": "A",
           "expr": "dictara_build",
-          "instant": true,
-          "legendFormat": ""
-        },
-        {
-          "refId": "B",
-          "expr": "build_info{job=\"transcriber\"}",
           "instant": true,
           "legendFormat": ""
         },
@@ -867,7 +867,7 @@
       },
       "targets": [
         {
-          "expr": "process_resident_memory_bytes{job=~\"gateway|transcriber|tg-bot\"}",
+          "expr": "process_resident_memory_bytes{job=~\"gateway|tg-bot\"}",
           "legendFormat": "{{job}}"
         }
       ],
@@ -884,7 +884,7 @@
       "gridPos": {
         "x": 12,
         "y": 58,
-        "w": 12,
+        "w": 6,
         "h": 8
       },
       "datasource": {
@@ -892,10 +892,6 @@
         "uid": "${DS_PROMETHEUS}"
       },
       "targets": [
-        {
-          "expr": "rate(process_cpu_seconds_total{job=\"transcriber\"}[2m])",
-          "legendFormat": "transcriber"
-        },
         {
           "expr": "process_cpu_usage{job=~\"gateway|tg-bot\"}",
           "legendFormat": "{{job}}"
@@ -905,6 +901,64 @@
         "defaults": {
           "unit": "percentunit"
         }
+      }
+    },
+    {
+      "id": 69,
+      "title": "Transcriber active instances",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 18,
+        "y": 58,
+        "w": 6,
+        "h": 8
+      },
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "${DS_GCM}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "${DS_GCM}"
+          },
+          "queryType": "metrics",
+          "projectName": "gen-lang-client-0721625814",
+          "metricType": "run.googleapis.com/container/instance_count",
+          "crossSeriesReducer": "REDUCE_SUM",
+          "perSeriesAligner": "ALIGN_MEAN",
+          "alignmentPeriod": "cloud-monitoring-auto",
+          "filters": [
+            "resource.labels.service_name",
+            "=",
+            "transcriber",
+            "AND",
+            "metric.labels.state",
+            "=",
+            "active"
+          ],
+          "groupBys": [],
+          "view": "FULL",
+          "aliasBy": "active instances"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          },
+          "custom": {
+            "fillOpacity": 20
+          }
+        }
+      },
+      "options": {
+        "tooltip": {"mode": "single"}
       }
     },
     {
@@ -935,7 +989,7 @@
       },
       "targets": [
         {
-          "expr": "{service=~\"gateway|tg-bot|transcriber\"} ${log_filter} | line_format \"[{{.service}}] {{__line__}}\"",
+          "expr": "{service=~\"gateway|tg-bot\"} ${log_filter} | line_format \"[{{.service}}] {{__line__}}\"",
           "legendFormat": ""
         }
       ],

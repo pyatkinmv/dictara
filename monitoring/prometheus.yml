@@ -8,11 +8,6 @@ scrape_configs:
       - targets: ['gateway:8080']
     metrics_path: /actuator/prometheus
 
-  - job_name: transcriber
-    static_configs:
-      - targets: ['transcriber:8000']
-    metrics_path: /metrics
-
   - job_name: tg-bot
     static_configs:
       - targets: ['tg-bot:9090']
