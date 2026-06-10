@@ -48,12 +48,12 @@
       "gridPos": {
         "x": 0,
         "y": 1,
-        "w": 24,
+        "w": 18,
         "h": 3
       },
       "datasource": {
-        "type": "datasource",
-        "uid": "-- Mixed --"
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
       },
       "targets": [
         {
@@ -65,31 +65,6 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           }
-        },
-        {
-          "refId": "B",
-          "datasource": {
-            "type": "stackdriver",
-            "uid": "${DS_GCM}"
-          },
-          "queryType": "metrics",
-          "projectName": "gen-lang-client-0721625814",
-          "metricType": "run.googleapis.com/container/instance_count",
-          "crossSeriesReducer": "REDUCE_SUM",
-          "perSeriesAligner": "ALIGN_MEAN",
-          "alignmentPeriod": "cloud-monitoring-auto",
-          "filters": [
-            "resource.labels.service_name",
-            "=",
-            "transcriber",
-            "AND",
-            "metric.labels.state",
-            "=",
-            "active"
-          ],
-          "groupBys": [],
-          "view": "FULL",
-          "aliasBy": "transcriber"
         }
       ],
       "options": {
@@ -130,102 +105,26 @@
             ]
           }
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "transcriber"
-            },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "special",
-                    "options": {
-                      "match": "null",
-                      "result": {
-                        "text": "IDLE",
-                        "color": "text",
-                        "index": 0
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "0": {
-                        "text": "IDLE",
-                        "color": "text",
-                        "index": 1
-                      }
-                    }
-                  },
-                  {
-                    "type": "range",
-                    "options": {
-                      "from": 1,
-                      "to": 1000,
-                      "result": {
-                        "text": "ACTIVE",
-                        "color": "green",
-                        "index": 2
-                      }
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "text",
-                      "value": null
-                    },
-                    {
-                      "color": "green",
-                      "value": 1
-                    }
-                  ]
-                }
-              },
-              {
-                "id": "noValue",
-                "value": "IDLE"
-              }
-            ]
-          }
-        ]
+        "overrides": []
       }
     },
     {
-      "id": 53,
-      "title": "Service health history",
-      "type": "state-timeline",
+      "id": 73,
+      "title": "transcriber",
+      "type": "stat",
       "gridPos": {
-        "x": 0,
-        "y": 4,
-        "w": 24,
-        "h": 4
+        "x": 18,
+        "y": 1,
+        "w": 6,
+        "h": 3
       },
       "datasource": {
-        "type": "datasource",
-        "uid": "-- Mixed --"
+        "type": "stackdriver",
+        "uid": "${DS_GCM}"
       },
       "targets": [
         {
-          "expr": "up{job=~\"gateway|tg-bot|app-material\"}",
-          "legendFormat": "{{job}}",
           "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        },
-        {
-          "refId": "B",
           "datasource": {
             "type": "stackdriver",
             "uid": "${DS_GCM}"
@@ -248,6 +147,94 @@
           "groupBys": [],
           "view": "FULL",
           "aliasBy": "transcriber"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "orientation": "horizontal"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": {
+                  "text": "IDLE",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "IDLE",
+                  "color": "text",
+                  "index": 1
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 1,
+                "to": 1000,
+                "result": {
+                  "text": "ACTIVE",
+                  "color": "green",
+                  "index": 2
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "noValue": "IDLE"
+        }
+      }
+    },
+    {
+      "id": 53,
+      "title": "Service health history",
+      "type": "state-timeline",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 24,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "expr": "up{job=~\"gateway|tg-bot|app-material\"}",
+          "legendFormat": "{{job}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          }
         }
       ],
       "options": {
@@ -301,70 +288,7 @@
             ]
           }
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "transcriber"
-            },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "special",
-                    "options": {
-                      "match": "null",
-                      "result": {
-                        "text": "IDLE",
-                        "color": "text",
-                        "index": 0
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "0": {
-                        "text": "IDLE",
-                        "color": "text",
-                        "index": 1
-                      }
-                    }
-                  },
-                  {
-                    "type": "range",
-                    "options": {
-                      "from": 1,
-                      "to": 1000,
-                      "result": {
-                        "text": "ACTIVE",
-                        "color": "green",
-                        "index": 2
-                      }
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "text",
-                      "value": null
-                    },
-                    {
-                      "color": "green",
-                      "value": 1
-                    }
-                  ]
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       }
     },
     {
