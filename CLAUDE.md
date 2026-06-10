@@ -1,7 +1,9 @@
 # Dictara — Local Audio Transcription Service
 
 ## What it does
-Transcribes audio/video files using Whisper with optional speaker diarization. Runs fully locally in Docker. The gateway is the single HTTP entry point; the transcriber does the actual Whisper work; tg-bot handles Telegram; the Flutter web client provides a browser UI.
+Transcribes audio/video files using Whisper with optional speaker diarization. Gateway, bot, and web app run in Docker on a VM; the transcriber runs on Google Cloud Run (GPU). The gateway is the single HTTP entry point; the transcriber does the actual Whisper work; tg-bot handles Telegram; the Flutter web client provides a browser UI.
+
+See [docs/deployment.md](docs/deployment.md) for production infrastructure details (Cloud Run, GCS, CloudFlare).
 
 ## Modules
 
@@ -36,7 +38,8 @@ dictara/
 | `HF_HOME` | transcriber | `/models` | HF model cache path (mapped to `model-cache` volume) |
 | `WHISPER_MODELS` | transcriber | `small,turbo` | Comma-separated list of Whisper models to load |
 | `GATEWAY_URL` | tg-bot | `http://gateway:8080` | Gateway URL (auto-set in Docker) |
-| `TRANSCRIBER_URL` | gateway | `http://transcriber:8000` | Transcriber URL (auto-set in Docker) |
+| `DICTARY_BASE_URL` | tg-bot | `https://dictary.app` | Public base URL — used in web login links sent to users |
+| `TRANSCRIBER_URL` | gateway | `http://transcriber:8000` | Transcriber URL — override to Cloud Run URL in production |
 | `GCS_UPLOADS_BUCKET` | gateway | — | GCS bucket for audio uploads — when set, large files are sent to the transcriber by `gs://` reference instead of streamed over HTTP (works around Cloud Run's 32 MiB request body limit). Empty = legacy in-DB BLOB path, used locally |
 | `GEMINI_API_KEY` | gateway | — | Google Gemini key — enables summarization |
 | `GEMINI_MODEL` | gateway | `gemini-2.5-flash` | Gemini model to use |
@@ -47,15 +50,19 @@ dictara/
 ## Build & run
 
 ```bash
-# First time — builds all images and downloads models (~4–5 GB, takes ~15 min)
-docker compose build
+# Start everything (transcriber NOT included — it runs on Cloud Run in production)
 docker compose up -d
 
+# Include local transcriber (first run downloads ~4–5 GB of models, takes ~15 min)
+docker compose --profile local up -d
+
 # Rebuild a single module after code changes
-docker compose build gateway    && docker compose up -d gateway
-docker compose build transcriber && docker compose up -d transcriber
-docker compose build tg-bot      && docker compose up -d tg-bot
+docker compose build gateway      && docker compose up -d gateway
+docker compose build tg-bot       && docker compose up -d tg-bot
 docker compose build app-material && docker compose up -d app-material
+
+# Rebuild transcriber (local profile only)
+docker compose --profile local build transcriber && docker compose --profile local up -d transcriber
 
 # Check health
 curl http://localhost:8080/health
@@ -65,14 +72,18 @@ curl http://localhost:8080/health
 
 | Service | Build context | Exposes | Notes |
 |---------|--------------|---------|-------|
-| `gateway` | `./gateway` | `:8080` (localhost only) | Spring Boot; depends on postgres + transcriber |
-| `transcriber` | `./transcriber` | `:8000` | Python/FastAPI; health-checked |
+| `gateway` | `./gateway` | `:8080` (localhost only) | Spring Boot; depends on postgres |
 | `postgres` | image `postgres:16` | `:5432` | Persistent volume `postgres-data` |
 | `telegram-bot-api` | image `aiogram/telegram-bot-api` | — | Local Bot API for >20 MB files |
 | `tg-bot` | `./tg-bot` | — | Outbound only; depends on gateway |
-| `app-material` | `./app` | `:3000` | Flutter web — Material 3 |
+| `app-material` | `./app` | `:3000` | Flutter web — Material 3; behind CloudFlare CDN |
+| `transcriber` | `./transcriber` | `:8000` | **`profiles: [local]` — not started by default.** In production the transcriber runs on Cloud Run; use `--profile local` for local dev |
+| `prometheus` | image `prom/prometheus` | `:9091` (localhost) | Metrics scraping |
+| `loki` | image `grafana/loki` | `:3100` (localhost) | Log aggregation |
+| `promtail` | image `grafana/promtail` | — | Ships Docker container logs to Loki |
+| `node-exporter` | image `prom/node-exporter` | — | Host metrics for Prometheus |
 
-Model downloads cache to the `model-cache` Docker volume. `docker compose down` keeps volumes; only `docker compose down -v` deletes them.
+Model downloads (when running transcriber locally) cache to the `model-cache` Docker volume. `docker compose down` keeps volumes; only `docker compose down -v` deletes them.
 
 ## Resource limits
 

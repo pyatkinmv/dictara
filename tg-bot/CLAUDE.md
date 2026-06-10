@@ -42,7 +42,9 @@ Web login flow:
 | Bot alias | API model |
 |-----------|-----------|
 | `fast` | `small` |
-| `accurate` | `large-v3` |
+| `accurate` | `turbo` |
+
+`large-v3` is also available on the transcriber API directly but is not exposed as a bot alias (too slow on CPU; only viable on GPU).
 
 ## User settings
 
@@ -54,6 +56,7 @@ Stored in-memory keyed by **chat ID**. Defaults: model=`accurate`, diarize=`true
 |-----|---------|-------------|
 | `TELEGRAM_TOKEN` | — | Bot token from @BotFather |
 | `GATEWAY_URL` | `http://gateway:8080` | Gateway service URL |
+| `DICTARY_BASE_URL` | `https://dictary.app` | Public base URL — used in web login links sent to users |
 | `TELEGRAM_API_URL` | `https://api.telegram.org` | Local Bot API URL for large files |
 | `GEMINI_API_KEY` | — | Google Gemini API key (summarization disabled if unset) |
 | `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model |

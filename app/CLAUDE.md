@@ -42,7 +42,9 @@ docker compose up -d app-material
 
 ## History section
 
-`HistorySection` loads on login, clears on logout. Metadata list fetched from `GET /api/transcriptions`. Content lazy-loaded via `GET /api/jobs/{jobId}` on expand, cached in memory. In-progress items poll every 3s. Download button for done items (blob URL, `.txt`).
+`HistorySection` loads on login, clears on logout. Metadata list fetched from `GET /api/transcriptions`. Content lazy-loaded via `GET /api/jobs/{jobId}` on expand, cached in memory. In-progress items poll every 3s. Download button per item (blob URL, `.txt`).
+
+Header has a **download-all** `PopupMenuButton` with two options — "Transcripts only" / "With audio" — that calls `GET /api/export` with the `Authorization` header and triggers a browser ZIP download. Shows a spinner while downloading to prevent double-clicks.
 
 New item prepended automatically when a transcription completes in the current session.
 

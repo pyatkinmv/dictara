@@ -27,8 +27,8 @@ audio files directly to the transcriber returns `413`. When
 job by `gs://` reference (`TranscriberClient.submitByReference`,
 `audio_meta.storage_uri`) — the transcriber downloads it directly from GCS,
 bypassing the HTTP body entirely. Uploaded objects are not deleted by the
-application; a 90-day bucket lifecycle rule expires them (see
-`docs/cloud-run-migration.md`).
+application; a 90-day bucket lifecycle rule configured on the GCS bucket expires
+them automatically (see [docs/deployment.md](../docs/deployment.md)).
 
 When the bucket is not configured (e.g. local docker-compose), the gateway falls
 back to the legacy path: the file is stored as a BLOB in `audio_content` and
@@ -71,6 +71,7 @@ Returns `null` for `processing`, `summarizing`, `done`, `failed`.
 | `OrchestratorService.kt` | Job lifecycle: dispatch, transcription polling, summarization |
 | `SubmissionStateService.kt` | DB state transitions (all `@Transactional`) |
 | `TranscribeController.kt` | POST /transcribe, GET /jobs/{id} |
+| `ExportController.kt` | GET /export — streams ZIP of all user transcriptions (transcript + summary + optional audio) |
 | `TranscriberClient.kt` | HTTP client for transcriber service |
 | `AudioStorageClient.kt` | Uploads audio to GCS for the reference-based submit path (active only when `dictara.storage.gcs.bucket` is set) |
 | `db/migration/` | Flyway migrations |

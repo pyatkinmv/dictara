@@ -69,7 +69,7 @@ curl http://localhost:8000/health
 | `storage_uri` | — | `gs://bucket/key` reference; the transcriber downloads it directly from GCS instead of receiving bytes over HTTP. Mutually exclusive with `file` |
 | `language` | auto-detect | Language code e.g. `ru`, `en`. Explicit is faster and more accurate |
 | `diarize` | `false` | Add speaker labels (SPEAKER_00, SPEAKER_01, ...) |
-| `model` | `small` | Which Whisper model to use: `small` or `large-v3` |
+| `model` | `small` | Which Whisper model to use: `small`, `turbo`, or `large-v3` |
 | `num_speakers` | auto | Exact speaker count hint passed to pyannote (omit for auto-detection) |
 
 **Segment shape** (without diarization): `{"start": 0.0, "end": 2.4, "text": "Hello"}`
@@ -90,20 +90,22 @@ self.model.transcribe(
 
 All models (Whisper + pyannote) download to the `model-cache` Docker volume on first start and are reused on every subsequent start. `docker compose down` keeps the volume intact. Only `docker compose down -v` deletes it.
 
-- `small`: ~500MB, downloads in ~1 min
-- `large-v3`: ~3GB, downloads in ~5 min
-- pyannote diarization models: ~1GB
+- `small`: ~500 MB, downloads in ~1 min
+- `turbo`: ~1.5 GB, downloads in ~2 min
+- `large-v3`: ~3 GB, downloads in ~5 min
+- pyannote diarization models: ~1 GB
 
 ## Performance (CPU, ~4-minute recording)
 
-| Model | Whisper only | Whisper + diarization |
-|-------|-------------|----------------------|
-| `small` | ~2.8 min | ~7.8 min |
-| `large-v3` | ~16 min | ~21 min |
+| Model | Whisper only | Whisper + diarization | Notes |
+|-------|-------------|----------------------|-------|
+| `small` | ~2.8 min | ~7.8 min | Fast, good enough for most speech |
+| `turbo` | ~4 min | ~9 min | Better accuracy, still practical on CPU — default "accurate" alias |
+| `large-v3` | ~16 min | ~21 min | Best quality; only practical on GPU |
 
-GPU would be 10-20x faster overall.
+GPU (e.g. Cloud Run L4) is 10–20x faster overall.
 
-**Quality difference:** large-v3 makes significantly fewer word-level errors — proper nouns, technical terms, and unclear speech are handled much better.
+**Quality:** turbo and large-v3 make significantly fewer word-level errors — proper nouns, technical terms, and unclear speech are handled much better than small.
 
 ## Dependency constraints (important)
 
