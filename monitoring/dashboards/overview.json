@@ -962,12 +962,113 @@
       }
     },
     {
+      "id": 43,
+      "type": "row",
+      "title": "Transcriber (Cloud Run)",
+      "gridPos": {"x": 0, "y": 66, "w": 24, "h": 1},
+      "collapsed": false
+    },
+    {
+      "id": 70,
+      "title": "GPU utilization",
+      "type": "timeseries",
+      "gridPos": {"x": 0, "y": 67, "w": 8, "h": 8},
+      "datasource": {"type": "stackdriver", "uid": "${DS_GCM}"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "stackdriver", "uid": "${DS_GCM}"},
+          "queryType": "metrics",
+          "projectName": "gen-lang-client-0721625814",
+          "metricType": "run.googleapis.com/container/gpu/utilizations",
+          "crossSeriesReducer": "REDUCE_MEAN",
+          "perSeriesAligner": "ALIGN_MEAN",
+          "alignmentPeriod": "cloud-monitoring-auto",
+          "filters": ["resource.labels.service_name", "=", "transcriber"],
+          "groupBys": [],
+          "view": "FULL",
+          "aliasBy": "gpu %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "color": {"mode": "fixed", "fixedColor": "purple"},
+          "custom": {"fillOpacity": 15}
+        }
+      }
+    },
+    {
+      "id": 71,
+      "title": "Request latency p99",
+      "type": "timeseries",
+      "gridPos": {"x": 8, "y": 67, "w": 8, "h": 8},
+      "datasource": {"type": "stackdriver", "uid": "${DS_GCM}"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "stackdriver", "uid": "${DS_GCM}"},
+          "queryType": "metrics",
+          "projectName": "gen-lang-client-0721625814",
+          "metricType": "run.googleapis.com/request_latencies",
+          "crossSeriesReducer": "REDUCE_PERCENTILE_99",
+          "perSeriesAligner": "ALIGN_DELTA",
+          "alignmentPeriod": "cloud-monitoring-auto",
+          "filters": ["resource.labels.service_name", "=", "transcriber"],
+          "groupBys": [],
+          "view": "FULL",
+          "aliasBy": "p99 ms"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {"mode": "fixed", "fixedColor": "blue"},
+          "custom": {"fillOpacity": 15}
+        }
+      }
+    },
+    {
+      "id": 72,
+      "title": "Startup latency p99 (cold start)",
+      "type": "timeseries",
+      "gridPos": {"x": 16, "y": 67, "w": 8, "h": 8},
+      "datasource": {"type": "stackdriver", "uid": "${DS_GCM}"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "stackdriver", "uid": "${DS_GCM}"},
+          "queryType": "metrics",
+          "projectName": "gen-lang-client-0721625814",
+          "metricType": "run.googleapis.com/container/startup_latencies",
+          "crossSeriesReducer": "REDUCE_PERCENTILE_99",
+          "perSeriesAligner": "ALIGN_DELTA",
+          "alignmentPeriod": "cloud-monitoring-auto",
+          "filters": ["resource.labels.service_name", "=", "transcriber"],
+          "groupBys": [],
+          "view": "FULL",
+          "aliasBy": "p99 ms"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "color": {"mode": "fixed", "fixedColor": "orange"},
+          "custom": {"fillOpacity": 15}
+        }
+      }
+    },
+    {
       "id": 40,
       "type": "row",
       "title": "Logs",
       "gridPos": {
         "x": 0,
-        "y": 66,
+        "y": 75,
         "w": 24,
         "h": 1
       },
@@ -979,7 +1080,7 @@
       "type": "logs",
       "gridPos": {
         "x": 0,
-        "y": 67,
+        "y": 76,
         "w": 24,
         "h": 12
       },
