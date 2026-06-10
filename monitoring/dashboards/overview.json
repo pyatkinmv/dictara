@@ -60,14 +60,27 @@
           "refId": "A",
           "expr": "up{job=~\"gateway|tg-bot|app-material\"}",
           "instant": true,
-          "legendFormat": "{{job}}"
+          "legendFormat": "{{job}}",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}
+        },
+        {
+          "refId": "B",
+          "datasource": {"type": "stackdriver", "uid": "${DS_GCM}"},
+          "queryType": "metrics",
+          "projectName": "gen-lang-client-0721625814",
+          "metricType": "run.googleapis.com/container/instance_count",
+          "crossSeriesReducer": "REDUCE_SUM",
+          "perSeriesAligner": "ALIGN_MEAN",
+          "alignmentPeriod": "cloud-monitoring-auto",
+          "filters": ["resource.labels.service_name", "=", "transcriber", "AND", "metric.labels.state", "=", "active"],
+          "groupBys": [],
+          "view": "FULL",
+          "aliasBy": "transcriber"
         }
       ],
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
+          "calcs": ["lastNotNull"]
         },
         "colorMode": "background",
         "orientation": "horizontal"
@@ -78,29 +91,63 @@
             {
               "type": "value",
               "options": {
-                "0": {
-                  "text": "DOWN"
-                },
-                "1": {
-                  "text": "UP"
-                }
+                "0": {"text": "DOWN"},
+                "1": {"text": "UP"}
               }
             }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
+              {"color": "red", "value": null},
+              {"color": "green", "value": 1}
             ]
           }
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "transcriber"},
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {"text": "IDLE", "color": "text", "index": 0}
+                    }
+                  },
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {"text": "IDLE", "color": "text", "index": 1}
+                    }
+                  },
+                  {
+                    "type": "range",
+                    "options": {
+                      "from": 1,
+                      "to": 1000,
+                      "result": {"text": "ACTIVE", "color": "green", "index": 2}
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {"color": "text", "value": null},
+                    {"color": "green", "value": 1}
+                  ]
+                }
+              },
+              {"id": "noValue", "value": "IDLE"}
+            ]
+          }
+        ]
       }
     },
     {
@@ -121,7 +168,22 @@
         {
           "expr": "up{job=~\"gateway|tg-bot|app-material\"}",
           "legendFormat": "{{job}}",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}
+        },
+        {
+          "refId": "B",
+          "datasource": {"type": "stackdriver", "uid": "${DS_GCM}"},
+          "queryType": "metrics",
+          "projectName": "gen-lang-client-0721625814",
+          "metricType": "run.googleapis.com/container/instance_count",
+          "crossSeriesReducer": "REDUCE_SUM",
+          "perSeriesAligner": "ALIGN_MEAN",
+          "alignmentPeriod": "cloud-monitoring-auto",
+          "filters": ["resource.labels.service_name", "=", "transcriber", "AND", "metric.labels.state", "=", "active"],
+          "groupBys": [],
+          "view": "FULL",
+          "aliasBy": "transcriber"
         }
       ],
       "options": {
@@ -145,37 +207,63 @@
             {
               "type": "value",
               "options": {
-                "0": {
-                  "text": "DOWN",
-                  "color": "red",
-                  "index": 0
-                },
-                "1": {
-                  "text": "UP",
-                  "color": "green",
-                  "index": 1
-                }
+                "0": {"text": "DOWN", "color": "red", "index": 0},
+                "1": {"text": "UP", "color": "green", "index": 1}
               }
             }
           ],
-          "color": {
-            "mode": "thresholds"
-          },
+          "color": {"mode": "thresholds"},
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {
-                "value": null,
-                "color": "red"
-              },
-              {
-                "value": 1,
-                "color": "green"
-              }
+              {"value": null, "color": "red"},
+              {"value": 1, "color": "green"}
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "transcriber"},
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {"text": "IDLE", "color": "text", "index": 0}
+                    }
+                  },
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {"text": "IDLE", "color": "text", "index": 1}
+                    }
+                  },
+                  {
+                    "type": "range",
+                    "options": {
+                      "from": 1,
+                      "to": 1000,
+                      "result": {"text": "ACTIVE", "color": "green", "index": 2}
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {"color": "text", "value": null},
+                    {"color": "green", "value": 1}
+                  ]
+                }
+              }
+            ]
+          }
+        ]
       }
     },
     {
