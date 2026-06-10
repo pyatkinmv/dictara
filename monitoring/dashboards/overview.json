@@ -52,8 +52,8 @@
         "h": 3
       },
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "datasource",
+        "uid": "-- Mixed --"
       },
       "targets": [
         {
@@ -61,18 +61,32 @@
           "expr": "up{job=~\"gateway|tg-bot|app-material\"}",
           "instant": true,
           "legendFormat": "{{job}}",
-          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          }
         },
         {
           "refId": "B",
-          "datasource": {"type": "stackdriver", "uid": "${DS_GCM}"},
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "${DS_GCM}"
+          },
           "queryType": "metrics",
           "projectName": "gen-lang-client-0721625814",
           "metricType": "run.googleapis.com/container/instance_count",
           "crossSeriesReducer": "REDUCE_SUM",
           "perSeriesAligner": "ALIGN_MEAN",
           "alignmentPeriod": "cloud-monitoring-auto",
-          "filters": ["resource.labels.service_name", "=", "transcriber", "AND", "metric.labels.state", "=", "active"],
+          "filters": [
+            "resource.labels.service_name",
+            "=",
+            "transcriber",
+            "AND",
+            "metric.labels.state",
+            "=",
+            "active"
+          ],
           "groupBys": [],
           "view": "FULL",
           "aliasBy": "transcriber"
@@ -80,7 +94,9 @@
       ],
       "options": {
         "reduceOptions": {
-          "calcs": ["lastNotNull"]
+          "calcs": [
+            "lastNotNull"
+          ]
         },
         "colorMode": "background",
         "orientation": "horizontal"
@@ -91,22 +107,35 @@
             {
               "type": "value",
               "options": {
-                "0": {"text": "DOWN"},
-                "1": {"text": "UP"}
+                "0": {
+                  "text": "DOWN"
+                },
+                "1": {
+                  "text": "UP"
+                }
               }
             }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "red", "value": null},
-              {"color": "green", "value": 1}
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           }
         },
         "overrides": [
           {
-            "matcher": {"id": "byName", "options": "transcriber"},
+            "matcher": {
+              "id": "byName",
+              "options": "transcriber"
+            },
             "properties": [
               {
                 "id": "mappings",
@@ -115,13 +144,21 @@
                     "type": "special",
                     "options": {
                       "match": "null",
-                      "result": {"text": "IDLE", "color": "text", "index": 0}
+                      "result": {
+                        "text": "IDLE",
+                        "color": "text",
+                        "index": 0
+                      }
                     }
                   },
                   {
                     "type": "value",
                     "options": {
-                      "0": {"text": "IDLE", "color": "text", "index": 1}
+                      "0": {
+                        "text": "IDLE",
+                        "color": "text",
+                        "index": 1
+                      }
                     }
                   },
                   {
@@ -129,7 +166,11 @@
                     "options": {
                       "from": 1,
                       "to": 1000,
-                      "result": {"text": "ACTIVE", "color": "green", "index": 2}
+                      "result": {
+                        "text": "ACTIVE",
+                        "color": "green",
+                        "index": 2
+                      }
                     }
                   }
                 ]
@@ -139,12 +180,21 @@
                 "value": {
                   "mode": "absolute",
                   "steps": [
-                    {"color": "text", "value": null},
-                    {"color": "green", "value": 1}
+                    {
+                      "color": "text",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
                   ]
                 }
               },
-              {"id": "noValue", "value": "IDLE"}
+              {
+                "id": "noValue",
+                "value": "IDLE"
+              }
             ]
           }
         ]
@@ -161,26 +211,40 @@
         "h": 4
       },
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "datasource",
+        "uid": "-- Mixed --"
       },
       "targets": [
         {
           "expr": "up{job=~\"gateway|tg-bot|app-material\"}",
           "legendFormat": "{{job}}",
           "refId": "A",
-          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          }
         },
         {
           "refId": "B",
-          "datasource": {"type": "stackdriver", "uid": "${DS_GCM}"},
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "${DS_GCM}"
+          },
           "queryType": "metrics",
           "projectName": "gen-lang-client-0721625814",
           "metricType": "run.googleapis.com/container/instance_count",
           "crossSeriesReducer": "REDUCE_SUM",
           "perSeriesAligner": "ALIGN_MEAN",
           "alignmentPeriod": "cloud-monitoring-auto",
-          "filters": ["resource.labels.service_name", "=", "transcriber", "AND", "metric.labels.state", "=", "active"],
+          "filters": [
+            "resource.labels.service_name",
+            "=",
+            "transcriber",
+            "AND",
+            "metric.labels.state",
+            "=",
+            "active"
+          ],
           "groupBys": [],
           "view": "FULL",
           "aliasBy": "transcriber"
@@ -207,23 +271,42 @@
             {
               "type": "value",
               "options": {
-                "0": {"text": "DOWN", "color": "red", "index": 0},
-                "1": {"text": "UP", "color": "green", "index": 1}
+                "0": {
+                  "text": "DOWN",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green",
+                  "index": 1
+                }
               }
             }
           ],
-          "color": {"mode": "thresholds"},
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"value": null, "color": "red"},
-              {"value": 1, "color": "green"}
+              {
+                "value": null,
+                "color": "red"
+              },
+              {
+                "value": 1,
+                "color": "green"
+              }
             ]
           }
         },
         "overrides": [
           {
-            "matcher": {"id": "byName", "options": "transcriber"},
+            "matcher": {
+              "id": "byName",
+              "options": "transcriber"
+            },
             "properties": [
               {
                 "id": "mappings",
@@ -232,13 +315,21 @@
                     "type": "special",
                     "options": {
                       "match": "null",
-                      "result": {"text": "IDLE", "color": "text", "index": 0}
+                      "result": {
+                        "text": "IDLE",
+                        "color": "text",
+                        "index": 0
+                      }
                     }
                   },
                   {
                     "type": "value",
                     "options": {
-                      "0": {"text": "IDLE", "color": "text", "index": 1}
+                      "0": {
+                        "text": "IDLE",
+                        "color": "text",
+                        "index": 1
+                      }
                     }
                   },
                   {
@@ -246,7 +337,11 @@
                     "options": {
                       "from": 1,
                       "to": 1000,
-                      "result": {"text": "ACTIVE", "color": "green", "index": 2}
+                      "result": {
+                        "text": "ACTIVE",
+                        "color": "green",
+                        "index": 2
+                      }
                     }
                   }
                 ]
@@ -256,8 +351,14 @@
                 "value": {
                   "mode": "absolute",
                   "steps": [
-                    {"color": "text", "value": null},
-                    {"color": "green", "value": 1}
+                    {
+                      "color": "text",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
                   ]
                 }
               }
@@ -1046,33 +1147,55 @@
         }
       },
       "options": {
-        "tooltip": {"mode": "single"}
+        "tooltip": {
+          "mode": "single"
+        }
       }
     },
     {
       "id": 43,
       "type": "row",
       "title": "Transcriber (Cloud Run)",
-      "gridPos": {"x": 0, "y": 66, "w": 24, "h": 1},
+      "gridPos": {
+        "x": 0,
+        "y": 66,
+        "w": 24,
+        "h": 1
+      },
       "collapsed": false
     },
     {
       "id": 70,
       "title": "GPU utilization",
       "type": "timeseries",
-      "gridPos": {"x": 0, "y": 67, "w": 8, "h": 8},
-      "datasource": {"type": "stackdriver", "uid": "${DS_GCM}"},
+      "gridPos": {
+        "x": 0,
+        "y": 67,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "${DS_GCM}"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": {"type": "stackdriver", "uid": "${DS_GCM}"},
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "${DS_GCM}"
+          },
           "queryType": "metrics",
           "projectName": "gen-lang-client-0721625814",
           "metricType": "run.googleapis.com/container/gpu/utilizations",
           "crossSeriesReducer": "REDUCE_MEAN",
           "perSeriesAligner": "ALIGN_MEAN",
           "alignmentPeriod": "cloud-monitoring-auto",
-          "filters": ["resource.labels.service_name", "=", "transcriber"],
+          "filters": [
+            "resource.labels.service_name",
+            "=",
+            "transcriber"
+          ],
           "groupBys": [],
           "view": "FULL",
           "aliasBy": "gpu %"
@@ -1083,8 +1206,13 @@
           "unit": "percent",
           "min": 0,
           "max": 100,
-          "color": {"mode": "fixed", "fixedColor": "purple"},
-          "custom": {"fillOpacity": 15}
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "purple"
+          },
+          "custom": {
+            "fillOpacity": 15
+          }
         }
       }
     },
@@ -1092,19 +1220,34 @@
       "id": 71,
       "title": "Request latency p99",
       "type": "timeseries",
-      "gridPos": {"x": 8, "y": 67, "w": 8, "h": 8},
-      "datasource": {"type": "stackdriver", "uid": "${DS_GCM}"},
+      "gridPos": {
+        "x": 8,
+        "y": 67,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "${DS_GCM}"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": {"type": "stackdriver", "uid": "${DS_GCM}"},
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "${DS_GCM}"
+          },
           "queryType": "metrics",
           "projectName": "gen-lang-client-0721625814",
           "metricType": "run.googleapis.com/request_latencies",
           "crossSeriesReducer": "REDUCE_PERCENTILE_99",
           "perSeriesAligner": "ALIGN_DELTA",
           "alignmentPeriod": "cloud-monitoring-auto",
-          "filters": ["resource.labels.service_name", "=", "transcriber"],
+          "filters": [
+            "resource.labels.service_name",
+            "=",
+            "transcriber"
+          ],
           "groupBys": [],
           "view": "FULL",
           "aliasBy": "p99 ms"
@@ -1114,8 +1257,13 @@
         "defaults": {
           "unit": "ms",
           "min": 0,
-          "color": {"mode": "fixed", "fixedColor": "blue"},
-          "custom": {"fillOpacity": 15}
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "custom": {
+            "fillOpacity": 15
+          }
         }
       }
     },
@@ -1123,19 +1271,34 @@
       "id": 72,
       "title": "Startup latency p99 (cold start)",
       "type": "timeseries",
-      "gridPos": {"x": 16, "y": 67, "w": 8, "h": 8},
-      "datasource": {"type": "stackdriver", "uid": "${DS_GCM}"},
+      "gridPos": {
+        "x": 16,
+        "y": 67,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "${DS_GCM}"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": {"type": "stackdriver", "uid": "${DS_GCM}"},
+          "datasource": {
+            "type": "stackdriver",
+            "uid": "${DS_GCM}"
+          },
           "queryType": "metrics",
           "projectName": "gen-lang-client-0721625814",
           "metricType": "run.googleapis.com/container/startup_latencies",
           "crossSeriesReducer": "REDUCE_PERCENTILE_99",
           "perSeriesAligner": "ALIGN_DELTA",
           "alignmentPeriod": "cloud-monitoring-auto",
-          "filters": ["resource.labels.service_name", "=", "transcriber"],
+          "filters": [
+            "resource.labels.service_name",
+            "=",
+            "transcriber"
+          ],
           "groupBys": [],
           "view": "FULL",
           "aliasBy": "p99 ms"
@@ -1145,8 +1308,13 @@
         "defaults": {
           "unit": "ms",
           "min": 0,
-          "color": {"mode": "fixed", "fixedColor": "orange"},
-          "custom": {"fillOpacity": 15}
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          },
+          "custom": {
+            "fillOpacity": 15
+          }
         }
       }
     },
