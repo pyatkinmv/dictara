@@ -965,39 +965,13 @@
       }
     },
     {
-      "id": 67,
-      "title": "Process memory RSS",
+      "id": 68,
+      "title": "Process CPU",
       "type": "timeseries",
       "gridPos": {
         "x": 0,
         "y": 58,
         "w": 12,
-        "h": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "targets": [
-        {
-          "expr": "process_resident_memory_bytes{job=~\"gateway|tg-bot\"}",
-          "legendFormat": "{{job}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes"
-        }
-      }
-    },
-    {
-      "id": 68,
-      "title": "Process CPU",
-      "type": "timeseries",
-      "gridPos": {
-        "x": 12,
-        "y": 58,
-        "w": 6,
         "h": 8
       },
       "datasource": {
@@ -1113,7 +1087,7 @@
           "projectName": "gen-lang-client-0721625814",
           "metricType": "run.googleapis.com/container/gpu/utilizations",
           "crossSeriesReducer": "REDUCE_MEAN",
-          "perSeriesAligner": "ALIGN_MEAN",
+          "perSeriesAligner": "ALIGN_PERCENTILE_99",
           "alignmentPeriod": "cloud-monitoring-auto",
           "filters": [
             "resource.labels.service_name",
