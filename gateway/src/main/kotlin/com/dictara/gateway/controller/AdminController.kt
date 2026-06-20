@@ -80,13 +80,14 @@ class AdminController(
                 }
 
                 log.info("migrate-audio: uploading {} ({} bytes, {})", id, content.data.size, meta.originalName)
-                val ref = storage.upload(id, meta.originalName, content.data.inputStream(), content.data.size.toLong(), meta.contentType)
-                val uri = ref.storageUri!!
+                val result = storage.upload(id, meta.originalName, content.data.inputStream(), content.data.size.toLong(), meta.contentType)
+                val uri = result.ref.storageUri!!
 
                 audioMetaRepo.save(AudioMetaEntity(
                     id = meta.id, user = meta.user, originalName = meta.originalName,
                     contentType = meta.contentType, sizeBytes = meta.sizeBytes,
                     createdAt = meta.createdAt, storageUri = uri,
+                    contentHash = result.contentHash.ifEmpty { null },
                 ))
                 log.info("migrate-audio: {} migrated to {}", id, uri)
                 migrated++

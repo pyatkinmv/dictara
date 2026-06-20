@@ -13,6 +13,8 @@ import org.springframework.core.type.AnnotatedTypeMetadata
 import org.springframework.stereotype.Component
 import java.io.InputStream
 import java.nio.channels.Channels
+import java.security.DigestInputStream
+import java.security.MessageDigest
 import java.util.UUID
 
 /** Matches only when `dictara.storage.gcs.bucket` resolves to a non-blank value.
@@ -45,16 +47,19 @@ class GcsAudioStorage(props: DictaraProperties) : AudioStorage {
     private val bucket = props.storage.gcs.bucket
     private val storage: Storage = StorageOptions.getDefaultInstance().service
 
-    /** Uploads [inputStream] to `gs://{bucket}/audio/{audioMetaId}/{fileName}` and returns the gs:// URI.
-     *  Uses a resumable streaming upload (no full-file direct-buffer allocation) — required
-     *  to avoid OOM when many large files are uploaded concurrently. */
-    override fun upload(audioMetaId: UUID, fileName: String, inputStream: InputStream, sizeBytes: Long, contentType: String): AudioRef.Gcs {
+    /** Uploads [inputStream] to `gs://{bucket}/audio/{audioMetaId}/{fileName}`.
+     *  Computes SHA-256 hash of the content in a single streaming pass alongside the upload
+     *  (no buffering in memory). Returns [UploadResult] with the gs:// URI and hex hash. */
+    override fun upload(audioMetaId: UUID, fileName: String, inputStream: InputStream, sizeBytes: Long, contentType: String): UploadResult {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val digestStream = DigestInputStream(inputStream, digest)
         val objectName = "audio/$audioMetaId/$fileName"
         val blobInfo = BlobInfo.newBuilder(BlobId.of(bucket, objectName)).setContentType(contentType).build()
-        storage.createFrom(blobInfo, inputStream)
+        storage.createFrom(blobInfo, digestStream)
         val uri = "gs://$bucket/$objectName"
-        log.info("Uploaded audio to {} ({} bytes)", uri, sizeBytes)
-        return AudioRef.Gcs(uri)
+        val contentHash = digest.digest().joinToString("") { "%02x".format(it) }
+        log.info("Uploaded audio to {} ({} bytes, sha256={})", uri, sizeBytes, contentHash)
+        return UploadResult(AudioRef.Gcs(uri), contentHash)
     }
 
     /** Downloads the GCS object referenced by [ref]. Returns null if the object is unavailable

@@ -4,6 +4,7 @@ import com.dictara.gateway.entity.*
 import com.dictara.gateway.repository.*
 import com.dictara.gateway.storage.AudioRef
 import com.dictara.gateway.storage.AudioStorage
+import com.dictara.gateway.storage.UploadResult
 import com.dictara.gateway.service.OrchestratorService
 import com.dictara.gateway.service.UserService
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -143,9 +144,35 @@ class TranscribeController(
             telegramUserId != null -> userService.resolveByTelegramId(telegramUserId, dec(telegramUsername), dec(telegramFirstName), dec(telegramLastName))
             else -> userService.resolveAnonymous()
         }
-        val audio = saveAudio(file, user)
         val resolvedModel = mapOf("fast" to "small", "accurate" to "turbo")[model] ?: model
         val source = if (telegramUserId != null) "telegram" else "web"
+        val originalName = file.originalFilename ?: "upload"
+        val contentType = file.contentType ?: "application/octet-stream"
+
+        // Pre-generate UUID so GCS path is known before saving to DB
+        val audioMetaId = UUID.randomUUID()
+        val uploadResult = audioStorage.upload(audioMetaId, originalName, file.inputStream, file.size, contentType)
+        val contentHash = uploadResult.contentHash
+
+        // Dedup: if same file + same settings already processed, return existing result without GPU
+        if (contentHash.isNotEmpty()) {
+            val duplicate = submissionRepo.findDuplicate(user.id!!, contentHash, resolvedModel, language, diarize, numSpeakers, summaryMode)
+            if (duplicate != null) {
+                log.info("Duplicate upload: hash={}, reusing submission={}, file={}", contentHash, duplicate.id, originalName)
+                return SubmitResponse(duplicate.id.toString())
+            }
+        }
+
+        val audio = audioMetaRepo.save(AudioMetaEntity(
+            id = audioMetaId, user = user, originalName = originalName,
+            contentType = contentType, sizeBytes = file.size,
+            storageUri = uploadResult.ref.storageUri,
+            contentHash = contentHash.ifEmpty { null },
+        ))
+        if (uploadResult.ref is AudioRef.Gcs) {
+            log.info("Audio {} stored in GCS at {}", audioMetaId, (uploadResult.ref as AudioRef.Gcs).uri)
+        }
+
         val submission = submissionRepo.save(SubmissionEntity(
             user = user, audio = audio, model = resolvedModel, language = language,
             diarize = diarize, numSpeakers = numSpeakers, summaryMode = summaryMode, source = source,
@@ -153,7 +180,7 @@ class TranscribeController(
         if (telegramChatId != null) {
             telegramDeliveryRepo.save(TelegramDeliveryEntity(jobId = submission.id!!, chatId = telegramChatId, telegramMessageId = telegramMessageId))
         }
-        log.info("Submission accepted: id=${submission.id}, file=${file.originalFilename}, size=${file.size}B, model=$resolvedModel, language=$language, diarize=$diarize, summaryMode=$summaryMode, source=$source, user=${user.id}")
+        log.info("Submission accepted: id=${submission.id}, file=$originalName, size=${file.size}B, model=$resolvedModel, language=$language, diarize=$diarize, summaryMode=$summaryMode, source=$source, user=${user.id}")
         org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
             object : org.springframework.transaction.support.TransactionSynchronization {
                 override fun afterCommit() { orchestrator.signalPending() }
@@ -375,26 +402,5 @@ class TranscribeController(
         telegramDeliveryRepo.scheduleRetry(id, retryAfterTs)
     }
 
-    private fun saveAudio(file: MultipartFile, user: UserEntity): AudioMetaEntity {
-        val originalName = file.originalFilename ?: "upload"
-        val contentType = file.contentType ?: "application/octet-stream"
-        // Save metadata first so DatabaseAudioStorage can satisfy the audio_content FK constraint.
-        val meta = audioMetaRepo.save(AudioMetaEntity(
-            user = user,
-            originalName = originalName,
-            contentType = contentType,
-            sizeBytes = file.size,
-        ))
-        val ref = audioStorage.upload(meta.id!!, originalName, file.inputStream, file.size, contentType)
-        return if (ref is AudioRef.Gcs) {
-            log.info("Audio {} stored in GCS at {}", meta.id, ref.uri)
-            audioMetaRepo.save(AudioMetaEntity(
-                id = meta.id, user = meta.user, originalName = meta.originalName,
-                contentType = meta.contentType, sizeBytes = meta.sizeBytes,
-                createdAt = meta.createdAt, storageUri = ref.uri,
-            ))
-        } else {
-            meta
-        }
-    }
+
 }

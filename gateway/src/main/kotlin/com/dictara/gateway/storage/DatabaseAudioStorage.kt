@@ -20,10 +20,10 @@ class DatabaseAudioStorage(private val repo: AudioContentRepository) : AudioStor
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    override fun upload(audioMetaId: UUID, fileName: String, inputStream: InputStream, sizeBytes: Long, contentType: String): AudioRef.Db {
+    override fun upload(audioMetaId: UUID, fileName: String, inputStream: InputStream, sizeBytes: Long, contentType: String): UploadResult {
         repo.save(AudioContentEntity(audioId = audioMetaId, data = inputStream.readBytes()))
         log.info("Audio {} stored as BLOB in database ({} bytes)", audioMetaId, sizeBytes)
-        return AudioRef.Db(audioMetaId)
+        return UploadResult(AudioRef.Db(audioMetaId), "")
     }
 
     override fun download(ref: AudioRef): InputStream? = when (ref) {

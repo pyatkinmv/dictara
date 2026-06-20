@@ -17,4 +17,6 @@ class AudioMetaEntity(
     /** gs://bucket/key when the audio is held in GCS (Cloud Run path); null when
      *  stored as a BLOB in [AudioContentEntity] (legacy/local-dev fallback path). */
     @Column(name = "storage_uri") val storageUri: String? = null,
+    /** SHA-256 hex digest of the raw file bytes, set on upload. Null for records created before V12 migration. */
+    @Column(name = "content_hash") val contentHash: String? = null,
 )
