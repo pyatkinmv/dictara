@@ -29,7 +29,6 @@ class AudioMetaEntity(
     @jakarta.persistence.Transient
     private var newEntity = true
 
-    override fun getId(): UUID? = id
     override fun isNew(): Boolean = newEntity
 
     @PostPersist
