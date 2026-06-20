@@ -1,6 +1,5 @@
 package com.dictara.gateway.controller
 
-import com.dictara.gateway.entity.AudioMetaEntity
 import com.dictara.gateway.repository.AudioContentRepository
 import com.dictara.gateway.repository.AudioMetaRepository
 import com.dictara.gateway.storage.AudioRef
@@ -83,12 +82,7 @@ class AdminController(
                 val result = storage.upload(id, meta.originalName, content.data.inputStream(), content.data.size.toLong(), meta.contentType)
                 val uri = result.ref.storageUri!!
 
-                audioMetaRepo.save(AudioMetaEntity(
-                    id = meta.id, user = meta.user, originalName = meta.originalName,
-                    contentType = meta.contentType, sizeBytes = meta.sizeBytes,
-                    createdAt = meta.createdAt, storageUri = uri,
-                    contentHash = result.contentHash.ifEmpty { null },
-                ))
+                audioMetaRepo.updateStorageUri(meta.id!!, uri, result.contentHash.ifEmpty { null })
                 log.info("migrate-audio: {} migrated to {}", id, uri)
                 migrated++
             } catch (e: Exception) {

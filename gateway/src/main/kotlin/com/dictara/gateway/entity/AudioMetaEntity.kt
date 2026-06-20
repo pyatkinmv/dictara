@@ -1,6 +1,7 @@
 package com.dictara.gateway.entity
 
 import jakarta.persistence.*
+import org.springframework.data.domain.Persistable
 import java.time.Instant
 import java.util.UUID
 
@@ -19,4 +20,19 @@ class AudioMetaEntity(
     @Column(name = "storage_uri") val storageUri: String? = null,
     /** SHA-256 hex digest of the raw file bytes, set on upload. Null for records created before V12 migration. */
     @Column(name = "content_hash") val contentHash: String? = null,
-)
+) : Persistable<UUID> {
+
+    // Spring Data JPA calls persist() when isNew()=true, merge() when false.
+    // Without Persistable, a non-null id makes isNew()=false → merge() → Hibernate 6.5
+    // generates a NEW UUID for the managed copy, discarding the pre-generated audioMetaId.
+    // That breaks DatabaseAudioStorage: audio_content.audio_id = audioMetaId ≠ audio.id.
+    @jakarta.persistence.Transient
+    private var newEntity = true
+
+    override fun getId(): UUID? = id
+    override fun isNew(): Boolean = newEntity
+
+    @PostPersist
+    @PostLoad
+    private fun markLoaded() { newEntity = false }
+}
