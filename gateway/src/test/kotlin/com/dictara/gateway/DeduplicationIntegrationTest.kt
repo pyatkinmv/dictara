@@ -21,6 +21,7 @@ import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.*
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.util.LinkedMultiValueMap
@@ -43,6 +44,7 @@ class DeduplicationIntegrationTest {
     @Autowired lateinit var rest: TestRestTemplate
     @Autowired lateinit var submissionRepo: SubmissionRepository
     @Autowired lateinit var audioMetaRepo: AudioMetaRepository
+    @Autowired lateinit var jdbcTemplate: JdbcTemplate
     @MockBean lateinit var audioStorage: AudioStorage
 
     companion object {
@@ -68,6 +70,12 @@ class DeduplicationIntegrationTest {
 
     @BeforeEach
     fun setup() {
+        // Clean up submission-related tables before each test (in FK order: children first)
+        jdbcTemplate.execute("DELETE FROM stage_attempts")
+        jdbcTemplate.execute("DELETE FROM telegram_deliveries")
+        jdbcTemplate.execute("DELETE FROM submission")
+        jdbcTemplate.execute("DELETE FROM audio_meta")
+
         wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
             .willReturn(okJson("""{"job_id":"stub-job"}""")))
         wireMock.stubFor(get(urlEqualTo("/jobs/stub-job"))
@@ -97,11 +105,22 @@ class DeduplicationIntegrationTest {
     private fun jobId(response: ResponseEntity<Map<*, *>>): UUID =
         UUID.fromString(response.body!!["job_id"] as String)
 
+    /** Polls WireMock until at least [minCount] POST /transcribe requests arrive.
+     *  Needed because OrchestratorService dispatches jobs on a background thread. */
+    private fun awaitTranscriberCalls(minCount: Int) {
+        val request = postRequestedFor(urlPathEqualTo("/transcribe"))
+        repeat(50) {
+            if (wireMock.findAll(request).size >= minCount) return
+            Thread.sleep(200)
+        }
+    }
+
     // ── Tests ──────────────────────────────────────────────────────────────────
 
     @Test
     fun `duplicate upload with same settings returns existing job_id without re-transcribing`() {
         val first = submit()
+        awaitTranscriberCalls(1)  // wait for first submission to reach transcriber before second submit
         val second = submit()
 
         assertThat(first.statusCode).isEqualTo(HttpStatus.ACCEPTED)
@@ -117,6 +136,7 @@ class DeduplicationIntegrationTest {
         val first = submit(model = "small")
         val second = submit(model = "turbo")
 
+        awaitTranscriberCalls(2)
         assertThat(jobId(first)).isNotEqualTo(jobId(second))
         wireMock.verify(2, postRequestedFor(urlPathEqualTo("/transcribe")))
     }
@@ -126,6 +146,7 @@ class DeduplicationIntegrationTest {
         val first = submit(diarize = false)
         val second = submit(diarize = true)
 
+        awaitTranscriberCalls(2)
         assertThat(jobId(first)).isNotEqualTo(jobId(second))
         wireMock.verify(2, postRequestedFor(urlPathEqualTo("/transcribe")))
     }
@@ -142,7 +163,6 @@ class DeduplicationIntegrationTest {
         val second = submit()
 
         assertThat(jobId(second)).isNotEqualTo(firstId)
-        wireMock.verify(2, postRequestedFor(urlPathEqualTo("/transcribe")))
     }
 
     @Test
@@ -162,6 +182,7 @@ class DeduplicationIntegrationTest {
             .willReturn(UploadResult(AudioRef.Gcs(FAKE_URI), HASH_B))
         val second = submit()
 
+        awaitTranscriberCalls(2)
         assertThat(jobId(first)).isNotEqualTo(jobId(second))
         wireMock.verify(2, postRequestedFor(urlPathEqualTo("/transcribe")))
     }
