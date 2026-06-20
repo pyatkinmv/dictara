@@ -25,6 +25,7 @@ internal class GcsBucketConfiguredCondition : Condition {
         !context.environment.getProperty("dictara.storage.gcs.bucket").isNullOrBlank()
 }
 
+@Deprecated("Used only by DatabaseAudioStorage which is itself deprecated — GCS is now always required")
 internal class GcsBucketNotConfiguredCondition : Condition {
     override fun matches(context: ConditionContext, metadata: AnnotatedTypeMetadata) =
         context.environment.getProperty("dictara.storage.gcs.bucket").isNullOrBlank()

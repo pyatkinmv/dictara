@@ -28,7 +28,10 @@ class AdminController(
     data class MigrateResponse(val migrated: Int, val skipped: Int, val failed: Int, val errors: List<String>)
 
     /** Migrates audio BLOBs from audio_content to GCS.
-     *  Pass specific IDs to migrate a subset; omit or send empty list to migrate all remaining. */
+     *  Pass specific IDs to migrate a subset; omit or send empty list to migrate all remaining.
+     *
+     *  @deprecated Migration completed 2026-06-21 — audio_content table is now empty. */
+    @Deprecated("Migration completed 2026-06-21 — audio_content is empty, all files are in GCS")
     @PostMapping("/migrate-audio")
     fun migrateAudio(
         @RequestBody(required = false) body: MigrateRequest?,

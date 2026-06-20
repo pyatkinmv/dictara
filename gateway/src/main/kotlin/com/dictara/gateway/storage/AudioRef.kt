@@ -4,6 +4,7 @@ import java.util.UUID
 
 sealed class AudioRef {
     data class Gcs(val uri: String) : AudioRef()
+    @Deprecated("audio_content has been migrated to GCS — Db refs no longer exist in production")
     data class Db(val audioMetaId: UUID) : AudioRef()
 
     /** Column value to persist in audio_meta.storage_uri. */

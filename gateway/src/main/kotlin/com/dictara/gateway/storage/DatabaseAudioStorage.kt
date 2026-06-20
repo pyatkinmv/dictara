@@ -9,7 +9,11 @@ import java.io.InputStream
 import java.util.UUID
 
 /** Stores audio as a BLOB in the `audio_content` PostgreSQL table.
- *  Active only when `dictara.storage.gcs.bucket` is NOT configured (local dev fallback). */
+ *  Active only when `dictara.storage.gcs.bucket` is NOT configured (local dev fallback).
+ *
+ *  @deprecated All BLOBs have been migrated to GCS. This fallback is no longer used in production.
+ *  Use [GcsAudioStorage] instead. */
+@Deprecated("All audio content has been migrated to GCS. DatabaseAudioStorage is a dead fallback.")
 @Component
 @Conditional(GcsBucketNotConfiguredCondition::class)
 class DatabaseAudioStorage(private val repo: AudioContentRepository) : AudioStorage {
