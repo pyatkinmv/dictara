@@ -1,8 +1,8 @@
 package com.dictara.gateway.controller
 
-import com.dictara.gateway.client.AudioStorageClient
 import com.dictara.gateway.entity.*
 import com.dictara.gateway.repository.*
+import com.dictara.gateway.storage.AudioStorage
 import com.dictara.gateway.service.OrchestratorService
 import com.dictara.gateway.service.UserService
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -27,7 +27,6 @@ class TranscribeController(
     private val userService: UserService,
     private val userRepo: UserRepository,
     private val audioMetaRepo: AudioMetaRepository,
-    private val audioContentRepo: AudioContentRepository,
     private val submissionRepo: SubmissionRepository,
     private val transcriptRepo: TranscriptRepository,
     private val diarizationRepo: DiarizationRepository,
@@ -35,7 +34,7 @@ class TranscribeController(
     private val stageAttemptRepo: StageAttemptRepository,
     private val tagRepo: SubmissionTagRepository,
     private val telegramDeliveryRepo: TelegramDeliveryRepository,
-    private val audioStorage: AudioStorageClient? = null,
+    private val audioStorage: AudioStorage,
 ) {
     companion object {
         private val log = LoggerFactory.getLogger(TranscribeController::class.java)
@@ -378,22 +377,23 @@ class TranscribeController(
     private fun saveAudio(file: MultipartFile, user: UserEntity): AudioMetaEntity {
         val originalName = file.originalFilename ?: "upload"
         val contentType = file.contentType ?: "application/octet-stream"
-        // GCS object key namespace — independent of AudioMetaEntity.id, which Hibernate
-        // assigns on insert (GenerationType.UUID generators ignore pre-assigned values).
-        val storageUri = audioStorage?.upload(UUID.randomUUID(), originalName, file.inputStream, file.size, contentType)
-
+        // Save metadata first so DatabaseAudioStorage can satisfy the audio_content FK constraint.
         val meta = audioMetaRepo.save(AudioMetaEntity(
             user = user,
             originalName = originalName,
             contentType = contentType,
             sizeBytes = file.size,
-            storageUri = storageUri,
         ))
-        if (storageUri == null) {
-            audioContentRepo.save(AudioContentEntity(audioId = meta.id!!, data = file.bytes))
+        val storageUri = audioStorage.upload(meta.id!!, originalName, file.inputStream, file.size, contentType)
+        return if (storageUri != null) {
+            log.info("Audio {} stored in GCS at {}", meta.id, storageUri)
+            audioMetaRepo.save(AudioMetaEntity(
+                id = meta.id, user = meta.user, originalName = meta.originalName,
+                contentType = meta.contentType, sizeBytes = meta.sizeBytes,
+                createdAt = meta.createdAt, storageUri = storageUri,
+            ))
         } else {
-            log.info("Audio {} stored in GCS at {}, skipping BLOB storage", meta.id, storageUri)
+            meta
         }
-        return meta
     }
 }

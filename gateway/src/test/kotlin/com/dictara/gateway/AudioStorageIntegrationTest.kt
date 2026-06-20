@@ -1,7 +1,7 @@
 package com.dictara.gateway
 
-import com.dictara.gateway.client.AudioStorageClient
 import com.dictara.gateway.repository.AudioContentRepository
+import com.dictara.gateway.storage.AudioStorage
 import com.dictara.gateway.repository.AudioMetaRepository
 import com.dictara.gateway.repository.SubmissionRepository
 import com.github.tomakehurst.wiremock.client.WireMock.*
@@ -29,10 +29,10 @@ import org.testcontainers.junit.jupiter.Testcontainers
 import java.util.UUID
 
 /** Plain `ArgumentMatchers.any()` returns `null`, and Kotlin inserts a not-null check
- *  on the result before passing it to [AudioStorageClient.upload]'s non-null
- *  parameters, throwing NPE while the stub is being recorded. Routing through a
- *  generic helper avoids the check — the compiler trusts the (erased) type parameter
- *  rather than the platform-typed Java return value. */
+ *  on the result before passing it to [AudioStorage.upload]'s non-null parameters,
+ *  throwing NPE while the stub is being recorded. Routing through a generic helper
+ *  avoids the check — the compiler trusts the (erased) type parameter rather than
+ *  the platform-typed Java return value. */
 private fun <T> any(): T {
     ArgumentMatchers.any<T>()
     @Suppress("UNCHECKED_CAST")
@@ -40,11 +40,11 @@ private fun <T> any(): T {
 }
 
 /** Verifies the GCS-reference upload path (gateway → bucket → transcriber by URI),
- *  added to work around Cloud Run's hard 32 MiB HTTP request body limit — see
- *  docs/cloud-run-migration.md. [AudioStorageClient] itself needs real GCS credentials,
- *  so it's replaced here with a [MockBean] that returns a fixed gs:// URI; this test
- *  only exercises the gateway-side wiring (storage_uri persisted, BLOB skipped,
- *  transcriber submitted by reference). */
+ *  added to work around Cloud Run's hard 32 MiB HTTP request body limit.
+ *  [GcsAudioStorage] needs real GCS credentials, so [AudioStorage] is replaced here
+ *  with a [MockBean] that returns a fixed gs:// URI; this test only exercises the
+ *  gateway-side wiring (storage_uri persisted, BLOB skipped, transcriber submitted
+ *  by reference). */
 @SpringBootTest(webEnvironment = RANDOM_PORT)
 @Testcontainers
 class AudioStorageIntegrationTest {
@@ -53,7 +53,7 @@ class AudioStorageIntegrationTest {
     @Autowired lateinit var submissionRepo: SubmissionRepository
     @Autowired lateinit var audioMetaRepo: AudioMetaRepository
     @Autowired lateinit var audioContentRepo: AudioContentRepository
-    @MockBean lateinit var audioStorage: AudioStorageClient
+    @MockBean lateinit var audioStorage: AudioStorage
 
     companion object {
         private const val FAKE_URI = "gs://test-bucket/audio/stub-key/audio.m4a"

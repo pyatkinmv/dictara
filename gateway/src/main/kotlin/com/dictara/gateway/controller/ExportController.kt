@@ -1,7 +1,7 @@
 package com.dictara.gateway.controller
 
-import com.dictara.gateway.client.AudioStorageClient
 import com.dictara.gateway.repository.*
+import com.dictara.gateway.storage.GcsAudioStorage
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.slf4j.LoggerFactory
@@ -24,7 +24,7 @@ class ExportController(
     private val diarizationRepo: DiarizationRepository,
     private val summaryRepo: SummaryRepository,
     private val audioContentRepo: AudioContentRepository,
-    private val audioStorage: AudioStorageClient? = null,
+    private val audioStorage: GcsAudioStorage? = null,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
     private val dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.systemDefault())
@@ -86,7 +86,7 @@ class ExportController(
                         val storageUri = submission.audio.storageUri
                         if (storageUri != null) {
                             // GCS-backed: try download, skip silently on failure (expired/unavailable)
-                            audioStorage?.download(storageUri)?.use { audioStream ->
+                            audioStorage?.download(submission.audio.id!!, storageUri)?.use { audioStream ->
                                 zip.putNextEntry(ZipEntry("$folderName/$originalName"))
                                 audioStream.copyTo(zip)
                                 zip.closeEntry()

@@ -30,7 +30,7 @@ data class DictaraProperties(
 
     /** Empty bucket = GCS audio storage disabled — gateway falls back to storing
      *  audio as a BLOB in Postgres and streaming it to the transcriber over HTTP
-     *  (see AudioStorageClient for why this matters on Cloud Run). */
+     *  (see GcsAudioStorage / DatabaseAudioStorage for why this matters on Cloud Run). */
     data class GcsProps(
         val bucket: String = "",
     )

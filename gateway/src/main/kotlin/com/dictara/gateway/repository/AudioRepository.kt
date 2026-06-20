@@ -7,4 +7,7 @@ import java.util.UUID
 
 interface AudioMetaRepository : JpaRepository<AudioMetaEntity, UUID>
 
-interface AudioContentRepository : JpaRepository<AudioContentEntity, UUID>
+interface AudioContentRepository : JpaRepository<AudioContentEntity, UUID> {
+    @org.springframework.data.jpa.repository.Query("SELECT a.audioId FROM AudioContentEntity a")
+    fun findAllAudioIds(): List<UUID>
+}
