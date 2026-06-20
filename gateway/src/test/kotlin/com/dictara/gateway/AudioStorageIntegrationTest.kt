@@ -19,8 +19,6 @@ import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.*
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.util.LinkedMultiValueMap
 import java.util.UUID
 
@@ -42,7 +40,7 @@ private fun <T> any(): T {
  *  gateway-side wiring (storage_uri persisted, BLOB skipped, transcriber submitted
  *  by reference). */
 @SpringBootTest(webEnvironment = RANDOM_PORT)
-class AudioStorageIntegrationTest {
+class AudioStorageIntegrationTest : AbstractSharedContextIntegrationTest() {
 
     @Autowired lateinit var rest: TestRestTemplate
     @Autowired lateinit var submissionRepo: SubmissionRepository
@@ -52,23 +50,12 @@ class AudioStorageIntegrationTest {
 
     companion object {
         private const val FAKE_URI = "gs://test-bucket/audio/stub-key/audio.m4a"
-
-        @DynamicPropertySource @JvmStatic
-        fun props(registry: DynamicPropertyRegistry) {
-            val pg = SharedTestInfrastructure.postgres
-            registry.add("spring.datasource.url") { pg.jdbcUrl }
-            registry.add("spring.datasource.username") { pg.username }
-            registry.add("spring.datasource.password") { pg.password }
-            registry.add("dictara.transcriber.url") { SharedTestInfrastructure.wireMock.baseUrl() }
-            registry.add("dictara.transcriber.poll-interval-ms") { "100" }
-        }
     }
 
     private val wireMock get() = SharedTestInfrastructure.wireMock
 
     @BeforeEach
     fun stubUpload() {
-        wireMock.resetAll()
         given(audioStorage.upload(any(), any(), any(), ArgumentMatchers.anyLong(), any()))
             .willReturn(UploadResult(AudioRef.Gcs(FAKE_URI), "fake-sha256-hash"))
     }

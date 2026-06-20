@@ -18,9 +18,6 @@ import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.*
-import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.util.LinkedMultiValueMap
 import java.util.UUID
 
@@ -32,42 +29,24 @@ private fun <T> any(): T {
 }
 
 @SpringBootTest(webEnvironment = RANDOM_PORT)
-class DeduplicationIntegrationTest {
+class DeduplicationIntegrationTest : AbstractSharedContextIntegrationTest() {
 
     @Autowired lateinit var rest: TestRestTemplate
     @Autowired lateinit var submissionRepo: SubmissionRepository
     @Autowired lateinit var audioMetaRepo: AudioMetaRepository
-    @Autowired lateinit var jdbcTemplate: JdbcTemplate
     @MockBean lateinit var audioStorage: AudioStorage
 
     companion object {
         private const val FAKE_URI = "gs://test-bucket/audio/stub/audio.m4a"
         private const val HASH_A = "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111"
         private const val HASH_B = "bbbb2222bbbb2222bbbb2222bbbb2222bbbb2222bbbb2222bbbb2222bbbb2222"
-
-        @DynamicPropertySource @JvmStatic
-        fun props(registry: DynamicPropertyRegistry) {
-            val pg = SharedTestInfrastructure.postgres
-            registry.add("spring.datasource.url") { pg.jdbcUrl }
-            registry.add("spring.datasource.username") { pg.username }
-            registry.add("spring.datasource.password") { pg.password }
-            registry.add("dictara.transcriber.url") { SharedTestInfrastructure.wireMock.baseUrl() }
-            registry.add("dictara.transcriber.poll-interval-ms") { "100" }
-        }
+        private const val DONE_STUB = """{"status":"done","duration_s":0.1,"result":{"formatted_text":"test","audio_duration_s":1.0,"segments":[{"start":0.0,"end":1.0,"text":"test"}]}}"""
     }
 
     private val wireMock get() = SharedTestInfrastructure.wireMock
 
     @BeforeEach
     fun setup() {
-        wireMock.resetAll()
-
-        // Clean up submission-related tables before each test (in FK order: children first)
-        jdbcTemplate.execute("DELETE FROM stage_attempts")
-        jdbcTemplate.execute("DELETE FROM telegram_deliveries")
-        jdbcTemplate.execute("DELETE FROM submissions")
-        jdbcTemplate.execute("DELETE FROM audio_meta")
-
         wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
             .willReturn(okJson("""{"job_id":"stub-job"}""")))
         wireMock.stubFor(get(urlEqualTo("/jobs/stub-job"))
@@ -125,6 +104,10 @@ class DeduplicationIntegrationTest {
 
     @Test
     fun `same file with different model is not a duplicate`() {
+        // Override to "done" so OrchestratorService completes the first dispatch and picks up the second.
+        // The default "processing" stub would keep submission A stuck, blocking B via idx_one_processing_submission.
+        wireMock.stubFor(get(urlEqualTo("/jobs/stub-job")).willReturn(okJson(DONE_STUB)))
+
         val first = submit(model = "small")
         val second = submit(model = "turbo")
 
@@ -135,6 +118,8 @@ class DeduplicationIntegrationTest {
 
     @Test
     fun `same file with different diarize setting is not a duplicate`() {
+        wireMock.stubFor(get(urlEqualTo("/jobs/stub-job")).willReturn(okJson(DONE_STUB)))
+
         val first = submit(diarize = false)
         val second = submit(diarize = true)
 
@@ -168,6 +153,8 @@ class DeduplicationIntegrationTest {
 
     @Test
     fun `different file content produces separate submissions`() {
+        wireMock.stubFor(get(urlEqualTo("/jobs/stub-job")).willReturn(okJson(DONE_STUB)))
+
         val first = submit()
 
         given(audioStorage.upload(any(), any(), any(), ArgumentMatchers.anyLong(), any()))
