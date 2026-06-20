@@ -7,12 +7,9 @@ import com.dictara.gateway.storage.UploadResult
 import com.dictara.gateway.repository.AudioMetaRepository
 import com.dictara.gateway.repository.SubmissionRepository
 import com.github.tomakehurst.wiremock.client.WireMock.*
-import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
-import com.github.tomakehurst.wiremock.junit5.WireMockExtension
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.extension.RegisterExtension
 import org.mockito.ArgumentMatchers
 import org.mockito.BDDMockito.given
 import org.springframework.beans.factory.annotation.Autowired
@@ -25,9 +22,6 @@ import org.springframework.http.*
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.util.LinkedMultiValueMap
-import org.testcontainers.containers.PostgreSQLContainer
-import org.testcontainers.junit.jupiter.Container
-import org.testcontainers.junit.jupiter.Testcontainers
 import java.util.UUID
 
 /** Plain `ArgumentMatchers.any()` returns `null`, and Kotlin inserts a not-null check
@@ -48,7 +42,6 @@ private fun <T> any(): T {
  *  gateway-side wiring (storage_uri persisted, BLOB skipped, transcriber submitted
  *  by reference). */
 @SpringBootTest(webEnvironment = RANDOM_PORT)
-@Testcontainers
 class AudioStorageIntegrationTest {
 
     @Autowired lateinit var rest: TestRestTemplate
@@ -60,25 +53,24 @@ class AudioStorageIntegrationTest {
     companion object {
         private const val FAKE_URI = "gs://test-bucket/audio/stub-key/audio.m4a"
 
-        @Container @JvmField val postgres = PostgreSQLContainer<Nothing>("postgres:16")
-
-        @RegisterExtension @JvmField
-        val wireMock: WireMockExtension = WireMockExtension.newInstance()
-            .options(wireMockConfig().dynamicPort()).build()
-
         @DynamicPropertySource @JvmStatic
         fun props(registry: DynamicPropertyRegistry) {
-            registry.add("spring.datasource.url") { postgres.jdbcUrl }
-            registry.add("spring.datasource.username") { postgres.username }
-            registry.add("spring.datasource.password") { postgres.password }
-            registry.add("dictara.transcriber.url") { wireMock.baseUrl() }
+            val pg = SharedTestInfrastructure.postgres
+            registry.add("spring.datasource.url") { pg.jdbcUrl }
+            registry.add("spring.datasource.username") { pg.username }
+            registry.add("spring.datasource.password") { pg.password }
+            registry.add("dictara.transcriber.url") { SharedTestInfrastructure.wireMock.baseUrl() }
             registry.add("dictara.transcriber.poll-interval-ms") { "100" }
         }
     }
 
+    private val wireMock get() = SharedTestInfrastructure.wireMock
+
     @BeforeEach
     fun stubUpload() {
-        given(audioStorage.upload(any(), any(), any(), ArgumentMatchers.anyLong(), any())).willReturn(UploadResult(AudioRef.Gcs(FAKE_URI), "fake-sha256-hash"))
+        wireMock.resetAll()
+        given(audioStorage.upload(any(), any(), any(), ArgumentMatchers.anyLong(), any()))
+            .willReturn(UploadResult(AudioRef.Gcs(FAKE_URI), "fake-sha256-hash"))
     }
 
     @Test

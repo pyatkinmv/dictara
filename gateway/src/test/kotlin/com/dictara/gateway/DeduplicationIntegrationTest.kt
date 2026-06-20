@@ -6,12 +6,9 @@ import com.dictara.gateway.storage.AudioRef
 import com.dictara.gateway.storage.AudioStorage
 import com.dictara.gateway.storage.UploadResult
 import com.github.tomakehurst.wiremock.client.WireMock.*
-import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
-import com.github.tomakehurst.wiremock.junit5.WireMockExtension
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.extension.RegisterExtension
 import org.mockito.ArgumentMatchers
 import org.mockito.BDDMockito.given
 import org.springframework.beans.factory.annotation.Autowired
@@ -25,9 +22,6 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.util.LinkedMultiValueMap
-import org.testcontainers.containers.PostgreSQLContainer
-import org.testcontainers.junit.jupiter.Container
-import org.testcontainers.junit.jupiter.Testcontainers
 import java.util.UUID
 
 /** See [AudioStorageIntegrationTest] for why this helper is needed. */
@@ -38,7 +32,6 @@ private fun <T> any(): T {
 }
 
 @SpringBootTest(webEnvironment = RANDOM_PORT)
-@Testcontainers
 class DeduplicationIntegrationTest {
 
     @Autowired lateinit var rest: TestRestTemplate
@@ -52,24 +45,23 @@ class DeduplicationIntegrationTest {
         private const val HASH_A = "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111"
         private const val HASH_B = "bbbb2222bbbb2222bbbb2222bbbb2222bbbb2222bbbb2222bbbb2222bbbb2222"
 
-        @Container @JvmField val postgres = PostgreSQLContainer<Nothing>("postgres:16")
-
-        @RegisterExtension @JvmField
-        val wireMock: WireMockExtension = WireMockExtension.newInstance()
-            .options(wireMockConfig().dynamicPort()).build()
-
         @DynamicPropertySource @JvmStatic
         fun props(registry: DynamicPropertyRegistry) {
-            registry.add("spring.datasource.url") { postgres.jdbcUrl }
-            registry.add("spring.datasource.username") { postgres.username }
-            registry.add("spring.datasource.password") { postgres.password }
-            registry.add("dictara.transcriber.url") { wireMock.baseUrl() }
+            val pg = SharedTestInfrastructure.postgres
+            registry.add("spring.datasource.url") { pg.jdbcUrl }
+            registry.add("spring.datasource.username") { pg.username }
+            registry.add("spring.datasource.password") { pg.password }
+            registry.add("dictara.transcriber.url") { SharedTestInfrastructure.wireMock.baseUrl() }
             registry.add("dictara.transcriber.poll-interval-ms") { "100" }
         }
     }
 
+    private val wireMock get() = SharedTestInfrastructure.wireMock
+
     @BeforeEach
     fun setup() {
+        wireMock.resetAll()
+
         // Clean up submission-related tables before each test (in FK order: children first)
         jdbcTemplate.execute("DELETE FROM stage_attempts")
         jdbcTemplate.execute("DELETE FROM telegram_deliveries")
