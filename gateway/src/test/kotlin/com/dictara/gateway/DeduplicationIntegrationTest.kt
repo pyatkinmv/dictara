@@ -73,7 +73,7 @@ class DeduplicationIntegrationTest {
         // Clean up submission-related tables before each test (in FK order: children first)
         jdbcTemplate.execute("DELETE FROM stage_attempts")
         jdbcTemplate.execute("DELETE FROM telegram_deliveries")
-        jdbcTemplate.execute("DELETE FROM submission")
+        jdbcTemplate.execute("DELETE FROM submissions")
         jdbcTemplate.execute("DELETE FROM audio_meta")
 
         wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
