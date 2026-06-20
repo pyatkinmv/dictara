@@ -8,6 +8,7 @@ import java.util.UUID
 @Entity @Table(name = "audio_meta")
 class AudioMetaEntity(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
+    @get:JvmName("getEntityId")
     val id: UUID? = null,
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "user_id", nullable = false)
     val user: UserEntity,
@@ -29,6 +30,7 @@ class AudioMetaEntity(
     @jakarta.persistence.Transient
     private var newEntity = true
 
+    override fun getId(): UUID? = id
     override fun isNew(): Boolean = newEntity
 
     @PostPersist
