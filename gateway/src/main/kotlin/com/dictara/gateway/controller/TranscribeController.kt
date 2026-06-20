@@ -2,6 +2,7 @@ package com.dictara.gateway.controller
 
 import com.dictara.gateway.entity.*
 import com.dictara.gateway.repository.*
+import com.dictara.gateway.storage.AudioRef
 import com.dictara.gateway.storage.AudioStorage
 import com.dictara.gateway.service.OrchestratorService
 import com.dictara.gateway.service.UserService
@@ -384,13 +385,13 @@ class TranscribeController(
             contentType = contentType,
             sizeBytes = file.size,
         ))
-        val storageUri = audioStorage.upload(meta.id!!, originalName, file.inputStream, file.size, contentType)
-        return if (storageUri != null) {
-            log.info("Audio {} stored in GCS at {}", meta.id, storageUri)
+        val ref = audioStorage.upload(meta.id!!, originalName, file.inputStream, file.size, contentType)
+        return if (ref is AudioRef.Gcs) {
+            log.info("Audio {} stored in GCS at {}", meta.id, ref.uri)
             audioMetaRepo.save(AudioMetaEntity(
                 id = meta.id, user = meta.user, originalName = meta.originalName,
                 contentType = meta.contentType, sizeBytes = meta.sizeBytes,
-                createdAt = meta.createdAt, storageUri = storageUri,
+                createdAt = meta.createdAt, storageUri = ref.uri,
             ))
         } else {
             meta

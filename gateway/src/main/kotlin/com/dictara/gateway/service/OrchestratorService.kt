@@ -7,8 +7,9 @@ import com.dictara.gateway.entity.StageAttemptEntity
 import com.dictara.gateway.entity.SubmissionEntity
 import com.dictara.gateway.model.SummaryMode
 import com.dictara.gateway.port.SummarizerPort
-import com.dictara.gateway.repository.AudioContentRepository
 import com.dictara.gateway.repository.TranscriptRepository
+import com.dictara.gateway.storage.AudioRef
+import com.dictara.gateway.storage.AudioStorage
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import jakarta.annotation.PostConstruct
@@ -24,7 +25,7 @@ class OrchestratorService(
     private val summarizer: SummarizerPort,
     private val props: com.dictara.gateway.config.DictaraProperties,
     private val stateService: SubmissionStateService,
-    private val audioContentRepo: AudioContentRepository,
+    private val audioStorage: AudioStorage,
     private val transcriptRepo: TranscriptRepository,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -102,14 +103,13 @@ class OrchestratorService(
                 originalFileName = submission.audio.originalName,
             )
 
-            // GCS-reference path (Cloud Run — avoids the 32 MiB request body limit) when the
-            // audio was uploaded to a bucket; otherwise fall back to streaming bytes directly.
-            val storageUri = submission.audio.storageUri
-            val transcriberJobId = if (storageUri != null) {
-                transcriberClient.submitByReference(storageUri, params)
-            } else {
-                val audioContent = audioContentRepo.findById(submission.audio.id!!).orElseThrow()
-                transcriberClient.submit(audioContent.data, submission.audio.originalName, params)
+            val transcriberJobId = when (val ref = AudioRef.from(submission.audio.id!!, submission.audio.storageUri)) {
+                is AudioRef.Gcs -> transcriberClient.submitByReference(ref.uri, params)
+                is AudioRef.Db  -> {
+                    val bytes = audioStorage.download(ref)
+                        ?: throw IllegalStateException("Audio content not found for submission $submissionId")
+                    transcriberClient.submit(bytes.readBytes(), submission.audio.originalName, params)
+                }
             }
             stateService.setAttemptExternalJobId(attempt.id!!, transcriberJobId)
             log.info("Submission $submissionId submitted to transcriber (externalJobId=$transcriberJobId)")

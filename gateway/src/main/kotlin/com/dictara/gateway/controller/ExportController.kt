@@ -1,7 +1,8 @@
 package com.dictara.gateway.controller
 
 import com.dictara.gateway.repository.*
-import com.dictara.gateway.storage.GcsAudioStorage
+import com.dictara.gateway.storage.AudioRef
+import com.dictara.gateway.storage.AudioStorage
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.slf4j.LoggerFactory
@@ -23,8 +24,7 @@ class ExportController(
     private val transcriptRepo: TranscriptRepository,
     private val diarizationRepo: DiarizationRepository,
     private val summaryRepo: SummaryRepository,
-    private val audioContentRepo: AudioContentRepository,
-    private val audioStorage: GcsAudioStorage? = null,
+    private val audioStorage: AudioStorage,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
     private val dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.systemDefault())
@@ -80,24 +80,13 @@ class ExportController(
                         zip.closeEntry()
                     }
 
-                    // audio file (optional)
+                    // audio file (optional) — skip silently if unavailable (expired/not found)
                     if (includeAudio) {
-                        val originalName = submission.audio.originalName
-                        val storageUri = submission.audio.storageUri
-                        if (storageUri != null) {
-                            // GCS-backed: try download, skip silently on failure (expired/unavailable)
-                            audioStorage?.download(submission.audio.id!!, storageUri)?.use { audioStream ->
-                                zip.putNextEntry(ZipEntry("$folderName/$originalName"))
-                                audioStream.copyTo(zip)
-                                zip.closeEntry()
-                            }
-                        } else {
-                            // BLOB-backed: read from audio_content table
-                            audioContentRepo.findById(submission.audio.id!!).orElse(null)?.let { content ->
-                                zip.putNextEntry(ZipEntry("$folderName/$originalName"))
-                                zip.write(content.data)
-                                zip.closeEntry()
-                            }
+                        val ref = AudioRef.from(submission.audio.id!!, submission.audio.storageUri)
+                        audioStorage.download(ref)?.use { audioStream ->
+                            zip.putNextEntry(ZipEntry("$folderName/${submission.audio.originalName}"))
+                            audioStream.copyTo(zip)
+                            zip.closeEntry()
                         }
                     }
                 }

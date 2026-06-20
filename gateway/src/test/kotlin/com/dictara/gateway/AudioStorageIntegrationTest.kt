@@ -1,6 +1,7 @@
 package com.dictara.gateway
 
 import com.dictara.gateway.repository.AudioContentRepository
+import com.dictara.gateway.storage.AudioRef
 import com.dictara.gateway.storage.AudioStorage
 import com.dictara.gateway.repository.AudioMetaRepository
 import com.dictara.gateway.repository.SubmissionRepository
@@ -76,7 +77,7 @@ class AudioStorageIntegrationTest {
 
     @BeforeEach
     fun stubUpload() {
-        given(audioStorage.upload(any(), any(), any(), ArgumentMatchers.anyLong(), any())).willReturn(FAKE_URI)
+        given(audioStorage.upload(any(), any(), any(), ArgumentMatchers.anyLong(), any())).willReturn(AudioRef.Gcs(FAKE_URI))
     }
 
     @Test

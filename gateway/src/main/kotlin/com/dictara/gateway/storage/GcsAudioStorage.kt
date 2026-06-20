@@ -47,25 +47,25 @@ class GcsAudioStorage(props: DictaraProperties) : AudioStorage {
     /** Uploads [inputStream] to `gs://{bucket}/audio/{audioMetaId}/{fileName}` and returns the gs:// URI.
      *  Uses a resumable streaming upload (no full-file direct-buffer allocation) — required
      *  to avoid OOM when many large files are uploaded concurrently. */
-    override fun upload(audioMetaId: UUID, fileName: String, inputStream: InputStream, sizeBytes: Long, contentType: String): String {
+    override fun upload(audioMetaId: UUID, fileName: String, inputStream: InputStream, sizeBytes: Long, contentType: String): AudioRef.Gcs {
         val objectName = "audio/$audioMetaId/$fileName"
         val blobInfo = BlobInfo.newBuilder(BlobId.of(bucket, objectName)).setContentType(contentType).build()
         storage.createFrom(blobInfo, inputStream)
         val uri = "gs://$bucket/$objectName"
         log.info("Uploaded audio to {} ({} bytes)", uri, sizeBytes)
-        return uri
+        return AudioRef.Gcs(uri)
     }
 
-    /** Downloads the object at [storageUri] and returns a readable [InputStream], or null if
-     *  the object is unavailable (expired by lifecycle rule, missing, or access denied). */
-    override fun download(audioMetaId: UUID, storageUri: String?): InputStream? {
-        if (storageUri == null) return null
-        return try {
-            val path = storageUri.removePrefix("gs://$bucket/")
+    /** Downloads the GCS object referenced by [ref]. Returns null if the object is unavailable
+     *  (expired by lifecycle rule, missing, or access denied). Returns null for non-GCS refs. */
+    override fun download(ref: AudioRef): InputStream? = when (ref) {
+        is AudioRef.Gcs -> try {
+            val path = ref.uri.removePrefix("gs://$bucket/")
             Channels.newInputStream(storage.reader(BlobId.of(bucket, path)))
         } catch (e: Exception) {
-            log.warn("Audio download failed for {}: {}", storageUri, e.message)
+            log.warn("Audio download failed for {}: {}", ref.uri, e.message)
             null
         }
+        is AudioRef.Db -> null
     }
 }

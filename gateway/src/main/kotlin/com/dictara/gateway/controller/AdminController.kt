@@ -3,6 +3,7 @@ package com.dictara.gateway.controller
 import com.dictara.gateway.entity.AudioMetaEntity
 import com.dictara.gateway.repository.AudioContentRepository
 import com.dictara.gateway.repository.AudioMetaRepository
+import com.dictara.gateway.storage.AudioRef
 import com.dictara.gateway.storage.GcsAudioStorage
 import jakarta.servlet.http.HttpServletRequest
 import org.slf4j.LoggerFactory
@@ -76,8 +77,8 @@ class AdminController(
                 }
 
                 log.info("migrate-audio: uploading {} ({} bytes, {})", id, content.data.size, meta.originalName)
-                val uri = storage.upload(id, meta.originalName, content.data.inputStream(), content.data.size.toLong(), meta.contentType)
-                    ?: throw IllegalStateException("GcsAudioStorage.upload returned null")
+                val ref = storage.upload(id, meta.originalName, content.data.inputStream(), content.data.size.toLong(), meta.contentType)
+                val uri = ref.storageUri!!
 
                 audioMetaRepo.save(AudioMetaEntity(
                     id = meta.id, user = meta.user, originalName = meta.originalName,
