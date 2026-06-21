@@ -35,10 +35,16 @@ abstract class AbstractSharedContextIntegrationTest {
     @BeforeEach
     fun cleanSharedState() {
         SharedTestInfrastructure.wireMock.resetAll()
-        // CASCADE truncates the entire FK chain:
-        // audio_meta → submissions → stage_attempts, telegram_deliveries, transcripts, diarizations, summaries
-        // The ACCESS EXCLUSIVE lock waits for any concurrent OrchestratorService transaction to finish,
-        // avoiding the FK violation that sequential DELETEs would race with.
-        jdbcTemplate.execute("TRUNCATE audio_meta CASCADE")
+        // Retry on deadlock: OrchestratorService background threads may hold locks on submissions/audio_meta
+        // while TRUNCATE CASCADE tries to acquire exclusive locks on both tables simultaneously.
+        repeat(5) { attempt ->
+            try {
+                jdbcTemplate.execute("TRUNCATE audio_meta CASCADE")
+                return
+            } catch (e: Exception) {
+                if (attempt == 4) throw e
+                Thread.sleep(300)
+            }
+        }
     }
 }
