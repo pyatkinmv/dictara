@@ -1,5 +1,6 @@
 package com.dictara.gateway.repository
 
+import com.dictara.gateway.SharedTestInfrastructure
 import com.dictara.gateway.entity.AudioMetaEntity
 import com.dictara.gateway.entity.SubmissionEntity
 import com.dictara.gateway.entity.UserEntity
@@ -10,24 +11,18 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
-import org.testcontainers.containers.PostgreSQLContainer
-import org.testcontainers.junit.jupiter.Container
-import org.testcontainers.junit.jupiter.Testcontainers
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Testcontainers
 class RepositorySmokeTest {
 
     companion object {
-        @Container @JvmField
-        val postgres = PostgreSQLContainer<Nothing>("postgres:16")
-
         @DynamicPropertySource @JvmStatic
         fun props(registry: DynamicPropertyRegistry) {
-            registry.add("spring.datasource.url") { postgres.jdbcUrl }
-            registry.add("spring.datasource.username") { postgres.username }
-            registry.add("spring.datasource.password") { postgres.password }
+            val pg = SharedTestInfrastructure.postgres
+            registry.add("spring.datasource.url") { pg.jdbcUrl }
+            registry.add("spring.datasource.username") { pg.username }
+            registry.add("spring.datasource.password") { pg.password }
             registry.add("spring.jpa.hibernate.ddl-auto") { "none" }
             registry.add("spring.flyway.enabled") { "true" }
         }
