@@ -84,6 +84,7 @@ jobs:
             if [ "$MONITORING_CHANGED" = "true" ]; then
               docker compose up -d --force-recreate prometheus loki promtail
             fi
+            docker image prune -f
         env:
           GATEWAY_CHANGED: ${{ steps.changes.outputs.gateway }}
           BOT_CHANGED: ${{ steps.changes.outputs.tg_bot }}
