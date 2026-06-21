@@ -50,8 +50,6 @@ class AudioStorageIntegrationTest : AbstractSharedContextIntegrationTest() {
         private const val FAKE_URI = "gs://test-bucket/audio/stub-key/audio.m4a"
     }
 
-    private val wireMock get() = SharedTestInfrastructure.wireMock
-
     @BeforeEach
     fun stubUpload() {
         given(audioStorage.upload(any(), any(), any(), ArgumentMatchers.anyLong(), any()))

@@ -43,8 +43,6 @@ class DeduplicationIntegrationTest : AbstractSharedContextIntegrationTest() {
         private const val DONE_STUB = """{"status":"done","duration_s":0.1,"result":{"formatted_text":"test","audio_duration_s":1.0,"segments":[{"start":0.0,"end":1.0,"text":"test"}]}}"""
     }
 
-    private val wireMock get() = SharedTestInfrastructure.wireMock
-
     @BeforeEach
     fun setup() {
         wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
