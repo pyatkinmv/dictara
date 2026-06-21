@@ -1,51 +1,28 @@
 package com.dictara.gateway.service
 
-import com.dictara.gateway.SharedTestInfrastructure
+import com.dictara.gateway.AbstractSharedContextIntegrationTest
 import com.dictara.gateway.entity.AudioMetaEntity
 import com.dictara.gateway.entity.SubmissionEntity
 import com.dictara.gateway.entity.UserEntity
 import com.dictara.gateway.repository.*
+import com.dictara.gateway.storage.AudioStorage
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.context.SpringBootTest.WebEnvironment.NONE
-import javax.sql.DataSource
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
+import org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT
+import org.springframework.boot.test.mock.mockito.MockBean
 import java.util.UUID
 
-@SpringBootTest(webEnvironment = NONE)
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-class SubmissionStateServiceTest {
+@SpringBootTest(webEnvironment = RANDOM_PORT)
+class SubmissionStateServiceTest : AbstractSharedContextIntegrationTest() {
 
-    companion object {
-        @DynamicPropertySource @JvmStatic
-        fun props(registry: DynamicPropertyRegistry) {
-            val pg = SharedTestInfrastructure.postgres
-            registry.add("spring.datasource.url") { pg.jdbcUrl }
-            registry.add("spring.datasource.username") { pg.username }
-            registry.add("spring.datasource.password") { pg.password }
-        }
-    }
+    @MockBean lateinit var audioStorage: AudioStorage
 
     @Autowired lateinit var stateService: SubmissionStateService
     @Autowired lateinit var userRepo: UserRepository
     @Autowired lateinit var audioMetaRepo: AudioMetaRepository
     @Autowired lateinit var submissionRepo: SubmissionRepository
-    @Autowired lateinit var dataSource: DataSource
-
-    @BeforeEach
-    fun cleanDb() {
-        dataSource.connection.use { conn ->
-            conn.createStatement().execute(
-                "TRUNCATE TABLE stage_attempts, telegram_deliveries, submission_tags, " +
-                "diarizations, summaries, transcripts, audio_meta, submissions CASCADE"
-            )
-        }
-    }
 
     @Test
     fun `claimNextPendingSubmission returns null when no submissions exist`() {
@@ -62,7 +39,6 @@ class SubmissionStateServiceTest {
         val saved = submissionRepo.save(SubmissionEntity(user = user, audio = audio))
         val submissionId = saved.id!!
 
-        // loadSubmission returns entity with associations accessible (no LazyInitializationException)
         val loaded = stateService.loadSubmission(submissionId)
         assertThat(loaded.audio.originalName).isEqualTo("a.m4a")
         assertThat(loaded.user.displayName).isEqualTo("Test")
