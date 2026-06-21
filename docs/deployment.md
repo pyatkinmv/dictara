@@ -76,22 +76,68 @@ Set `GCS_UPLOADS_BUCKET` in gateway environment:
 GCS_UPLOADS_BUCKET=gen-lang-client-0721625814-uploads
 ```
 
-When unset (local dev), the gateway falls back to storing audio as a BLOB in the `audio_content` postgres table.
+`GCS_UPLOADS_BUCKET` is **required** — the legacy in-DB BLOB path (`audio_content` table) has been removed. Without it, audio uploads will fail.
 
 ---
 
-## CI/CD for the transcriber
+## GCS Maintenance Jobs
+
+Two background jobs keep the GCS bucket lean. Every run is recorded in the `job_runs` table (`job_name`, `status`, `rows_affected`, `finished_at`).
+
+| Job | Schedule (UTC) | What it does |
+|-----|---------------|--------------|
+| `dedup_storage_uris` | Daily 03:00 | Finds `audio_meta` rows with the same `content_hash` and rewrites them all to the oldest `storage_uri`, so duplicate GCS objects become unreferenced and are eventually deleted by the bucket lifecycle rule |
+| `cleanup_orphaned_gcs_objects` | Weekly Sunday 04:00 | Lists all objects in the bucket, deletes any not referenced by `audio_meta.storage_uri`. Skips objects younger than 1 hour (grace period for in-flight uploads) |
+
+These are no-ops when `GCS_UPLOADS_BUCKET` is not set.
+
+---
+
+## Upload Deduplication
+
+When a file is uploaded, the gateway computes a SHA-256 hash of its content and stores it in `audio_meta.content_hash`. On subsequent uploads of the same file (same hash, same model/diarize settings), the existing `job_id` is returned immediately — no re-transcription, no new GCS object.
+
+The daily `dedup_storage_uris` job further consolidates any rows that share a `content_hash` but ended up with different `storage_uri` values (e.g. uploaded before dedup was in place), pointing them all to the oldest URI.
+
+---
+
+## CI/CD Pipeline
+
+All pushes to `master` trigger: **test → build-images → deploy**.
+
+### gateway, tg-bot, app-material
+
+Images are built in GitHub Actions and pushed to GitHub Container Registry. The VM never builds images — it only pulls and runs them.
+
+**Path-based detection** — only changed services are rebuilt:
+
+| Source dir | Image |
+|------------|-------|
+| `gateway/**` | `ghcr.io/pyatkinmv/dictara/gateway:latest` |
+| `tg-bot/**` | `ghcr.io/pyatkinmv/dictara/tg-bot:latest` |
+| `app/**` | `ghcr.io/pyatkinmv/dictara/app-material:latest` |
+
+**Deploy step (SSH to VM):**
+```bash
+git pull
+docker compose pull <service>
+docker compose up -d --remove-orphans --force-recreate <service>
+```
+
+The registry is public; no credentials needed to pull from the VM.
+
+### transcriber (Cloud Run)
 
 When `transcriber/**` changes, GitHub Actions automatically:
 
 1. Authenticates to GCP using the `github-ci` service account (key stored as `GCP_SA_KEY` secret)
 2. Builds and pushes the Docker image to Artifact Registry — tagged both `:latest` and `:<git-sha>`
-3. Runs `gcloud run deploy transcriber --image ... --region europe-west4` — updates only the image; all other Cloud Run settings (GPU, memory, env vars, GCS mount) are preserved
+3. Runs `gcloud run deploy transcriber --image ... --region europe-west4` — updates only the image; all other Cloud Run settings (GPU, memory, env vars) are preserved
 
 **Service account**: `github-ci@gen-lang-client-0721625814.iam.gserviceaccount.com`
 **Roles**: `artifactregistry.writer`, `run.developer`, `iam.serviceAccountUser` (on the Compute Engine default SA)
 
-To verify a deploy succeeded, check that a new revision with the expected image SHA appeared:
+To verify a deploy succeeded:
 ```bash
 gcloud run revisions list --service transcriber --region europe-west4 --limit 5
 ```
