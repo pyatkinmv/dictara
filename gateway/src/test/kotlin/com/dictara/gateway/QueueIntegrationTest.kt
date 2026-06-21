@@ -41,7 +41,7 @@ class QueueIntegrationTest {
     @BeforeEach
     fun setup() {
         given(audioStorage.upload(any(), any(), any(), ArgumentMatchers.anyLong(), any()))
-            .willReturn(UploadResult(AudioRef("gs://test-bucket/test.m4a"), "testhash"))
+            .willReturn(UploadResult(AudioRef("gs://test-bucket/test.m4a"), ""))
         dataSource.connection.use { conn ->
             conn.createStatement().execute(
                 "TRUNCATE TABLE stage_attempts, telegram_deliveries, submission_tags, " +

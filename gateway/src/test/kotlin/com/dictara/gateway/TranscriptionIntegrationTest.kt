@@ -37,7 +37,7 @@ class TranscriptionIntegrationTest {
     @BeforeEach
     fun stubAudio() {
         given(audioStorage.upload(any(), any(), any(), ArgumentMatchers.anyLong(), any()))
-            .willReturn(UploadResult(AudioRef("gs://test-bucket/test.m4a"), "testhash"))
+            .willReturn(UploadResult(AudioRef("gs://test-bucket/test.m4a"), ""))
     }
 
     companion object {
