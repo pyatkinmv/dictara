@@ -154,6 +154,7 @@ jobs:
               docker compose up -d --force-recreate prometheus loki promtail
             fi
             docker system prune -f
+            docker builder prune -af
         env:
           GATEWAY_CHANGED: ${{ needs.build-images.outputs.gateway_changed }}
           BOT_CHANGED: ${{ needs.build-images.outputs.tg_bot_changed }}
