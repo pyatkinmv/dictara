@@ -9,7 +9,7 @@ import java.util.UUID
 
 interface AudioMetaRepository : JpaRepository<AudioMetaEntity, UUID> {
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Transactional
     @Query(nativeQuery = true, value = """
         UPDATE audio_meta am
