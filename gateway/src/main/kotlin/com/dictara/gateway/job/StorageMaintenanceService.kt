@@ -21,14 +21,14 @@ class StorageMaintenanceService(
         val ORPHAN_GRACE_PERIOD: Duration = Duration.ofHours(1)
     }
 
-    @Scheduled(cron = "0 30 20 * * *")
+    @Scheduled(cron = "0 30 16 * * *")
     fun deduplicateStorageUris() = jobTracker.tracked("dedup_storage_uris") {
         val updated = audioMetaRepo.deduplicateStorageUris()
         log.info("Dedup: {} audio_meta rows updated to canonical storage URI", updated)
         updated
     }
 
-    @Scheduled(cron = "0 0 21 * * *")
+    @Scheduled(cron = "0 0 17 * * *")
     fun cleanupOrphanedGcsObjects() = jobTracker.tracked("cleanup_orphaned_gcs_objects") {
         val referencedUris = audioMetaRepo.findAllStorageUris().toHashSet()
         log.info("GCS orphan cleanup: {} URIs referenced in DB", referencedUris.size)
