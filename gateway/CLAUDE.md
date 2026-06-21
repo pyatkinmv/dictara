@@ -64,6 +64,17 @@ queue_position = COUNT(pending submissions with createdAt < this.createdAt) + 1
 
 Returns `null` for `processing`, `summarizing`, `done`, `failed`.
 
+## Scheduled maintenance jobs
+
+Two background jobs run automatically to keep GCS storage lean:
+
+| Job | Schedule | What it does |
+|-----|----------|--------------|
+| `dedup_storage_uris` | Daily at 03:00 | Finds `audio_meta` rows with the same `content_hash` and updates them all to share the oldest `storage_uri`, making duplicate GCS objects unreferenced |
+| `cleanup_orphaned_gcs_objects` | Weekly Sunday at 04:00 | Lists all objects in the GCS bucket, deletes any not referenced by `audio_meta.storage_uri`. Skips objects younger than 1 hour (grace period to avoid race with in-flight uploads) |
+
+Every run is recorded in the `job_runs` table (`status`: `running` → `completed`/`failed`, `rows_affected`, `finished_at`). Use `JobTracker.tracked(name) { ... }` to wrap any future job in the same way — one line, no boilerplate.
+
 ## Key files
 
 | File | Purpose |
@@ -74,6 +85,8 @@ Returns `null` for `processing`, `summarizing`, `done`, `failed`.
 | `ExportController.kt` | GET /export — streams ZIP of all user transcriptions (transcript + summary + optional audio) |
 | `TranscriberClient.kt` | HTTP client for transcriber service |
 | `AudioStorageClient.kt` | Uploads audio to GCS for the reference-based submit path (active only when `dictara.storage.gcs.bucket` is set) |
+| `job/JobTracker.kt` | Wraps any block in a `job_runs` DB record (running → completed/failed) |
+| `job/StorageMaintenanceService.kt` | Two `@Scheduled` GCS maintenance jobs |
 | `db/migration/` | Flyway migrations |
 
 ## Build

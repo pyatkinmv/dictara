@@ -11,6 +11,8 @@ import java.io.InputStream
 import java.nio.channels.Channels
 import java.security.DigestInputStream
 import java.security.MessageDigest
+import java.time.Instant
+import java.time.OffsetDateTime
 import java.util.UUID
 
 /** Uploads submitted audio files to a GCS bucket so they can be referenced by URI
@@ -48,5 +50,26 @@ class GcsAudioStorage(props: DictaraProperties) : AudioStorage {
     } catch (e: Exception) {
         log.warn("Audio download failed for {}: {}", ref.uri, e.message)
         null
+    }
+
+    /** Lists all objects under the `audio/` prefix. Returns empty list when bucket is not configured. */
+    override fun listObjects(): List<StorageObject> {
+        if (bucket.isEmpty()) return emptyList()
+        return storage.list(bucket, Storage.BlobListOption.prefix("audio/"))
+            .iterateAll()
+            .map { blob ->
+                StorageObject(
+                    uri = "gs://$bucket/${blob.name}",
+                    createdAt = (blob.createTimeOffsetDateTime ?: OffsetDateTime.MIN).toInstant(),
+                )
+            }
+    }
+
+    /** Deletes the GCS object referenced by [ref]. No-op when bucket is not configured. */
+    override fun delete(ref: AudioRef) {
+        if (bucket.isEmpty()) return
+        val objectName = ref.uri.removePrefix("gs://$bucket/")
+        val deleted = storage.delete(BlobId.of(bucket, objectName))
+        if (!deleted) log.warn("GCS object not found for deletion: {}", ref.uri)
     }
 }
