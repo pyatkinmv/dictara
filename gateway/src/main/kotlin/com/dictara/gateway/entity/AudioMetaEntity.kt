@@ -15,6 +15,5 @@ class AudioMetaEntity(
     @Column(name = "size_bytes", nullable = false) val sizeBytes: Long,
     @Column(name = "created_at", nullable = false, updatable = false) val createdAt: Instant = Instant.now(),
     @Column(name = "storage_uri") val storageUri: String? = null,
-    /** SHA-256 hex digest of the raw file bytes, set on upload. Null for records created before V12 migration. */
-    @Column(name = "content_hash") val contentHash: String? = null,
+    @Column(name = "content_hash", nullable = false) val contentHash: String,
 )

@@ -165,7 +165,7 @@ class TranscribeController(
             id = audioMetaId, user = user, originalName = originalName,
             contentType = contentType, sizeBytes = file.size,
             storageUri = uploadResult.ref.uri,
-            contentHash = contentHash.ifEmpty { null },
+            contentHash = contentHash,
         ))
         log.info("Audio {} stored in GCS at {}", audioMetaId, uploadResult.ref.uri)
 

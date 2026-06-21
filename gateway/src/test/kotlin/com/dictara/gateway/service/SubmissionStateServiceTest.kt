@@ -62,7 +62,7 @@ class SubmissionStateServiceTest {
     fun `loadSubmission returns entity with EAGER associations accessible outside transaction`() {
         val user = userRepo.save(UserEntity(displayName = "Test"))
         val audio = audioMetaRepo.save(AudioMetaEntity(
-            user = user, originalName = "a.m4a", contentType = "audio/mp4", sizeBytes = 100,
+            user = user, originalName = "a.m4a", contentType = "audio/mp4", sizeBytes = 100, contentHash = "abc123",
         ))
         val saved = submissionRepo.save(SubmissionEntity(user = user, audio = audio))
         val submissionId = saved.id!!
