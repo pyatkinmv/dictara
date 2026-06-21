@@ -11,10 +11,13 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
+import org.mockito.ArgumentMatchers
 import org.mockito.Mockito.*
 import org.mockito.junit.jupiter.MockitoExtension
 import java.time.Instant
 import java.util.UUID
+
+private fun <T> any(): T { ArgumentMatchers.any<T>(); @Suppress("UNCHECKED_CAST") return null as T }
 
 @ExtendWith(MockitoExtension::class)
 class StorageMaintenanceServiceTest {

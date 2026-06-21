@@ -4,8 +4,10 @@ import com.dictara.gateway.SharedTestInfrastructure
 import com.dictara.gateway.entity.AudioMetaEntity
 import com.dictara.gateway.entity.UserEntity
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.test.context.DynamicPropertyRegistry
@@ -30,6 +32,12 @@ class AudioMetaRepositoryDeduplicationTest {
 
     @Autowired lateinit var userRepo: UserRepository
     @Autowired lateinit var audioMetaRepo: AudioMetaRepository
+    @Autowired lateinit var jdbcTemplate: JdbcTemplate
+
+    @BeforeEach
+    fun clean() {
+        jdbcTemplate.execute("TRUNCATE audio_meta CASCADE")
+    }
 
     @Test
     fun `deduplicateStorageUris points all duplicates to oldest storage URI`() {
