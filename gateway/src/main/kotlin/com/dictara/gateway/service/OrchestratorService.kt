@@ -127,8 +127,8 @@ class OrchestratorService(
             val totalAttempts = stateService.countAttempts(submissionId, "transcription")
             if (totalAttempts < 3) {
                 log.warn("Transcription attempt ${attempt.attemptNum} failed for submission $submissionId: ${e.message} — retrying ($totalAttempts/3)")
-                // Retrying — job stays in 'processing', do NOT dispatch next
                 Thread.sleep(props.transcriber.pollIntervalMs * 2)
+                if (!stateService.submissionExists(submissionId)) return
                 runTranscription(submission)
             } else {
                 log.error("Transcription failed for submission $submissionId after $totalAttempts attempts: ${e.message}")
@@ -213,6 +213,7 @@ class OrchestratorService(
             val totalAttempts = stateService.countAttempts(submissionId, "summarization")
             if (totalAttempts < 3) {
                 Thread.sleep(2000)
+                if (!stateService.submissionExists(submissionId)) return
                 runSummarization(submissionId, language, formattedText, mode)
             } else {
                 // Summarization failed — submission is still done (transcript is usable)

@@ -143,6 +143,8 @@ class SubmissionStateService(
     fun countAttempts(submissionId: UUID, stage: String): Int =
         stageAttemptRepo.countBySubmissionIdAndStage(submissionId, stage).toInt()
 
+    fun submissionExists(submissionId: UUID): Boolean = submissionRepo.existsById(submissionId)
+
     /** Loads a submission with its EAGER associations (safe to access on worker thread). */
     @Transactional(readOnly = true)
     fun loadSubmission(submissionId: UUID): SubmissionEntity =
