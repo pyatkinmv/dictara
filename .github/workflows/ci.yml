@@ -33,10 +33,17 @@ jobs:
           pip install fastapi httpx pytest python-multipart prometheus-fastapi-instrumentator prometheus_client
           pytest -v
 
-  deploy:
+  build-images:
     needs: test
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      gateway_changed: ${{ steps.changes.outputs.gateway }}
+      tg_bot_changed: ${{ steps.changes.outputs.tg_bot }}
+      app_changed: ${{ steps.changes.outputs.app }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -52,6 +59,70 @@ jobs:
               - 'tg-bot/**'
             app:
               - 'app/**'
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push gateway
+        if: steps.changes.outputs.gateway == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./gateway
+          push: true
+          tags: ghcr.io/pyatkinmv/dictara/gateway:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ github.event.head_commit.timestamp }}
+
+      - name: Build and push tg-bot
+        if: steps.changes.outputs.tg_bot == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./tg-bot
+          push: true
+          tags: ghcr.io/pyatkinmv/dictara/tg-bot:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ github.event.head_commit.timestamp }}
+
+      - name: Build and push app-material
+        if: steps.changes.outputs.app == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./app
+          push: true
+          tags: ghcr.io/pyatkinmv/dictara/app-material:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            FLUTTER_TARGET=lib/material/main_material.dart
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ github.event.head_commit.timestamp }}
+
+  deploy:
+    needs: [test, build-images]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
             transcriber:
               - 'transcriber/**'
             monitoring:
@@ -68,27 +139,25 @@ jobs:
           script: |
             cd ~/dictara
             git pull
-            export GIT_COMMIT=$(git rev-parse --short HEAD)
-            export BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
             bash scripts/set-limits.sh
             set -a; source .env.limits; set +a
             if [ "$GATEWAY_CHANGED" = "true" ]; then
-              docker compose build gateway && docker compose up -d --remove-orphans --force-recreate gateway
+              docker compose pull gateway && docker compose up -d --remove-orphans --force-recreate gateway
             fi
             if [ "$BOT_CHANGED" = "true" ]; then
-              docker compose build tg-bot && docker compose up -d --remove-orphans --force-recreate tg-bot
+              docker compose pull tg-bot && docker compose up -d --remove-orphans --force-recreate tg-bot
             fi
             if [ "$APP_CHANGED" = "true" ]; then
-              docker compose build app-material && docker compose up -d --remove-orphans --force-recreate app-material
+              docker compose pull app-material && docker compose up -d --remove-orphans --force-recreate app-material
             fi
             if [ "$MONITORING_CHANGED" = "true" ]; then
               docker compose up -d --force-recreate prometheus loki promtail
             fi
             docker system prune -f
         env:
-          GATEWAY_CHANGED: ${{ steps.changes.outputs.gateway }}
-          BOT_CHANGED: ${{ steps.changes.outputs.tg_bot }}
-          APP_CHANGED: ${{ steps.changes.outputs.app }}
+          GATEWAY_CHANGED: ${{ needs.build-images.outputs.gateway_changed }}
+          BOT_CHANGED: ${{ needs.build-images.outputs.tg_bot_changed }}
+          APP_CHANGED: ${{ needs.build-images.outputs.app_changed }}
           MONITORING_CHANGED: ${{ steps.changes.outputs.monitoring }}
 
       - name: Authenticate to GCP
@@ -118,7 +187,7 @@ jobs:
             --region europe-west4
 
       - name: Purge CloudFlare cache
-        if: steps.changes.outputs.app == 'true'
+        if: needs.build-images.outputs.app_changed == 'true'
         run: |
           curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${{ secrets.CF_ZONE_ID }}/purge_cache" \
             -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
