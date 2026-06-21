@@ -2,9 +2,7 @@ package com.dictara.gateway.controller
 
 import com.dictara.gateway.entity.*
 import com.dictara.gateway.repository.*
-import com.dictara.gateway.storage.AudioRef
 import com.dictara.gateway.storage.AudioStorage
-import com.dictara.gateway.storage.UploadResult
 import com.dictara.gateway.service.OrchestratorService
 import com.dictara.gateway.service.UserService
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -166,12 +164,10 @@ class TranscribeController(
         val audio = audioMetaRepo.save(AudioMetaEntity(
             id = audioMetaId, user = user, originalName = originalName,
             contentType = contentType, sizeBytes = file.size,
-            storageUri = uploadResult.ref.storageUri,
+            storageUri = uploadResult.ref.uri,
             contentHash = contentHash.ifEmpty { null },
         ))
-        if (uploadResult.ref is AudioRef.Gcs) {
-            log.info("Audio {} stored in GCS at {}", audioMetaId, (uploadResult.ref as AudioRef.Gcs).uri)
-        }
+        log.info("Audio {} stored in GCS at {}", audioMetaId, uploadResult.ref.uri)
 
         val submission = submissionRepo.save(SubmissionEntity(
             user = user, audio = audio, model = resolvedModel, language = language,

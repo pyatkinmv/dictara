@@ -3,15 +3,22 @@ package com.dictara.gateway
 import com.dictara.gateway.repository.StageAttemptRepository
 import com.dictara.gateway.repository.SubmissionRepository
 import com.dictara.gateway.repository.TranscriptRepository
+import com.dictara.gateway.storage.AudioRef
+import com.dictara.gateway.storage.AudioStorage
+import com.dictara.gateway.storage.UploadResult
 import com.github.tomakehurst.wiremock.client.WireMock.*
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import org.mockito.ArgumentMatchers
+import org.mockito.BDDMockito.given
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT
+import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.*
@@ -23,6 +30,8 @@ import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.util.UUID
 
+private fun <T> any(): T { ArgumentMatchers.any<T>(); @Suppress("UNCHECKED_CAST") return null as T }
+
 @SpringBootTest(webEnvironment = RANDOM_PORT)
 @Testcontainers
 class PersistenceIntegrationTest {
@@ -31,6 +40,13 @@ class PersistenceIntegrationTest {
     @Autowired lateinit var submissionRepo: SubmissionRepository
     @Autowired lateinit var transcriptRepo: TranscriptRepository
     @Autowired lateinit var stageAttemptRepo: StageAttemptRepository
+    @MockBean lateinit var audioStorage: AudioStorage
+
+    @BeforeEach
+    fun stubAudio() {
+        given(audioStorage.upload(any(), any(), any(), ArgumentMatchers.anyLong(), any()))
+            .willReturn(UploadResult(AudioRef("gs://test-bucket/test.m4a"), "testhash"))
+    }
 
     companion object {
         @Container @JvmField val postgres = PostgreSQLContainer<Nothing>("postgres:16")

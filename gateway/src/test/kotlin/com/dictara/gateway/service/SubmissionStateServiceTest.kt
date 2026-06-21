@@ -47,7 +47,7 @@ class SubmissionStateServiceTest {
         dataSource.connection.use { conn ->
             conn.createStatement().execute(
                 "TRUNCATE TABLE stage_attempts, telegram_deliveries, submission_tags, " +
-                "diarizations, summaries, transcripts, audio_content, audio_meta, submissions CASCADE"
+                "diarizations, summaries, transcripts, audio_meta, submissions CASCADE"
             )
         }
     }

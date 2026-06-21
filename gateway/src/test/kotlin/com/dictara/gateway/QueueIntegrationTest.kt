@@ -1,5 +1,8 @@
 package com.dictara.gateway
 
+import com.dictara.gateway.storage.AudioRef
+import com.dictara.gateway.storage.AudioStorage
+import com.dictara.gateway.storage.UploadResult
 import com.github.tomakehurst.wiremock.client.WireMock.*
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension
@@ -7,9 +10,12 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import org.mockito.ArgumentMatchers
+import org.mockito.BDDMockito.given
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT
+import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.*
@@ -22,19 +28,24 @@ import org.testcontainers.junit.jupiter.Testcontainers
 import java.util.UUID
 import javax.sql.DataSource
 
+private fun <T> any(): T { ArgumentMatchers.any<T>(); @Suppress("UNCHECKED_CAST") return null as T }
+
 @SpringBootTest(webEnvironment = RANDOM_PORT)
 @Testcontainers
 class QueueIntegrationTest {
 
     @Autowired lateinit var rest: TestRestTemplate
     @Autowired lateinit var dataSource: DataSource
+    @MockBean lateinit var audioStorage: AudioStorage
 
     @BeforeEach
-    fun cleanDb() {
+    fun setup() {
+        given(audioStorage.upload(any(), any(), any(), ArgumentMatchers.anyLong(), any()))
+            .willReturn(UploadResult(AudioRef("gs://test-bucket/test.m4a"), "testhash"))
         dataSource.connection.use { conn ->
             conn.createStatement().execute(
                 "TRUNCATE TABLE stage_attempts, telegram_deliveries, submission_tags, " +
-                "diarizations, summaries, transcripts, audio_content, audio_meta, submissions CASCADE"
+                "diarizations, summaries, transcripts, audio_meta, submissions CASCADE"
             )
         }
     }

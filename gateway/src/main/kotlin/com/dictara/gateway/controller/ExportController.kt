@@ -82,8 +82,8 @@ class ExportController(
 
                     // audio file (optional) — skip silently if unavailable (expired/not found)
                     if (includeAudio) {
-                        val ref = AudioRef.from(submission.audio.id!!, submission.audio.storageUri)
-                        audioStorage.download(ref)?.use { audioStream ->
+                        val storageUri = submission.audio.storageUri
+                        if (storageUri != null) audioStorage.download(AudioRef(storageUri))?.use { audioStream ->
                             zip.putNextEntry(ZipEntry("$folderName/${submission.audio.originalName}"))
                             audioStream.copyTo(zip)
                             zip.closeEntry()

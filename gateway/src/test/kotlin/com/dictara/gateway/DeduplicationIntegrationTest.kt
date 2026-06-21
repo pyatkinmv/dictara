@@ -52,7 +52,7 @@ class DeduplicationIntegrationTest : AbstractSharedContextIntegrationTest() {
         wireMock.stubFor(get(urlEqualTo("/jobs/stub-job"))
             .willReturn(okJson("""{"status":"processing"}""")))
         given(audioStorage.upload(any(), any(), any(), ArgumentMatchers.anyLong(), any()))
-            .willReturn(UploadResult(AudioRef.Gcs(FAKE_URI), HASH_A))
+            .willReturn(UploadResult(AudioRef(FAKE_URI), HASH_A))
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
@@ -158,7 +158,7 @@ class DeduplicationIntegrationTest : AbstractSharedContextIntegrationTest() {
         val first = submit()
 
         given(audioStorage.upload(any(), any(), any(), ArgumentMatchers.anyLong(), any()))
-            .willReturn(UploadResult(AudioRef.Gcs(FAKE_URI), HASH_B))
+            .willReturn(UploadResult(AudioRef(FAKE_URI), HASH_B))
         val second = submit()
 
         awaitTranscriberCalls(2)

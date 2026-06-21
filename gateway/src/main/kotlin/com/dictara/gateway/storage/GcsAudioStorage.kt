@@ -6,10 +6,6 @@ import com.google.cloud.storage.BlobInfo
 import com.google.cloud.storage.Storage
 import com.google.cloud.storage.StorageOptions
 import org.slf4j.LoggerFactory
-import org.springframework.context.annotation.Condition
-import org.springframework.context.annotation.ConditionContext
-import org.springframework.context.annotation.Conditional
-import org.springframework.core.type.AnnotatedTypeMetadata
 import org.springframework.stereotype.Component
 import java.io.InputStream
 import java.nio.channels.Channels
@@ -17,30 +13,12 @@ import java.security.DigestInputStream
 import java.security.MessageDigest
 import java.util.UUID
 
-/** Matches only when `dictara.storage.gcs.bucket` resolves to a non-blank value.
- *  A plain `@ConditionalOnProperty` would also match the empty string that
- *  `${GCS_UPLOADS_BUCKET:}` resolves to when the env var is unset (its default
- *  "not equal to false" check treats "" as present), creating this bean — and
- *  making it issue real GCS calls — even when no bucket is configured. */
-internal class GcsBucketConfiguredCondition : Condition {
-    override fun matches(context: ConditionContext, metadata: AnnotatedTypeMetadata) =
-        !context.environment.getProperty("dictara.storage.gcs.bucket").isNullOrBlank()
-}
-
-@Deprecated("Used only by DatabaseAudioStorage which is itself deprecated — GCS is now always required")
-internal class GcsBucketNotConfiguredCondition : Condition {
-    override fun matches(context: ConditionContext, metadata: AnnotatedTypeMetadata) =
-        context.environment.getProperty("dictara.storage.gcs.bucket").isNullOrBlank()
-}
-
 /** Uploads submitted audio files to a GCS bucket so they can be referenced by URI
  *  instead of streamed over HTTP (Cloud Run enforces a hard 32 MiB request body limit).
- *  Active only when `dictara.storage.gcs.bucket` is configured.
  *
  *  Uploaded objects are NOT deleted by the application — the bucket has a 90-day
  *  lifecycle rule that expires them automatically. */
 @Component
-@Conditional(GcsBucketConfiguredCondition::class)
 class GcsAudioStorage(props: DictaraProperties) : AudioStorage {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -59,19 +37,16 @@ class GcsAudioStorage(props: DictaraProperties) : AudioStorage {
         val uri = "gs://$bucket/$objectName"
         val contentHash = digest.digest().joinToString("") { "%02x".format(it) }
         log.info("Uploaded audio to {} ({} bytes, sha256={})", uri, sizeBytes, contentHash)
-        return UploadResult(AudioRef.Gcs(uri), contentHash)
+        return UploadResult(AudioRef(uri), contentHash)
     }
 
     /** Downloads the GCS object referenced by [ref]. Returns null if the object is unavailable
-     *  (expired by lifecycle rule, missing, or access denied). Returns null for non-GCS refs. */
-    override fun download(ref: AudioRef): InputStream? = when (ref) {
-        is AudioRef.Gcs -> try {
-            val path = ref.uri.removePrefix("gs://$bucket/")
-            Channels.newInputStream(storage.reader(BlobId.of(bucket, path)))
-        } catch (e: Exception) {
-            log.warn("Audio download failed for {}: {}", ref.uri, e.message)
-            null
-        }
-        is AudioRef.Db -> null
+     *  (expired by lifecycle rule, missing, or access denied). */
+    override fun download(ref: AudioRef): InputStream? = try {
+        val path = ref.uri.removePrefix("gs://$bucket/")
+        Channels.newInputStream(storage.reader(BlobId.of(bucket, path)))
+    } catch (e: Exception) {
+        log.warn("Audio download failed for {}: {}", ref.uri, e.message)
+        null
     }
 }

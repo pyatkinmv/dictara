@@ -1,6 +1,5 @@
 package com.dictara.gateway
 
-import com.dictara.gateway.repository.AudioContentRepository
 import com.dictara.gateway.storage.AudioRef
 import com.dictara.gateway.storage.AudioStorage
 import com.dictara.gateway.storage.UploadResult
@@ -45,7 +44,6 @@ class AudioStorageIntegrationTest : AbstractSharedContextIntegrationTest() {
     @Autowired lateinit var rest: TestRestTemplate
     @Autowired lateinit var submissionRepo: SubmissionRepository
     @Autowired lateinit var audioMetaRepo: AudioMetaRepository
-    @Autowired lateinit var audioContentRepo: AudioContentRepository
     @MockBean lateinit var audioStorage: AudioStorage
 
     companion object {
@@ -57,7 +55,7 @@ class AudioStorageIntegrationTest : AbstractSharedContextIntegrationTest() {
     @BeforeEach
     fun stubUpload() {
         given(audioStorage.upload(any(), any(), any(), ArgumentMatchers.anyLong(), any()))
-            .willReturn(UploadResult(AudioRef.Gcs(FAKE_URI), "fake-sha256-hash"))
+            .willReturn(UploadResult(AudioRef(FAKE_URI), "fake-sha256-hash"))
     }
 
     @Test
@@ -75,7 +73,6 @@ class AudioStorageIntegrationTest : AbstractSharedContextIntegrationTest() {
 
         val meta = audioMetaRepo.findById(submission.audio.id!!).orElseThrow()
         assertThat(meta.storageUri).isEqualTo(FAKE_URI)
-        assertThat(audioContentRepo.findById(meta.id!!).isPresent).isFalse()
 
         awaitTranscriberSubmission(FAKE_URI)
     }
