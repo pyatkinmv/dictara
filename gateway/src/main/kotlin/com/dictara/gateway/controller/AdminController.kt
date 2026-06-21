@@ -41,10 +41,10 @@ class AdminController(
         for (id in ids) {
             try {
                 val meta = audioMetaRepo.findById(id).orElse(null)
-                    ?: run { log.warn("Backfill: audio_meta {} not found", id); skipped++; continue }
+                if (meta == null) { log.warn("Backfill: audio_meta {} not found", id); skipped++; continue }
                 if (meta.contentHash != null) { skipped++; continue }
                 val stream = audioStorage.download(AudioRef(meta.storageUri!!))
-                    ?: run { log.warn("Backfill: GCS file not found for {}", id); skipped++; continue }
+                if (stream == null) { log.warn("Backfill: GCS file not found for {}", id); skipped++; continue }
                 val hash = stream.use { computeHash(it) }
                 audioMetaRepo.updateContentHash(id, hash)
                 log.info("Backfilled hash for {} → {}", id, hash)
