@@ -41,6 +41,7 @@ interface SubmissionRepository : JpaRepository<SubmissionEntity, UUID> {
         AND s.summaryMode = :summaryMode
         AND s.status <> 'failed'
         ORDER BY s.createdAt DESC
+        LIMIT 1
     """)
     fun findDuplicate(
         @Param("userId") userId: UUID,
