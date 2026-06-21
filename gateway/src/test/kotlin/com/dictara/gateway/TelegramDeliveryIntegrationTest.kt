@@ -5,12 +5,9 @@ import com.dictara.gateway.storage.AudioRef
 import com.dictara.gateway.storage.AudioStorage
 import com.dictara.gateway.storage.UploadResult
 import com.github.tomakehurst.wiremock.client.WireMock.*
-import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
-import com.github.tomakehurst.wiremock.junit5.WireMockExtension
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.extension.RegisterExtension
 import org.mockito.ArgumentMatchers
 import org.mockito.BDDMockito.given
 import org.springframework.beans.factory.annotation.Autowired
@@ -20,19 +17,13 @@ import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.*
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.util.LinkedMultiValueMap
-import org.testcontainers.containers.PostgreSQLContainer
-import org.testcontainers.junit.jupiter.Container
-import org.testcontainers.junit.jupiter.Testcontainers
 import java.util.UUID
 
 private fun <T> any(): T { ArgumentMatchers.any<T>(); @Suppress("UNCHECKED_CAST") return null as T }
 
 @SpringBootTest(webEnvironment = RANDOM_PORT)
-@Testcontainers
-class TelegramDeliveryIntegrationTest {
+class TelegramDeliveryIntegrationTest : AbstractSharedContextIntegrationTest() {
 
     @Autowired lateinit var rest: TestRestTemplate
     @Autowired lateinit var telegramDeliveryRepo: TelegramDeliveryRepository
@@ -42,23 +33,6 @@ class TelegramDeliveryIntegrationTest {
     fun stubAudio() {
         given(audioStorage.upload(any(), any(), any(), ArgumentMatchers.anyLong(), any()))
             .willReturn(UploadResult(AudioRef("gs://test-bucket/test.m4a"), ""))
-    }
-
-    companion object {
-        @Container @JvmField val postgres = PostgreSQLContainer<Nothing>("postgres:16")
-
-        @RegisterExtension @JvmField
-        val wireMock: WireMockExtension = WireMockExtension.newInstance()
-            .options(wireMockConfig().dynamicPort()).build()
-
-        @DynamicPropertySource @JvmStatic
-        fun props(registry: DynamicPropertyRegistry) {
-            registry.add("spring.datasource.url") { postgres.jdbcUrl }
-            registry.add("spring.datasource.username") { postgres.username }
-            registry.add("spring.datasource.password") { postgres.password }
-            registry.add("dictara.transcriber.url") { wireMock.baseUrl() }
-            registry.add("dictara.transcriber.poll-interval-ms") { "100" }
-        }
     }
 
     private fun fakeAudio() = object : ByteArrayResource(ByteArray(8)) {

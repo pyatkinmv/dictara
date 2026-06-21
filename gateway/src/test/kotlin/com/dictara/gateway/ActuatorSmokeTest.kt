@@ -9,9 +9,6 @@ import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.http.HttpStatus
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
-import org.testcontainers.containers.PostgreSQLContainer
-import org.testcontainers.junit.jupiter.Container
-import org.testcontainers.junit.jupiter.Testcontainers
 
 @SpringBootTest(
     webEnvironment = RANDOM_PORT,
@@ -20,20 +17,17 @@ import org.testcontainers.junit.jupiter.Testcontainers
         "management.prometheus.metrics.export.enabled=true"
     ]
 )
-@Testcontainers
 class ActuatorSmokeTest {
 
     @Autowired lateinit var rest: TestRestTemplate
 
     companion object {
-        @Container @JvmField
-        val postgres = PostgreSQLContainer<Nothing>("postgres:16")
-
         @DynamicPropertySource @JvmStatic
         fun props(registry: DynamicPropertyRegistry) {
-            registry.add("spring.datasource.url") { postgres.jdbcUrl }
-            registry.add("spring.datasource.username") { postgres.username }
-            registry.add("spring.datasource.password") { postgres.password }
+            val pg = SharedTestInfrastructure.postgres
+            registry.add("spring.datasource.url") { pg.jdbcUrl }
+            registry.add("spring.datasource.username") { pg.username }
+            registry.add("spring.datasource.password") { pg.password }
             registry.add("dictara.transcriber.url") { "http://localhost:9999" }
         }
     }

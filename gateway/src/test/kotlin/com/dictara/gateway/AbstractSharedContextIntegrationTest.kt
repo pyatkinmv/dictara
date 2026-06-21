@@ -19,6 +19,8 @@ abstract class AbstractSharedContextIntegrationTest {
     @Autowired
     protected lateinit var jdbcTemplate: JdbcTemplate
 
+    protected val wireMock get() = SharedTestInfrastructure.wireMock
+
     companion object {
         @DynamicPropertySource
         @JvmStatic
