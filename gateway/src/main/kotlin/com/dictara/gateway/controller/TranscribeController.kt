@@ -69,7 +69,7 @@ class TranscribeController(
 
     private val mapper = ObjectMapper().registerKotlinModule()
 
-    data class SubmitResponse(val jobId: String)
+    data class SubmitResponse(val jobId: String, val dedup: Boolean = false)
 
     data class ProgressResponse(
         val phase: String?,
@@ -157,7 +157,7 @@ class TranscribeController(
             val duplicate = submissionRepo.findDuplicate(user.id!!, contentHash, resolvedModel, language, diarize, numSpeakers, summaryMode)
             if (duplicate != null) {
                 log.info("Duplicate upload: hash={}, reusing submission={}, file={}", contentHash, duplicate.id, originalName)
-                return SubmitResponse(duplicate.id.toString())
+                return SubmitResponse(duplicate.id.toString(), dedup = true)
             }
         }
 

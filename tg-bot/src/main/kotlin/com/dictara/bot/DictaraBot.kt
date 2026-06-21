@@ -356,12 +356,12 @@ class DictaraBot(
                         false
                     }
                     log.info("Inline: ack result jobId={} claimed={}", result.jobId, claimed)
-                    if (!claimed) {
+                    if (!claimed && !result.dedup) {
                         log.warn("Inline: delivery already claimed by background poller, skipping send: jobId={} chatId={}", result.jobId, chatId)
                         if (statusMsg != null) try { execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build()) } catch (_: Exception) {}
                         return@submit
                     }
-                    log.info("Inline: sending transcript for jobId={} chatId={}", result.jobId, chatId)
+                    log.info("Inline: sending transcript for jobId={} chatId={} dedup={}", result.jobId, chatId, result.dedup)
                     val sentMsg = try {
                         val msg = sendTranscript(chatId, result, originalMessageId)
                         client.confirmDelivery(result.jobId)
@@ -378,12 +378,12 @@ class DictaraBot(
                                 log.info("Inline: delivered as link jobId={}", result.jobId)
                             } catch (linkEx: Exception) {
                                 log.error("Inline: link send also failed jobId={}: {}", result.jobId, linkEx.message)
-                                try { client.failDelivery(result.jobId, retryAfterS) } catch (ex: Exception) {
+                                if (!result.dedup) try { client.failDelivery(result.jobId, retryAfterS) } catch (ex: Exception) {
                                     log.error("Inline: could not report failure for jobId={}: {}", result.jobId, ex.message)
                                 }
                             }
                         } else {
-                            try { client.failDelivery(result.jobId, retryAfterS) } catch (ex: Exception) {
+                            if (!result.dedup) try { client.failDelivery(result.jobId, retryAfterS) } catch (ex: Exception) {
                                 log.error("Inline: could not report failure for jobId={}: {}", result.jobId, ex.message)
                             }
                         }

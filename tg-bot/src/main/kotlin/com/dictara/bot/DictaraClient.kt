@@ -19,7 +19,10 @@ data class TranscriptResult(
     val audioDurationSeconds: Double? = null,
     val summary: String? = null,
     val jobId: String = "",
+    val dedup: Boolean = false,
 )
+
+private data class SubmitResult(val jobId: String, val dedup: Boolean)
 
 class DictaraClient(private val baseUrl: String) {
     private val log = LoggerFactory.getLogger(DictaraClient::class.java)
@@ -193,9 +196,9 @@ class DictaraClient(private val baseUrl: String) {
         telegramMessageId: Long? = null,
         onProgress: ((String) -> Unit)? = null,
     ): TranscriptResult {
-        val jobId = submitWithRetry(audioFile, model, diarize, summaryMode, language, numSpeakers,
+        val submitResult = submitWithRetry(audioFile, model, diarize, summaryMode, language, numSpeakers,
             telegramUserId, telegramUsername, telegramFirstName, telegramLastName, chatId, telegramMessageId, onProgress)
-        return pollJob(jobId, diarize, summaryMode, onProgress)
+        return pollJob(submitResult.jobId, diarize, summaryMode, onProgress).copy(dedup = submitResult.dedup)
     }
 
     private fun submitWithRetry(
@@ -212,7 +215,7 @@ class DictaraClient(private val baseUrl: String) {
         chatId: Long,
         telegramMessageId: Long?,
         onProgress: ((String) -> Unit)?,
-    ): String {
+    ): SubmitResult {
         var pollInterval = 5_000L
         val failureStart = System.currentTimeMillis()
         while (true) {
@@ -244,7 +247,7 @@ class DictaraClient(private val baseUrl: String) {
         telegramLastName: String?,
         chatId: Long,
         telegramMessageId: Long?,
-    ): String {
+    ): SubmitResult {
         val body = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
             .addFormDataPart("file", file.name, file.asRequestBody("application/octet-stream".toMediaType()))
@@ -275,7 +278,11 @@ class DictaraClient(private val baseUrl: String) {
             val message = runCatching { mapper.readTree(responseBody)["message"]?.asText() }.getOrNull()
             throw RuntimeException(message ?: "Submit failed (${response.code}): $responseBody")
         }
-        return mapper.readTree(responseBody)["job_id"].asText()
+        val root = mapper.readTree(responseBody)
+        return SubmitResult(
+            jobId = root["job_id"].asText(),
+            dedup = root["dedup"]?.asBoolean() ?: false,
+        )
     }
 
     private fun pollJob(

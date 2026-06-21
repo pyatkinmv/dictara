@@ -103,6 +103,16 @@ class DeduplicationIntegrationTest : AbstractSharedContextIntegrationTest() {
     }
 
     @Test
+    fun `fresh upload returns dedup=false, duplicate returns dedup=true`() {
+        val first = submit()
+        awaitTranscriberCalls(1)
+        val second = submit()
+
+        assertThat(first.body!!["dedup"]).isEqualTo(false)
+        assertThat(second.body!!["dedup"]).isEqualTo(true)
+    }
+
+    @Test
     fun `same file with different model is not a duplicate`() {
         // Override to "done" so OrchestratorService completes the first dispatch and picks up the second.
         // The default "processing" stub would keep submission A stuck, blocking B via idx_one_processing_submission.
