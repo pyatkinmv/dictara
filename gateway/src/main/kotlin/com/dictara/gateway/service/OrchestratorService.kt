@@ -88,12 +88,7 @@ class OrchestratorService(
 
     private fun runTranscription(submission: SubmissionEntity) {
         val submissionId = submission.id!!
-        val attempt = try {
-            stateService.createAttempt(submissionId, "transcription")
-        } catch (e: org.springframework.dao.DataIntegrityViolationException) {
-            log.info("Transcription aborted for submission $submissionId: submission deleted during retry")
-            return
-        }
+        val attempt = stateService.createAttempt(submissionId, "transcription")
         log.info("Transcription attempt ${attempt.attemptNum} started for submission $submissionId")
 
         try {
@@ -197,12 +192,7 @@ class OrchestratorService(
     }
 
     private fun runSummarization(submissionId: UUID, language: String, formattedText: String, mode: SummaryMode) {
-        val attempt = try {
-            stateService.createAttempt(submissionId, "summarization")
-        } catch (e: org.springframework.dao.DataIntegrityViolationException) {
-            log.info("Summarization aborted for submission $submissionId: submission deleted during retry")
-            return
-        }
+        val attempt = stateService.createAttempt(submissionId, "summarization")
         log.info("Summarization attempt ${attempt.attemptNum} started for submission $submissionId")
 
         try {
