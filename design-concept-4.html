@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dictara — Concept 4: Wizard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet">
+<script type="importmap">{"imports":{"@material/web/":"https://esm.run/@material/web/"}}</script>
+<script type="module">import 'https://esm.run/@material/web/all.js';</script>
+<style>
+:root{--bg:#F5F4FF;--surface:#fff;--text:#0F0D1A;--text2:#5C5A6B;--text3:#9B99AA;--accent:#5B4CF5;--accent-l:#EEF0FF;--accent-d:#3730A3;--border:#E4E2F5;--success:#15803D;--success-bg:#DCFCE7;--r:16px;
+--md-sys-color-primary:#5B4CF5;--md-sys-color-on-primary:#fff;--md-sys-color-surface:#fff;--md-sys-color-on-surface:#0F0D1A;--md-sys-color-outline-variant:#E4E2F5;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;}
+
+/* NAV */
+nav{display:flex;align-items:center;justify-content:space-between;padding:18px 32px;background:var(--surface);border-bottom:1px solid var(--border);}
+.brand{font-size:17px;font-weight:700;letter-spacing:-.3px;}
+.nav-user{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;padding:6px 12px;border-radius:100px;border:1px solid var(--border);transition:.15s;}
+.nav-user:hover{border-color:var(--accent);color:var(--accent);}
+.nav-user .icon{font-family:'Material Symbols Rounded';font-size:16px;}
+
+/* WIZARD SHELL */
+.wizard{max-width:680px;margin:0 auto;padding:40px 24px 80px;width:100%;}
+
+/* STEP INDICATOR */
+.steps{display:flex;align-items:center;margin-bottom:44px;}
+.step{display:flex;align-items:center;gap:10px;flex:1;}
+.step:last-child{flex:0;}
+.step-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;transition:all .3s;}
+.step-dot.done{background:var(--accent);color:#fff;font-family:'Material Symbols Rounded';font-size:16px;}
+.step-dot.active{background:var(--accent);color:#fff;box-shadow:0 0 0 4px var(--accent-l);}
+.step-dot.todo{background:var(--surface);border:2px solid var(--border);color:var(--text3);}
+.step-label{font-size:13px;font-weight:500;color:var(--text3);white-space:nowrap;}
+.step.active .step-label{color:var(--accent);font-weight:600;}
+.step.done .step-label{color:var(--text2);}
+.step-line{flex:1;height:2px;background:var(--border);margin:0 8px;border-radius:100px;transition:background .3s;}
+.step-line.done{background:var(--accent);}
+
+/* STEP PANELS */
+.panel{background:var(--surface);border-radius:20px;padding:36px;border:1px solid var(--border);animation:fadeUp .25s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+.panel-title{font-size:22px;font-weight:700;letter-spacing:-.3px;margin-bottom:6px;}
+.panel-sub{font-size:14px;color:var(--text2);margin-bottom:28px;line-height:1.5;}
+
+/* UPLOAD PANEL */
+.drop-zone{border:2px dashed var(--border);border-radius:var(--r);padding:56px 32px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;transition:.2s;text-align:center;background:var(--bg);}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--accent);background:var(--accent-l);}
+.drop-zone.has-file{border-color:var(--success);background:var(--success-bg);border-style:solid;}
+.d-icon{font-family:'Material Symbols Rounded';font-size:48px;color:var(--accent);margin-bottom:4px;}
+.drop-zone.has-file .d-icon{color:var(--success);}
+.d-title{font-size:16px;font-weight:600;}
+.d-sub{font-size:13px;color:var(--text2);}
+.d-fmt{font-size:11px;color:var(--text3);margin-top:4px;}
+
+/* SETTINGS PANEL */
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:4px;}
+.setting-row{display:flex;flex-direction:column;gap:8px;}
+.s-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.1px;color:var(--text3);}
+.chip-row{display:flex;gap:8px;}
+.s-chip{padding:8px 18px;border-radius:10px;font-size:13px;font-weight:500;border:1.5px solid var(--border);background:var(--bg);color:var(--text2);cursor:pointer;font-family:'Inter';transition:.15s;}
+.s-chip.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+.s-select{padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'Inter';color:var(--text);background:var(--bg);appearance:none;cursor:pointer;}
+.s-select:focus{outline:2px solid var(--accent);border-color:transparent;}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;background:var(--bg);}
+.toggle-row span{font-size:13px;font-weight:500;}
+.tog{width:40px;height:22px;border-radius:100px;background:var(--border);border:none;cursor:pointer;position:relative;transition:.2s;flex-shrink:0;}
+.tog::after{content:'';position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s;}
+.tog.on{background:var(--accent);}
+.tog.on::after{transform:translateX(18px);}
+
+/* PROCESSING PANEL */
+.proc-visual{display:flex;flex-direction:column;align-items:center;gap:24px;padding:20px 0;}
+.proc-ring{position:relative;width:96px;height:96px;}
+.proc-ring svg{transform:rotate(-90deg);}
+.proc-ring-bg{fill:none;stroke:var(--border);stroke-width:6;}
+.proc-ring-fg{fill:none;stroke:var(--accent);stroke-width:6;stroke-linecap:round;stroke-dasharray:251.2;stroke-dashoffset:148;transition:stroke-dashoffset .4s;}
+.proc-pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;}
+.proc-phase{font-size:15px;font-weight:600;}
+.proc-hint{font-size:13px;color:var(--text2);}
+.proc-file{font-size:13px;color:var(--text3);}
+
+/* RESULT PANEL */
+.result-file{font-size:18px;font-weight:700;letter-spacing:-.2px;margin-bottom:4px;}
+.result-meta{font-size:12px;color:var(--text3);margin-bottom:20px;}
+.transcript-box{background:var(--bg);border-radius:12px;padding:16px;font-size:13px;line-height:1.75;color:var(--text2);max-height:220px;overflow-y:auto;margin-bottom:12px;border:1px solid var(--border);}
+.seg{margin-bottom:10px;}
+.seg-t{font-size:10px;font-weight:700;color:var(--text3);}
+.seg-s{font-weight:600;color:var(--accent);}
+.summary-box{background:var(--accent-l);border-radius:12px;padding:16px;font-size:13px;line-height:1.7;color:var(--accent-d);margin-bottom:16px;}
+.s-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.1px;color:var(--accent);margin-bottom:6px;}
+.tags-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:20px;}
+.tag{padding:4px 12px;border-radius:100px;font-size:12px;font-weight:600;color:#fff;}
+.tag-add{padding:4px 12px;border-radius:100px;font-size:12px;font-weight:500;border:1.5px dashed var(--border);background:none;color:var(--text3);cursor:pointer;font-family:'Inter';}
+
+/* NAV BUTTONS */
+.panel-nav{display:flex;justify-content:space-between;margin-top:28px;gap:12px;}
+.btn-back{padding:11px 24px;border-radius:10px;border:1.5px solid var(--border);background:none;font-size:14px;font-weight:500;font-family:'Inter';cursor:pointer;color:var(--text2);transition:.15s;}
+.btn-back:hover{border-color:var(--accent);color:var(--accent);}
+.btn-next{padding:11px 28px;border-radius:10px;background:var(--accent);color:#fff;border:none;font-size:14px;font-weight:600;font-family:'Inter';cursor:pointer;transition:.15s;display:flex;align-items:center;gap:8px;}
+.btn-next:hover{background:var(--accent-d);}
+.btn-next:disabled{background:var(--border);color:var(--text3);cursor:not-allowed;}
+.btn-next .icon{font-family:'Material Symbols Rounded';font-size:18px;}
+
+/* HISTORY DRAWER (collapsed footer) */
+.history-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);z-index:50;}
+.history-bar-toggle{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text2);transition:.15s;}
+.history-bar-toggle:hover{color:var(--accent);}
+.history-bar-toggle .icon{font-family:'Material Symbols Rounded';font-size:18px;transition:.2s;}
+.history-bar.open .history-bar-toggle .icon{transform:rotate(180deg);}
+.history-list{display:none;max-height:280px;overflow-y:auto;padding:0 24px 16px;}
+.history-bar.open .history-list{display:block;}
+.h-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;}
+.h-item:last-child{border:none;}
+.h-icon{font-family:'Material Symbols Rounded';font-size:18px;color:var(--text3);}
+.h-info{flex:1;min-width:0;}
+.h-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.h-meta{font-size:11px;color:var(--text3);}
+.h-badge{padding:2px 8px;border-radius:100px;font-size:10px;font-weight:700;text-transform:uppercase;}
+.h-badge.done{background:var(--success-bg);color:var(--success);}
+
+/* LOGIN */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:300;backdrop-filter:blur(4px);}
+.lbox{background:var(--surface);border-radius:24px;padding:40px;width:380px;box-shadow:0 24px 48px rgba(0,0,0,.15);display:flex;flex-direction:column;gap:20px;}
+.l-title{font-size:22px;font-weight:700;letter-spacing:-.3px;}
+.l-sub{font-size:14px;color:var(--text2);line-height:1.5;}
+.l-input-wrap{display:flex;align-items:center;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;}
+.l-input-wrap:focus-within{border-color:var(--accent);}
+.l-prefix{padding:0 10px;font-size:14px;color:var(--text3);font-weight:500;}
+.l-input{flex:1;padding:11px 10px 11px 0;border:none;font-size:14px;font-family:'Inter';color:var(--text);background:transparent;}
+.l-input:focus{outline:none;}
+.l-btn{padding:13px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;font-family:'Inter';cursor:pointer;}
+.l-hint{font-size:12px;color:var(--text3);}
+.l-hint a{color:var(--accent);}
+.l-waiting{display:none;flex-direction:column;align-items:center;gap:14px;text-align:center;}
+.spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.l-wait-txt{font-size:14px;color:var(--text2);line-height:1.5;}
+.l-wait-txt strong{color:var(--text);}
+.l-cancel{font-size:12px;color:var(--text3);background:none;border:none;cursor:pointer;font-family:'Inter';text-decoration:underline;}
+
+/* DEMO */
+.demo-nav{position:fixed;top:80px;right:16px;display:flex;flex-direction:column;gap:6px;align-items:flex-end;}
+.demo-lbl{font-size:10px;color:var(--text3);letter-spacing:.5px;text-transform:uppercase;}
+.demo-btn{font-size:12px;font-family:'Inter';padding:5px 12px;border-radius:100px;border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer;}
+.demo-btn.active{background:var(--accent);color:#fff;border-color:transparent;font-weight:600;}
+</style>
+</head>
+<body>
+
+<div class="overlay" id="overlay">
+  <div class="lbox">
+    <p class="l-title">Sign in</p>
+    <div id="ls1" style="display:flex;flex-direction:column;gap:16px">
+      <p class="l-sub">Enter your Telegram username.</p>
+      <div class="l-input-wrap"><span class="l-prefix">@</span><input class="l-input" id="ufield" type="text" placeholder="username"></div>
+      <button class="l-btn" onclick="doLogin()">Continue</button>
+      <p class="l-hint">No account? Start <a href="#">@DictaraBot</a> first.</p>
+    </div>
+    <div class="l-waiting" id="ls2">
+      <div class="spinner"></div>
+      <p class="l-wait-txt">Sent to Telegram<br><strong id="tgn"></strong><br>Tap <strong>Confirm login</strong>.</p>
+      <button class="l-cancel" onclick="cancelLogin()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<nav>
+  <span class="brand">Dictara</span>
+  <div class="nav-user" id="navuser" onclick="logout()" style="display:none">
+    <span class="icon">account_circle</span>
+    <span id="navuname"></span>
+    <span class="icon">logout</span>
+  </div>
+</nav>
+
+<div class="wizard">
+  <!-- STEP BAR -->
+  <div class="steps" id="stepbar">
+    <div class="step active" id="s0">
+      <div class="step-dot active">1</div>
+      <span class="step-label">Upload</span>
+    </div>
+    <div class="step-line" id="l01"></div>
+    <div class="step todo" id="s1">
+      <div class="step-dot todo">2</div>
+      <span class="step-label">Settings</span>
+    </div>
+    <div class="step-line" id="l12"></div>
+    <div class="step todo" id="s2">
+      <div class="step-dot todo">3</div>
+      <span class="step-label">Processing</span>
+    </div>
+    <div class="step-line" id="l23"></div>
+    <div class="step todo" id="s3">
+      <div class="step-dot todo">4</div>
+      <span class="step-label">Result</span>
+    </div>
+  </div>
+
+  <!-- PANEL 0: UPLOAD -->
+  <div class="panel" id="p0">
+    <p class="panel-title">Upload your file</p>
+    <p class="panel-sub">Drop any audio or video — we'll handle the rest.</p>
+    <div class="drop-zone" id="dz"
+      ondragover="event.preventDefault();this.classList.add('drag-over')"
+      ondragleave="this.classList.remove('drag-over')"
+      ondrop="onDrop(event)"
+      onclick="document.getElementById('fi').click()">
+      <input id="fi" type="file" accept="audio/*,video/*" style="display:none" onchange="onFile(this.files[0])">
+      <span class="d-icon">audio_file</span>
+      <p class="d-title" id="dt">Drop your file here</p>
+      <p class="d-sub" id="ds">or click to browse</p>
+      <p class="d-fmt" id="df">MP3 · MP4 · WAV · M4A · OGG · FLAC · max 2 GB</p>
+    </div>
+    <div class="panel-nav">
+      <div></div>
+      <button class="btn-next" id="btn0" disabled onclick="go(1)">
+        Settings <span class="icon">arrow_forward</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- PANEL 1: SETTINGS -->
+  <div class="panel" id="p1" style="display:none">
+    <p class="panel-title">Configure transcription</p>
+    <p class="panel-sub">All settings have smart defaults — change only what you need.</p>
+    <div class="settings-grid">
+      <div class="setting-row">
+        <p class="s-label">Model</p>
+        <div class="chip-row">
+          <button class="s-chip on" onclick="sc(this)">Turbo</button>
+          <button class="s-chip" onclick="sc(this)">Small</button>
+        </div>
+      </div>
+      <div class="setting-row">
+        <p class="s-label">Language</p>
+        <select class="s-select"><option>Auto-detect</option><option>Russian</option><option>English</option><option>Ukrainian</option></select>
+      </div>
+      <div class="setting-row">
+        <p class="s-label">Summary</p>
+        <select class="s-select"><option>No summary</option><option>Short</option><option>Full</option></select>
+      </div>
+      <div class="setting-row">
+        <p class="s-label">Diarize</p>
+        <div class="toggle-row">
+          <span>Split by speaker</span>
+          <button class="tog" onclick="this.classList.toggle('on')"></button>
+        </div>
+      </div>
+    </div>
+    <div class="panel-nav">
+      <button class="btn-back" onclick="go(0)">← Back</button>
+      <button class="btn-next" onclick="go(2)">Transcribe <span class="icon">graphic_eq</span></button>
+    </div>
+  </div>
+
+  <!-- PANEL 2: PROCESSING -->
+  <div class="panel" id="p2" style="display:none">
+    <p class="panel-title">Transcribing…</p>
+    <p class="panel-sub">Usually takes 1–3× the audio duration. You can close this tab and come back later.</p>
+    <div class="proc-visual">
+      <div class="proc-ring">
+        <svg width="96" height="96" viewBox="0 0 96 96">
+          <circle class="proc-ring-bg" cx="48" cy="48" r="40"/>
+          <circle class="proc-ring-fg" cx="48" cy="48" r="40"/>
+        </svg>
+        <div class="proc-pct">41%</div>
+      </div>
+      <p class="proc-phase">Transcribing audio…</p>
+      <p class="proc-file">meeting-recording-june.mp3 · 14 min · Turbo</p>
+      <p class="proc-hint">Diarization will run after transcription completes.</p>
+    </div>
+    <div class="panel-nav">
+      <div></div>
+      <button class="btn-next" onclick="go(3)" style="background:#059669">Jump to result (demo) <span class="icon">arrow_forward</span></button>
+    </div>
+  </div>
+
+  <!-- PANEL 3: RESULT -->
+  <div class="panel" id="p3" style="display:none">
+    <p class="panel-title">Done! 🎉</p>
+    <div class="result-meta">meeting-recording-june.mp3 · 14 min · Turbo · Auto · Diarize · 22 Jun 2026</div>
+    <div class="tags-row">
+      <span class="tag" style="background:#5B4CF5">meeting</span>
+      <span class="tag" style="background:#059669">quarterly</span>
+      <button class="tag-add">+ Add tag</button>
+    </div>
+    <div class="transcript-box">
+      <div class="seg"><div class="seg-t">00:00</div><p><span class="seg-s">Speaker 1:</span> Добрый день, начнём встречу. Сегодня обсудим результаты квартала.</p></div>
+      <div class="seg"><div class="seg-t">00:18</div><p><span class="seg-s">Speaker 2:</span> По итогам квартала план выполнен на 94%. Все показатели растут.</p></div>
+      <div class="seg"><div class="seg-t">00:42</div><p><span class="seg-s">Speaker 1:</span> Три крупных запуска на следующий квартал.</p></div>
+      <div class="seg"><div class="seg-t">01:05</div><p><span class="seg-s">Speaker 3:</span> Есть блокер по интеграции — нужно обсудить отдельно.</p></div>
+    </div>
+    <div class="summary-box">
+      <div class="s-lbl">Summary</div>
+      Квартальная встреча: план выполнен на 94%. Запланированы 3 крупных запуска. Команда разработки обозначила блокер по интеграции.
+    </div>
+    <div class="panel-nav">
+      <button class="btn-back" onclick="go(0);resetFile()">New transcription</button>
+      <button class="btn-next" onclick="dlTxt()"><span class="icon">download</span> Download .txt</button>
+    </div>
+  </div>
+</div>
+
+<!-- HISTORY BAR -->
+<div class="history-bar" id="hbar">
+  <div class="history-bar-toggle" onclick="document.getElementById('hbar').classList.toggle('open')">
+    <span class="icon" style="font-family:'Material Symbols Rounded';font-size:18px">history</span>
+    History (12)
+    <span class="icon" style="font-family:'Material Symbols Rounded';font-size:18px">expand_less</span>
+  </div>
+  <div class="history-list">
+    <div class="h-item" onclick="go(3)"><span class="h-icon">audio_file</span><div class="h-info"><div class="h-name">interview-candidate-anna.m4a</div><div class="h-meta">21 Jun · 47 min</div></div><span class="h-badge done">done</span></div>
+    <div class="h-item" onclick="go(3)"><span class="h-icon">audio_file</span><div class="h-info"><div class="h-name">lecture-economics-part2.mp4</div><div class="h-meta">20 Jun · 1h 12min</div></div><span class="h-badge done">done</span></div>
+    <div class="h-item" onclick="go(3)"><span class="h-icon">audio_file</span><div class="h-info"><div class="h-name">podcast-episode-47.mp3</div><div class="h-meta">19 Jun · 38 min</div></div><span class="h-badge done">done</span></div>
+  </div>
+</div>
+
+<div class="demo-nav">
+  <span class="demo-lbl">Step</span>
+  <button class="demo-btn" onclick="demoLogin()">Login</button>
+  <button class="demo-btn active" onclick="go(0);setA(event.target)">1 Upload</button>
+  <button class="demo-btn" onclick="demoFile();setA(event.target)">2 Settings</button>
+  <button class="demo-btn" onclick="go(2);setA(event.target)">3 Processing</button>
+  <button class="demo-btn" onclick="go(3);setA(event.target)">4 Result</button>
+</div>
+
+<script>
+function doLogin(){const u=document.getElementById('ufield').value.replace('@','').trim();if(!u)return;document.getElementById('tgn').textContent='@'+u;document.getElementById('ls1').style.display='none';document.getElementById('ls2').style.display='flex';setTimeout(()=>fl(u),2000);}
+function fl(u){document.getElementById('overlay').style.display='none';document.getElementById('navuname').textContent='@'+u;document.getElementById('navuser').style.display='flex';}
+function cancelLogin(){document.getElementById('ls2').style.display='none';document.getElementById('ls1').style.display='flex';}
+function logout(){document.getElementById('navuser').style.display='none';document.getElementById('ls1').style.display='flex';document.getElementById('ls2').style.display='none';document.getElementById('overlay').style.display='flex';}
+setTimeout(()=>fl('pyatkinmv'),400);
+
+let cur=0;
+const panels=['p0','p1','p2','p3'];
+const dots=['s0','s1','s2','s3'];
+const lines=['l01','l12','l23'];
+function go(n){
+  panels.forEach(p=>document.getElementById(p).style.display='none');
+  document.getElementById(panels[n]).style.display='';
+  dots.forEach((d,i)=>{
+    const el=document.getElementById(d);const dot=el.querySelector('.step-dot');
+    if(i<n){el.className='step done';dot.className='step-dot done';dot.textContent='check';}
+    else if(i===n){el.className='step active';dot.className='step-dot active';dot.textContent=i+1;}
+    else{el.className='step todo';dot.className='step-dot todo';dot.textContent=i+1;}
+  });
+  lines.forEach((l,i)=>{document.getElementById(l).className='step-line'+(i<n?' done':'');});
+  cur=n;
+}
+
+function sc(el){el.closest('.chip-row').querySelectorAll('.s-chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');}
+function onDrop(e){e.preventDefault();document.getElementById('dz').classList.remove('drag-over');onFile(e.dataTransfer.files[0]);}
+function onFile(f){if(!f)return;document.getElementById('dz').classList.add('has-file');document.getElementById('dt').textContent=f.name;document.getElementById('ds').textContent=(f.size/1024/1024).toFixed(1)+' MB';document.getElementById('df').textContent='';document.getElementById('btn0').disabled=false;}
+function resetFile(){document.getElementById('dz').className='drop-zone';document.getElementById('dt').textContent='Drop your file here';document.getElementById('ds').textContent='or click to browse';document.getElementById('df').textContent='MP3 · MP4 · WAV · M4A · OGG · FLAC · max 2 GB';document.getElementById('btn0').disabled=true;}
+function dlTxt(){alert('Download would start here');}
+
+function demoLogin(){setA(event.target);logout();}
+function demoFile(){go(1);const dz=document.getElementById('dz');dz.classList.add('has-file');document.getElementById('dt').textContent='meeting-recording-june.mp3';document.getElementById('ds').textContent='128 MB';document.getElementById('df').textContent='';document.getElementById('btn0').disabled=false;}
+function setA(el){document.querySelectorAll('.demo-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active');}
+</script>
+</body>
+</html>

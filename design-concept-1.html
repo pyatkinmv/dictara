@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dictara — Concept 1: Minimal Focus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet">
+<script type="importmap">{"imports":{"@material/web/":"https://esm.run/@material/web/"}}</script>
+<script type="module">import 'https://esm.run/@material/web/all.js';</script>
+<style>
+  :root {
+    --bg: #F7F7F5;
+    --surface: #FFFFFF;
+    --text: #111111;
+    --text-2: #666666;
+    --text-3: #999999;
+    --accent: #0055FF;
+    --accent-light: #EEF3FF;
+    --border: #E5E5E5;
+    --success: #16A34A;
+    --success-bg: #DCFCE7;
+    --radius: 20px;
+    --md-sys-color-primary: #0055FF;
+    --md-sys-color-on-primary: #FFFFFF;
+    --md-sys-color-surface: #FFFFFF;
+    --md-sys-color-on-surface: #111111;
+    --md-sys-color-outline-variant: #E5E5E5;
+    --md-filter-chip-selected-container-color: #EEF3FF;
+    --md-filter-chip-selected-label-text-color: #0055FF;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* NAV */
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 32px;
+    background: transparent;
+  }
+  .brand {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .user-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 6px 14px 6px 10px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: box-shadow .15s;
+  }
+  .user-pill:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  .user-pill .icon {
+    font-family: 'Material Symbols Rounded';
+    font-size: 18px;
+    color: var(--text-3);
+  }
+
+  /* MAIN */
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 24px 80px;
+    max-width: 680px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  /* HEADING */
+  .page-heading {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .page-heading h1 {
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    color: var(--text);
+    line-height: 1.15;
+  }
+  .page-heading p {
+    font-size: 16px;
+    color: var(--text-2);
+    margin-top: 8px;
+    font-weight: 400;
+  }
+
+  /* DROP ZONE */
+  .drop-zone {
+    width: 100%;
+    background: var(--surface);
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 64px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all .2s;
+    text-align: center;
+    position: relative;
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-light);
+  }
+  .drop-zone.has-file {
+    border-color: var(--success);
+    background: var(--success-bg);
+    border-style: solid;
+  }
+  .drop-icon {
+    font-family: 'Material Symbols Rounded';
+    font-size: 52px;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .drop-zone.has-file .drop-icon { color: var(--success); }
+  .drop-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .drop-sub {
+    font-size: 14px;
+    color: var(--text-2);
+  }
+  .drop-formats {
+    font-size: 12px;
+    color: var(--text-3);
+    margin-top: 4px;
+  }
+  .drop-change {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* SETTINGS — hidden until file picked */
+  .settings-panel {
+    width: 100%;
+    margin-top: 16px;
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+    animation: slideIn .25s ease;
+  }
+  .settings-panel.visible { display: flex; }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .settings-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+
+  .settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .setting-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .setting-block-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-3);
+  }
+
+  .model-chips {
+    display: flex;
+    gap: 8px;
+  }
+  .model-chip {
+    padding: 6px 14px;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 500;
+    border: 1.5px solid var(--border);
+    background: var(--bg);
+    color: var(--text-2);
+    cursor: pointer;
+    transition: all .15s;
+    font-family: 'Inter', sans-serif;
+  }
+  .model-chip.selected {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+
+  .diarize-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .diarize-toggle span {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  /* custom selects */
+  .custom-select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: 'Inter', sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+    cursor: pointer;
+  }
+  .custom-select:focus { outline: 2px solid var(--accent); border-color: transparent; }
+
+  /* TRANSCRIBE BUTTON */
+  .transcribe-wrap {
+    width: 100%;
+    margin-top: 4px;
+    display: none;
+  }
+  .transcribe-wrap.visible { display: block; }
+  .transcribe-btn {
+    width: 100%;
+    padding: 16px;
+    background: var(--text);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all .15s;
+  }
+  .transcribe-btn:hover { background: #333; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,.2); }
+  .transcribe-btn:disabled { background: var(--border); color: var(--text-3); transform: none; box-shadow: none; cursor: not-allowed; }
+  .transcribe-btn .icon {
+    font-family: 'Material Symbols Rounded';
+    font-size: 20px;
+  }
+
+  /* PROGRESS */
+  .progress-wrap {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 24px;
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .progress-wrap.visible { display: flex; }
+  .progress-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .progress-pct { color: var(--text-2); }
+  .progress-track {
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 100px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 100px;
+    transition: width .4s;
+  }
+
+  /* HISTORY */
+  .history-section {
+    width: 100%;
+    margin-top: 48px;
+  }
+  .history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .history-header h2 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+  .history-count {
+    font-size: 13px;
+    color: var(--text-3);
+    font-weight: 400;
+  }
+
+  .h-item {
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .h-item:last-child { border-bottom: none; }
+  .h-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 0;
+    cursor: pointer;
+  }
+  .h-head:hover { background: none; }
+  .h-num {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-3);
+    width: 24px;
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .h-info { flex: 1; min-width: 0; }
+  .h-name {
+    font-size: 15px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .h-meta {
+    font-size: 12px;
+    color: var(--text-3);
+    margin-top: 2px;
+  }
+  .h-badge {
+    padding: 3px 10px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .h-badge.done { background: var(--success-bg); color: var(--success); }
+  .h-badge.processing { background: #EEF3FF; color: var(--accent); }
+  .h-badge.pending { background: var(--bg); color: var(--text-3); }
+  .h-actions {
+    display: flex;
+    gap: 4px;
+  }
+  .icon-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--text-3);
+    font-family: 'Material Symbols Rounded';
+    font-size: 18px;
+    transition: all .15s;
+  }
+  .icon-btn:hover { background: var(--bg); color: var(--text); }
+
+  .h-expand {
+    font-family: 'Material Symbols Rounded';
+    font-size: 18px;
+    color: var(--text-3);
+    transition: transform .2s;
+    flex-shrink: 0;
+  }
+  .h-item.open .h-expand { transform: rotate(90deg); }
+
+  .h-body {
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+    padding: 0 0 20px 36px;
+  }
+  .h-item.open .h-body { display: flex; }
+  .transcript-box {
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text-2);
+    max-height: 180px;
+    overflow-y: auto;
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .summary-box {
+    font-size: 13px;
+    line-height: 1.65;
+    color: #00368A;
+    background: var(--accent-light);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .summary-box strong {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--accent);
+    margin-bottom: 6px;
+    font-weight: 700;
+  }
+  .tags-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .tag {
+    padding: 3px 10px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 600;
+    color: white;
+  }
+  .icon-btn.small { width: 26px; height: 26px; font-size: 16px; }
+
+  /* LOGIN */
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.4);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 300;
+    backdrop-filter: blur(4px);
+  }
+  .login-box {
+    background: var(--surface);
+    border-radius: 24px;
+    padding: 40px;
+    width: 380px;
+    box-shadow: 0 24px 48px rgba(0,0,0,.15);
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .login-brand { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+  .login-desc { font-size: 14px; color: var(--text-2); line-height: 1.5; }
+  .login-input-wrap { position: relative; }
+  .login-prefix {
+    position: absolute;
+    left: 14px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-3);
+  }
+  .login-input {
+    width: 100%;
+    padding: 12px 14px 12px 28px;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    transition: border-color .15s;
+  }
+  .login-input:focus { outline: none; border-color: var(--accent); }
+  .login-btn {
+    padding: 14px;
+    background: var(--text);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .login-btn:hover { background: #333; }
+  .login-hint { font-size: 12px; color: var(--text-3); }
+  .login-hint a { color: var(--accent); }
+  .login-waiting {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    text-align: center;
+    padding: 8px 0;
+  }
+  .spinner {
+    width: 44px; height: 44px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .waiting-text { font-size: 14px; color: var(--text-2); line-height: 1.5; }
+  .waiting-text strong { color: var(--text); }
+  .cancel-btn {
+    font-size: 13px; color: var(--text-3); background: none; border: none;
+    cursor: pointer; font-family: 'Inter'; text-decoration: underline;
+  }
+
+  /* DEMO NAV */
+  .demo-nav {
+    position: fixed; bottom: 16px; right: 16px;
+    display: flex; flex-direction: column; gap: 6px; align-items: flex-end;
+  }
+  .demo-lbl { font-size: 10px; color: var(--text-3); letter-spacing: .5px; text-transform: uppercase; }
+  .demo-btn {
+    font-size: 12px; font-family: 'Inter'; padding: 5px 12px;
+    border-radius: 100px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text-2); cursor: pointer;
+  }
+  .demo-btn.active { background: var(--text); color: white; border-color: transparent; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN OVERLAY -->
+<div class="overlay" id="overlay">
+  <div class="login-box">
+    <div class="login-brand">Dictara</div>
+    <div id="ls1" style="display:flex;flex-direction:column;gap:16px">
+      <p class="login-desc">Sign in with your Telegram account to get started.</p>
+      <div class="login-input-wrap">
+        <span class="login-prefix">@</span>
+        <input class="login-input" id="ufield" type="text" placeholder="username">
+      </div>
+      <button class="login-btn" onclick="doLogin()">Continue</button>
+      <p class="login-hint">Haven't started the bot yet? Open <a href="#">@DictaraBot</a> first.</p>
+    </div>
+    <div class="login-waiting" id="ls2">
+      <div class="spinner"></div>
+      <p class="waiting-text">Confirmation sent to Telegram<br><strong id="tgname"></strong><br>Tap <strong>Confirm login</strong> in the bot.</p>
+      <button class="cancel-btn" onclick="cancelLogin()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav>
+  <span class="brand">Dictara</span>
+  <div class="nav-right">
+    <div class="user-pill" id="user-pill" onclick="logout()" style="display:none">
+      <span class="icon">account_circle</span>
+      <span id="uname-display"></span>
+      <span class="icon">logout</span>
+    </div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main>
+  <div class="page-heading">
+    <h1>Transcribe anything.<br>In seconds.</h1>
+    <p>Drop an audio or video file and get a clean transcript.</p>
+  </div>
+
+  <!-- DROP ZONE -->
+  <div class="drop-zone" id="dropzone"
+    ondragover="ev.preventDefault();this.classList.add('drag-over')"
+    ondragleave="this.classList.remove('drag-over')"
+    ondrop="onDrop(event)"
+    onclick="document.getElementById('finput').click()">
+    <input id="finput" type="file" accept="audio/*,video/*" style="display:none" onchange="onFile(this.files[0])">
+    <span class="drop-icon">audio_file</span>
+    <p class="drop-title" id="drop-title">Drop your file here</p>
+    <p class="drop-sub" id="drop-sub">or click to browse</p>
+    <p class="drop-formats" id="drop-formats">MP3 · MP4 · WAV · M4A · OGG · FLAC · max 2 GB</p>
+  </div>
+
+  <!-- SETTINGS (shown after file pick) -->
+  <div class="settings-panel" id="settings-panel">
+    <p class="settings-label">Transcription settings</p>
+    <div class="settings-grid">
+      <div class="setting-block">
+        <p class="setting-block-label">Model</p>
+        <div class="model-chips">
+          <button class="model-chip selected" onclick="selectChip(this)">Turbo</button>
+          <button class="model-chip" onclick="selectChip(this)">Small</button>
+        </div>
+      </div>
+      <div class="setting-block">
+        <p class="setting-block-label">Language</p>
+        <select class="custom-select">
+          <option>Auto-detect</option>
+          <option>Russian</option>
+          <option>English</option>
+          <option>Ukrainian</option>
+          <option>German</option>
+        </select>
+      </div>
+      <div class="setting-block">
+        <p class="setting-block-label">Summary</p>
+        <select class="custom-select">
+          <option>No summary</option>
+          <option>Short</option>
+          <option>Full</option>
+        </select>
+      </div>
+      <div class="setting-block">
+        <p class="setting-block-label">Diarize speakers</p>
+        <div class="diarize-toggle">
+          <span>Split by speaker</span>
+          <md-switch id="dsw"></md-switch>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRANSCRIBE BUTTON -->
+  <div class="transcribe-wrap" id="tbtnwrap">
+    <button class="transcribe-btn" id="tbtn" onclick="doTranscribe()">
+      <span class="icon">graphic_eq</span>
+      Transcribe
+    </button>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap" id="progwrap">
+    <div class="progress-row">
+      <span id="prog-phase">Uploading…</span>
+      <span class="progress-pct" id="prog-pct">0%</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="prog-fill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="history-section">
+    <div class="history-header">
+      <h2>History <span class="history-count">12 transcriptions</span></h2>
+    </div>
+
+    <div class="h-item open">
+      <div class="h-head" onclick="toggle(this)">
+        <span class="h-num">1</span>
+        <div class="h-info">
+          <div class="h-name">meeting-recording-june.mp3</div>
+          <div class="h-meta">22 Jun · 14 min · Turbo · Auto · Diarize</div>
+        </div>
+        <span class="h-badge done">done</span>
+        <div class="h-actions">
+          <button class="icon-btn" title="Download">file_download</button>
+        </div>
+        <span class="h-expand material-symbols-rounded">chevron_right</span>
+      </div>
+      <div class="h-body">
+        <div class="transcript-box">
+          [00:00] Speaker 1: Добрый день, начнём встречу.<br>
+          [00:18] Speaker 2: По итогам квартала мы выполнили план на 94%.<br>
+          [00:42] Speaker 1: Отлично. Три крупных запуска на следующий квартал.<br>
+          [01:05] Speaker 3: У нас небольшой блокер по интеграции.
+        </div>
+        <div class="summary-box">
+          <strong>Summary</strong>
+          Квартальная встреча: план выполнен на 94%. Запланированы 3 крупных запуска. Есть блокер по интеграции.
+        </div>
+        <div class="tags-row">
+          <span class="tag" style="background:#0055FF">meeting</span>
+          <span class="tag" style="background:#16A34A">quarterly</span>
+          <button class="icon-btn small">add_circle</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="h-item">
+      <div class="h-head" onclick="toggle(this)">
+        <span class="h-num">2</span>
+        <div class="h-info">
+          <div class="h-name">interview-candidate-anna.m4a</div>
+          <div class="h-meta">21 Jun · 47 min · Turbo · Russian</div>
+        </div>
+        <span class="h-badge done">done</span>
+        <div class="h-actions">
+          <button class="icon-btn">file_download</button>
+        </div>
+        <span class="h-expand material-symbols-rounded">chevron_right</span>
+      </div>
+      <div class="h-body">
+        <div class="transcript-box">Transcript text…</div>
+      </div>
+    </div>
+
+    <div class="h-item">
+      <div class="h-head">
+        <span class="h-num">3</span>
+        <div class="h-info">
+          <div class="h-name">lecture-economics-part2.mp4</div>
+          <div class="h-meta">22 Jun · Turbo · Auto</div>
+        </div>
+        <span class="h-badge processing">processing</span>
+        <div class="h-actions">
+          <div class="spinner" style="width:20px;height:20px;border-width:2px"></div>
+        </div>
+        <span class="h-expand material-symbols-rounded" style="visibility:hidden">chevron_right</span>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- DEMO NAV -->
+<div class="demo-nav">
+  <span class="demo-lbl">Demo</span>
+  <button class="demo-btn" onclick="demoLogin()">Login screen</button>
+  <button class="demo-btn active" onclick="demoIdle()">Idle</button>
+  <button class="demo-btn" onclick="demoFile()">File picked</button>
+  <button class="demo-btn" onclick="demoProgress()">Processing</button>
+</div>
+
+<script>
+function doLogin() {
+  const u = document.getElementById('ufield').value.replace('@','').trim();
+  if (!u) return;
+  document.getElementById('tgname').textContent = '@' + u;
+  document.getElementById('ls1').style.display = 'none';
+  document.getElementById('ls2').style.display = 'flex';
+  setTimeout(() => finishLogin(u), 2000);
+}
+function finishLogin(u) {
+  document.getElementById('overlay').style.display = 'none';
+  document.getElementById('uname-display').textContent = '@' + u;
+  document.getElementById('user-pill').style.display = 'flex';
+}
+function cancelLogin() {
+  document.getElementById('ls2').style.display = 'none';
+  document.getElementById('ls1').style.display = 'flex';
+}
+function logout() {
+  document.getElementById('user-pill').style.display = 'none';
+  document.getElementById('ufield').value = '';
+  document.getElementById('ls1').style.display = 'flex';
+  document.getElementById('ls2').style.display = 'none';
+  document.getElementById('overlay').style.display = 'flex';
+}
+setTimeout(() => finishLogin('pyatkinmv'), 400);
+
+function toggle(h) { h.parentElement.classList.toggle('open'); }
+function selectChip(el) {
+  el.closest('.model-chips').querySelectorAll('.model-chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+function onDrop(e) { e.preventDefault(); document.getElementById('dropzone').classList.remove('drag-over'); onFile(e.dataTransfer.files[0]); }
+function onFile(f) {
+  if (!f) return;
+  const dz = document.getElementById('dropzone');
+  dz.classList.add('has-file');
+  document.getElementById('drop-title').textContent = f.name;
+  document.getElementById('drop-sub').textContent = (f.size/1024/1024).toFixed(1) + ' MB';
+  document.getElementById('drop-formats').textContent = '';
+  dz.innerHTML += '<button class="drop-change" onclick="event.stopPropagation();resetDrop()">Change file</button>';
+  showSettings(true);
+}
+function resetDrop() {
+  const dz = document.getElementById('dropzone');
+  dz.className = 'drop-zone';
+  document.getElementById('drop-title').textContent = 'Drop your file here';
+  document.getElementById('drop-sub').textContent = 'or click to browse';
+  document.getElementById('drop-formats').textContent = 'MP3 · MP4 · WAV · M4A · OGG · FLAC · max 2 GB';
+  document.querySelector('.drop-change')?.remove();
+  showSettings(false);
+}
+function showSettings(v) {
+  document.getElementById('settings-panel').className = 'settings-panel' + (v ? ' visible' : '');
+  document.getElementById('tbtnwrap').className = 'transcribe-wrap' + (v ? ' visible' : '');
+}
+function doTranscribe() {
+  showSettings(false);
+  document.getElementById('progwrap').className = 'progress-wrap visible';
+  document.getElementById('prog-fill').style.width = '40%';
+  document.getElementById('prog-pct').textContent = '40%';
+}
+
+// DEMO
+function demoLogin() {
+  setActive(event.target);
+  document.getElementById('ufield').value=''; document.getElementById('ls1').style.display='flex'; document.getElementById('ls2').style.display='none';
+  document.getElementById('overlay').style.display='flex';
+  document.getElementById('user-pill').style.display='none';
+}
+function demoIdle() { setActive(event.target); resetDrop(); document.getElementById('progwrap').className='progress-wrap'; }
+function demoFile() {
+  setActive(event.target);
+  document.getElementById('progwrap').className='progress-wrap';
+  const dz = document.getElementById('dropzone');
+  dz.classList.add('has-file');
+  document.getElementById('drop-title').textContent = 'interview-candidate-anna.m4a';
+  document.getElementById('drop-sub').textContent = '234 MB';
+  document.getElementById('drop-formats').textContent = '';
+  showSettings(true);
+}
+function demoProgress() {
+  setActive(event.target);
+  showSettings(false);
+  document.getElementById('progwrap').className='progress-wrap visible';
+  document.getElementById('prog-phase').textContent='Transcribing…';
+  document.getElementById('prog-fill').style.width='63%';
+  document.getElementById('prog-pct').textContent='63%';
+}
+function setActive(el) { document.querySelectorAll('.demo-btn').forEach(b=>b.classList.remove('active')); el.classList.add('active'); }
+</script>
+</body>
+</html>

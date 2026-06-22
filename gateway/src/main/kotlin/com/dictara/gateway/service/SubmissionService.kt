@@ -2,7 +2,6 @@ package com.dictara.gateway.service
 
 import com.dictara.gateway.entity.AudioMetaEntity
 import com.dictara.gateway.entity.SubmissionEntity
-import com.dictara.gateway.entity.SubmissionTagEntity
 import com.dictara.gateway.entity.TelegramDeliveryEntity
 import com.dictara.gateway.repository.*
 import com.dictara.gateway.storage.UploadResult
@@ -132,7 +131,7 @@ class SubmissionService(
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found") }
         if (submission.userId != userId) throw ResponseStatusException(HttpStatus.FORBIDDEN)
         if (!tagRepo.existsBySubmissionIdAndTag(submissionId, tag)) {
-            tagRepo.save(SubmissionTagEntity(submissionId = submissionId, tag = tag))
+            tagRepo.insert(submissionId, tag)
         }
         return tagRepo.findBySubmissionId(submissionId).map { it.tag }.sorted()
     }
