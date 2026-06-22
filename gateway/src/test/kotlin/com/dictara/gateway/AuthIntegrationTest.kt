@@ -130,7 +130,7 @@ class AuthIntegrationTest {
             token = UUID.randomUUID(),
             pendingUsername = "expired_ivy",
             expiresAt = Instant.now().minusSeconds(1),
-        ))
+        ).apply { _isNew = true })
 
         val response = rest.postForEntity(
             "/auth/login-link/confirm-callback",
