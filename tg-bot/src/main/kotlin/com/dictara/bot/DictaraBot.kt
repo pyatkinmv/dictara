@@ -421,6 +421,7 @@ class DictaraBot(
                 }
             } catch (e: PlanLimitException) {
                 log.info("Plan limit exceeded: chatId={} error={}", chatId, e.message)
+                if (statusMsg != null) try { execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build()) } catch (_: Exception) {}
                 send(chatId, "⚠️ ${e.message}", replyToMessageId = originalMessageId)
             } catch (e: Exception) {
                 log.error("Failed to process audio: chatId={} fileId={} error={}", chatId, fileId, e.message, e)
