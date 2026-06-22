@@ -1,13 +1,14 @@
 package com.dictara.gateway.entity
 
-import jakarta.persistence.*
+import org.springframework.data.annotation.Id
+import org.springframework.data.relational.core.mapping.Table
 import java.time.Instant
 import java.util.UUID
 
-@Entity @Table(name = "summaries")
+@Table("summaries")
 class SummaryEntity(
-    @Id @GeneratedValue(strategy = GenerationType.UUID) val id: UUID? = null,
-    @Column(name = "submission_id", nullable = false, unique = true) val submissionId: UUID,
-    @Column var text: String? = null,
-    @Column(name = "created_at", nullable = false, updatable = false) val createdAt: Instant = Instant.now(),
+    @Id val id: UUID? = null,
+    val submissionId: UUID,
+    var text: String? = null,
+    val createdAt: Instant = Instant.now(),
 )

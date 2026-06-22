@@ -1,15 +1,14 @@
 package com.dictara.gateway.entity
 
-import jakarta.persistence.*
+import org.springframework.data.annotation.Id
+import org.springframework.data.relational.core.mapping.Table
 import java.io.Serializable
 import java.util.UUID
 
-@Entity
-@Table(name = "submission_tags")
-@IdClass(SubmissionTagId::class)
+@Table("submission_tags")
 class SubmissionTagEntity(
-    @Id @Column(name = "submission_id") val submissionId: UUID,
-    @Id @Column(name = "tag") val tag: String,
+    @Id val submissionId: UUID,
+    @Id val tag: String,
 )
 
 data class SubmissionTagId(

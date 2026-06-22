@@ -7,6 +7,7 @@ import com.dictara.gateway.entity.StageAttemptEntity
 import com.dictara.gateway.entity.SubmissionEntity
 import com.dictara.gateway.model.SummaryMode
 import com.dictara.gateway.port.SummarizerPort
+import com.dictara.gateway.repository.AudioMetaRepository
 import com.dictara.gateway.repository.TranscriptRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
@@ -24,6 +25,7 @@ class OrchestratorService(
     private val props: com.dictara.gateway.config.DictaraProperties,
     private val stateService: SubmissionStateService,
     private val transcriptRepo: TranscriptRepository,
+    private val audioMetaRepo: AudioMetaRepository,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -80,7 +82,8 @@ class OrchestratorService(
     /** Runs on dispatchExecutor only — serialized so no concurrent claims are possible. */
     private fun doDispatch() {
         val submission = stateService.claimNextPendingSubmission() ?: return
-        log.info("Dispatching submission ${submission.id} (file=${submission.audio.originalName}, model=${submission.model}, language=${submission.language}, diarize=${submission.diarize}, summaryMode=${submission.summaryMode})")
+        val audio = audioMetaRepo.findById(submission.audioId!!).orElseThrow()
+        log.info("Dispatching submission ${submission.id} (file=${audio.originalName}, model=${submission.model}, language=${submission.language}, diarize=${submission.diarize}, summaryMode=${submission.summaryMode})")
         executor.submit { runTranscription(submission) }
     }
 
@@ -88,6 +91,7 @@ class OrchestratorService(
 
     private fun runTranscription(submission: SubmissionEntity) {
         val submissionId = submission.id!!
+        val audio = audioMetaRepo.findById(submission.audioId!!).orElseThrow()
         val attempt = stateService.createAttempt(submissionId, "transcription")
         log.info("Transcription attempt ${attempt.attemptNum} started for submission $submissionId")
 
@@ -97,10 +101,10 @@ class OrchestratorService(
                 language = submission.language,
                 diarize = submission.diarize,
                 numSpeakers = submission.numSpeakers,
-                originalFileName = submission.audio.originalName,
+                originalFileName = audio.originalName,
             )
 
-            val transcriberJobId = transcriberClient.submitByReference(submission.audio.storageUri!!, params)
+            val transcriberJobId = transcriberClient.submitByReference(audio.storageUri!!, params)
             stateService.setAttemptExternalJobId(attempt.id!!, transcriberJobId)
             log.info("Submission $submissionId submitted to transcriber (externalJobId=$transcriberJobId)")
 

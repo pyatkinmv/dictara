@@ -1,7 +1,7 @@
 package com.dictara.gateway.repository
 
 import com.dictara.gateway.entity.JobRunEntity
-import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.repository.CrudRepository
 import java.util.UUID
 
-interface JobRunRepository : JpaRepository<JobRunEntity, UUID>
+interface JobRunRepository : CrudRepository<JobRunEntity, UUID>

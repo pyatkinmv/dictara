@@ -31,16 +31,16 @@ class SubmissionStateServiceTest : AbstractSharedContextIntegrationTest() {
     }
 
     @Test
-    fun `loadSubmission returns entity with EAGER associations accessible outside transaction`() {
+    fun `loadSubmission returns submission with correct FK references`() {
         val user = userRepo.save(UserEntity(displayName = "Test"))
         val audio = audioMetaRepo.save(AudioMetaEntity(
-            user = user, originalName = "a.m4a", contentType = "audio/mp4", sizeBytes = 100, contentHash = "abc123",
+            userId = user.id!!, originalName = "a.m4a", contentType = "audio/mp4", sizeBytes = 100, contentHash = "abc123",
         ))
-        val saved = submissionRepo.save(SubmissionEntity(user = user, audio = audio))
+        val saved = submissionRepo.save(SubmissionEntity(userId = user.id!!, audioId = audio.id!!))
         val submissionId = saved.id!!
 
         val loaded = stateService.loadSubmission(submissionId)
-        assertThat(loaded.audio.originalName).isEqualTo("a.m4a")
-        assertThat(loaded.user.displayName).isEqualTo("Test")
+        assertThat(loaded.audioId).isEqualTo(audio.id)
+        assertThat(loaded.userId).isEqualTo(user.id)
     }
 }

@@ -8,13 +8,13 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.boot.test.autoconfigure.data.jdbc.DataJdbcTest
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import java.time.Instant
 
-@DataJpaTest
+@DataJdbcTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class AudioMetaRepositoryDeduplicationTest {
 
@@ -22,10 +22,9 @@ class AudioMetaRepositoryDeduplicationTest {
         @DynamicPropertySource @JvmStatic
         fun props(registry: DynamicPropertyRegistry) {
             val pg = SharedTestInfrastructure.postgres
-            registry.add("spring.datasource.url") { pg.jdbcUrl }
+            registry.add("spring.datasource.url") { pg.jdbcUrl + "?stringtype=unspecified" }
             registry.add("spring.datasource.username") { pg.username }
             registry.add("spring.datasource.password") { pg.password }
-            registry.add("spring.jpa.hibernate.ddl-auto") { "none" }
             registry.add("spring.flyway.enabled") { "true" }
         }
     }
@@ -100,7 +99,7 @@ class AudioMetaRepositoryDeduplicationTest {
 
     private fun audioMeta(user: UserEntity, hash: String, uri: String, createdAt: Instant) =
         audioMetaRepo.save(AudioMetaEntity(
-            user = user, originalName = "file.mp4", contentType = "video/mp4",
+            userId = user.id!!, originalName = "file.mp4", contentType = "video/mp4",
             sizeBytes = 1024, contentHash = hash, storageUri = uri, createdAt = createdAt,
         ))
 }

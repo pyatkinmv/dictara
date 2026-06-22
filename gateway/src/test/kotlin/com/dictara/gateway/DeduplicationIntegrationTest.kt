@@ -154,7 +154,7 @@ class DeduplicationIntegrationTest : AbstractSharedContextIntegrationTest() {
     fun `content_hash is persisted to audio_meta after upload`() {
         val response = submit()
         val submission = submissionRepo.findById(jobId(response)).orElseThrow()
-        val meta = audioMetaRepo.findById(submission.audio.id!!).orElseThrow()
+        val meta = audioMetaRepo.findById(submission.audioId!!).orElseThrow()
 
         assertThat(meta.contentHash).isEqualTo(HASH_A)
     }

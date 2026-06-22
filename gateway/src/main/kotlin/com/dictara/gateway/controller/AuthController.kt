@@ -6,11 +6,13 @@ import com.dictara.gateway.entity.LoginTokenEntity
 import com.dictara.gateway.repository.AuthIdentityRepository
 import com.dictara.gateway.repository.LoginNotificationRepository
 import com.dictara.gateway.repository.LoginTokenRepository
+import com.dictara.gateway.repository.UserRepository
 import com.dictara.gateway.service.JwtTokenProvider
 import com.dictara.gateway.service.UserService
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
@@ -20,6 +22,7 @@ import java.util.UUID
 class AuthController(
     private val jwt: JwtTokenProvider,
     private val userService: UserService,
+    private val userRepo: UserRepository,
     private val loginTokenRepo: LoginTokenRepository,
     private val loginNotificationRepo: LoginNotificationRepository,
     private val authIdentityRepo: AuthIdentityRepository,
@@ -40,6 +43,7 @@ class AuthController(
     data class LoginLinkStatusResponse(val confirmed: Boolean, val token: String?, val displayName: String?)
 
     @PostMapping("/auth/bot-started")
+    @Transactional
     fun markBotStarted(@RequestBody body: Map<String, String>) {
         val uid = body["telegram_user_id"] ?: return
         val identity = authIdentityRepo.findByProviderAndProviderUid("telegram", uid) ?: return
@@ -49,7 +53,7 @@ class AuthController(
         val updated = (mapper.convertValue(current, Map::class.java) as Map<String, Any?>).toMutableMap()
         updated["bot_started"] = true
         authIdentityRepo.save(AuthIdentityEntity(
-            id = identity.id, user = identity.user,
+            id = identity.id, userId = identity.userId,
             provider = identity.provider, providerUid = identity.providerUid,
             credentials = identity.credentials,
             metadata = mapper.writeValueAsString(updated),
@@ -58,6 +62,7 @@ class AuthController(
     }
 
     @PostMapping("/auth/login-by-username")
+    @Transactional
     fun loginByUsername(@RequestBody req: LoginByUsernameRequest): LoginByUsernameResponse {
         val username = req.telegramUsername.trimStart('@')
         val token = UUID.randomUUID()
@@ -66,13 +71,14 @@ class AuthController(
             runCatching { mapper.readTree(it.metadata ?: "{}").get("bot_started")?.asBoolean() }.getOrNull() == true
         } ?: false
         if (identity != null && botStarted) {
-            val tokenEntity = loginTokenRepo.save(LoginTokenEntity(
+            loginTokenRepo.save(LoginTokenEntity(
                 token = token,
-                user = identity.user,
+                userId = identity.userId,
                 expiresAt = Instant.now().plusSeconds(600),
+                _isNew = true,
             ))
             loginNotificationRepo.save(LoginNotificationEntity(
-                loginToken = tokenEntity,
+                tokenId = token,
                 chatId = identity.providerUid,
             ))
             return LoginByUsernameResponse(token.toString(), "notified", null)
@@ -83,6 +89,7 @@ class AuthController(
                 token = token,
                 pendingUsername = username,
                 expiresAt = Instant.now().plusSeconds(600),
+                _isNew = true,
             ))
             return LoginByUsernameResponse(token.toString(), "unknown_user", "https://t.me/$botUsername")
         }
@@ -94,7 +101,7 @@ class AuthController(
             mapOf(
                 "id" to it.id.toString(),
                 "chatId" to it.chatId,
-                "token" to it.loginToken.token.toString(),
+                "token" to it.tokenId.toString(),
             )
         }
 
@@ -114,6 +121,7 @@ class AuthController(
     }
 
     @PostMapping("/auth/login-link/confirm-callback")
+    @Transactional
     fun confirmCallback(@RequestBody req: ConfirmCallbackRequest) {
         val entity = loginTokenRepo.findById(UUID.fromString(req.token))
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND) }
@@ -122,12 +130,13 @@ class AuthController(
         val user = userService.resolveByTelegramId(
             req.telegramUserId, req.telegramUsername, req.telegramFirstName, req.telegramLastName,
         )
-        entity.user = user
+        entity.userId = user.id
         entity.confirmed = true
         loginTokenRepo.save(entity)
     }
 
     @PostMapping("/auth/login-link/reject")
+    @Transactional
     fun rejectLogin(@RequestBody body: Map<String, String>) {
         val entity = loginTokenRepo.findById(UUID.fromString(body["token"]!!))
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND) }
@@ -136,6 +145,7 @@ class AuthController(
     }
 
     @GetMapping("/auth/login-link/{token}")
+    @Transactional(readOnly = true)
     fun pollLoginLink(@PathVariable token: String): LoginLinkStatusResponse {
         val entity = loginTokenRepo.findById(UUID.fromString(token))
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND) }
@@ -143,9 +153,10 @@ class AuthController(
             throw ResponseStatusException(HttpStatus.GONE, "Login rejected")
         if (entity.expiresAt.isBefore(Instant.now()))
             throw ResponseStatusException(HttpStatus.GONE, "Token expired")
-        if (!entity.confirmed || entity.user == null)
+        if (!entity.confirmed || entity.userId == null)
             return LoginLinkStatusResponse(false, null, null)
-        val jwtToken = jwt.issue(entity.user!!.id!!)
-        return LoginLinkStatusResponse(true, jwtToken, entity.user!!.displayName)
+        val user = userRepo.findById(entity.userId!!).orElseThrow()
+        val jwtToken = jwt.issue(entity.userId!!)
+        return LoginLinkStatusResponse(true, jwtToken, user.displayName)
     }
 }

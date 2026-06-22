@@ -1,19 +1,23 @@
 package com.dictara.gateway.entity
 
-import jakarta.persistence.*
+import org.springframework.data.annotation.Id
+import org.springframework.data.annotation.Transient
+import org.springframework.data.domain.Persistable
+import org.springframework.data.relational.core.mapping.Table
 import java.time.Instant
 import java.util.UUID
 
-@Entity
-@Table(name = "login_tokens")
+@Table("login_tokens")
 class LoginTokenEntity(
     @Id val token: UUID,
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
-    var user: UserEntity? = null,
+    var userId: UUID? = null,
     var confirmed: Boolean = false,
     var rejected: Boolean = false,
-    @Column(name = "pending_username") val pendingUsername: String? = null,
-    @Column(name = "expires_at", nullable = false) val expiresAt: Instant,
-    @Column(name = "created_at", nullable = false, updatable = false) val createdAt: Instant = Instant.now(),
-)
+    val pendingUsername: String? = null,
+    val expiresAt: Instant,
+    val createdAt: Instant = Instant.now(),
+    @Transient val _isNew: Boolean = false,
+) : Persistable<UUID> {
+    override fun getId(): UUID = token
+    override fun isNew(): Boolean = _isNew
+}

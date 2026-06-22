@@ -78,7 +78,7 @@ services:
     environment:
       TRANSCRIBER_URL: ${TRANSCRIBER_URL:-http://transcriber:8000}
       GCS_UPLOADS_BUCKET: ${GCS_UPLOADS_BUCKET:-}
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/dictara
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/dictara?stringtype=unspecified
       SPRING_DATASOURCE_USERNAME: dictara
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}

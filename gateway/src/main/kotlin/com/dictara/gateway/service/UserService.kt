@@ -39,17 +39,18 @@ class UserService(
         val metadata = mapper.writeValueAsString(metaMap)
 
         if (existing != null) {
-            existing.user.displayName = displayName
-            userRepo.save(existing.user)
+            val user = userRepo.findById(existing.userId).orElseThrow()
+            user.displayName = displayName
+            userRepo.save(user)
             authIdentityRepo.save(AuthIdentityEntity(
-                id = existing.id, user = existing.user,
+                id = existing.id, userId = existing.userId,
                 provider = "telegram", providerUid = uid,
                 credentials = existing.credentials, metadata = metadata, createdAt = existing.createdAt,
             ))
-            return existing.user
+            return user
         }
         val user = userRepo.save(UserEntity(displayName = displayName))
-        authIdentityRepo.save(AuthIdentityEntity(user = user, provider = "telegram", providerUid = uid, metadata = metadata))
+        authIdentityRepo.save(AuthIdentityEntity(userId = user.id!!, provider = "telegram", providerUid = uid, metadata = metadata))
         return user
     }
 

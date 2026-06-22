@@ -1,55 +1,55 @@
 package com.dictara.gateway.repository
 
 import com.dictara.gateway.entity.SubmissionEntity
-import jakarta.persistence.LockModeType
-import jakarta.persistence.QueryHint
-import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.data.jpa.repository.Lock
-import org.springframework.data.jpa.repository.Query
-import org.springframework.data.jpa.repository.QueryHints
-import org.springframework.data.repository.query.Param
+import org.springframework.data.jdbc.repository.query.Query
+import org.springframework.data.repository.CrudRepository
 import java.time.Instant
 import java.util.UUID
 
-interface SubmissionRepository : JpaRepository<SubmissionEntity, UUID> {
+interface SubmissionRepository : CrudRepository<SubmissionEntity, UUID> {
 
-    fun findByUser_IdOrderByCreatedAtDesc(userId: UUID): List<SubmissionEntity>
+    fun findByUserIdOrderByCreatedAtDesc(userId: UUID): List<SubmissionEntity>
 
-    fun findByUser_IdAndStatusOrderByCreatedAtAsc(userId: UUID, status: String): List<SubmissionEntity>
+    fun findByUserIdAndStatusOrderByCreatedAtAsc(userId: UUID, status: String): List<SubmissionEntity>
 
     fun existsByStatus(status: String): Boolean
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @QueryHints(value = [QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2")])
-    @Query("SELECT s FROM SubmissionEntity s JOIN FETCH s.audio JOIN FETCH s.user WHERE s.status = 'pending' ORDER BY s.createdAt LIMIT 1")
+    @Query("""
+        SELECT * FROM submissions
+        WHERE status = 'pending'
+        ORDER BY created_at
+        LIMIT 1
+        FOR UPDATE NOWAIT
+    """)
     fun findNextPendingForUpdate(): SubmissionEntity?
 
-    @Query("SELECT COUNT(s) FROM SubmissionEntity s WHERE s.status = 'pending' AND s.createdAt < :createdAt")
+    @Query("SELECT COUNT(*) FROM submissions WHERE status = 'pending' AND created_at < :createdAt")
     fun countPendingSubmissionsBefore(createdAt: Instant): Long
 
-    @Query("SELECT COUNT(s) FROM SubmissionEntity s WHERE s.status = :status")
-    fun countByStatus(@Param("status") status: String): Long
+    @Query("SELECT COUNT(*) FROM submissions WHERE status = :status")
+    fun countByStatus(status: String): Long
 
     @Query("""
-        SELECT s FROM SubmissionEntity s
-        WHERE s.audio.user.id = :userId
-        AND s.audio.contentHash = :contentHash
-        AND s.model = :model
-        AND s.language = :language
-        AND s.diarize = :diarize
-        AND COALESCE(s.numSpeakers, 0) = COALESCE(:numSpeakers, 0)
-        AND s.summaryMode = :summaryMode
-        AND s.status <> 'failed'
-        ORDER BY s.createdAt DESC
+        SELECT s.* FROM submissions s
+        JOIN audio_meta a ON s.audio_id = a.id
+        WHERE a.user_id = :userId
+          AND a.content_hash = :contentHash
+          AND s.model = :model
+          AND s.language = :language
+          AND s.diarize = :diarize
+          AND COALESCE(s.num_speakers, 0) = COALESCE(:numSpeakers, 0)
+          AND s.summary_mode = :summaryMode
+          AND s.status <> 'failed'
+        ORDER BY s.created_at DESC
         LIMIT 1
     """)
     fun findDuplicate(
-        @Param("userId") userId: UUID,
-        @Param("contentHash") contentHash: String,
-        @Param("model") model: String,
-        @Param("language") language: String,
-        @Param("diarize") diarize: Boolean,
-        @Param("numSpeakers") numSpeakers: Int?,
-        @Param("summaryMode") summaryMode: String,
+        userId: UUID,
+        contentHash: String,
+        model: String,
+        language: String,
+        diarize: Boolean,
+        numSpeakers: Int?,
+        summaryMode: String,
     ): SubmissionEntity?
 }

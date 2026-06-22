@@ -1,15 +1,11 @@
 package com.dictara.gateway.repository
 
 import com.dictara.gateway.entity.StageAttemptEntity
-import jakarta.persistence.LockModeType
-import jakarta.persistence.QueryHint
-import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.data.jpa.repository.Lock
-import org.springframework.data.jpa.repository.Query
-import org.springframework.data.jpa.repository.QueryHints
+import org.springframework.data.jdbc.repository.query.Query
+import org.springframework.data.repository.CrudRepository
 import java.util.UUID
 
-interface StageAttemptRepository : JpaRepository<StageAttemptEntity, UUID> {
+interface StageAttemptRepository : CrudRepository<StageAttemptEntity, UUID> {
 
     fun findBySubmissionIdAndStageOrderByAttemptNumDesc(
         submissionId: UUID, stage: String,
@@ -17,13 +13,12 @@ interface StageAttemptRepository : JpaRepository<StageAttemptEntity, UUID> {
 
     fun countBySubmissionIdAndStage(submissionId: UUID, stage: String): Long
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @QueryHints(value = [QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2")])
     @Query("""
-        SELECT a FROM StageAttemptEntity a
-        WHERE a.status = 'processing'
-          AND a.externalJobId IS NOT NULL
-        ORDER BY a.startedAt
+        SELECT * FROM stage_attempts
+        WHERE status = 'processing'
+          AND external_job_id IS NOT NULL
+        ORDER BY started_at
+        FOR UPDATE
     """)
     fun findInFlightForUpdate(): List<StageAttemptEntity>
 }

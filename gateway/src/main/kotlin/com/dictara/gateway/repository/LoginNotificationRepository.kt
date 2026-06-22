@@ -1,8 +1,8 @@
 package com.dictara.gateway.repository
 
 import com.dictara.gateway.entity.LoginNotificationEntity
-import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.repository.CrudRepository
 
-interface LoginNotificationRepository : JpaRepository<LoginNotificationEntity, Long> {
+interface LoginNotificationRepository : CrudRepository<LoginNotificationEntity, Long> {
     fun findBySentFalse(): List<LoginNotificationEntity>
 }

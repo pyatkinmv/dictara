@@ -147,9 +147,9 @@ class TranscribeController(
         val originalName = file.originalFilename ?: "upload"
         val contentType = file.contentType ?: "application/octet-stream"
 
-        // Pre-generate UUID so GCS path is known before saving to DB
-        val audioMetaId = UUID.randomUUID()
-        val uploadResult = audioStorage.upload(audioMetaId, originalName, file.inputStream, file.size, contentType)
+        // Use a separate UUID for GCS path; DB generates audio_meta.id via gen_random_uuid()
+        val gcsId = UUID.randomUUID()
+        val uploadResult = audioStorage.upload(gcsId, originalName, file.inputStream, file.size, contentType)
         val contentHash = uploadResult.contentHash
 
         // Dedup: if same file + same settings already processed, return existing result without GPU
@@ -162,19 +162,19 @@ class TranscribeController(
         }
 
         val audio = audioMetaRepo.save(AudioMetaEntity(
-            id = audioMetaId, user = user, originalName = originalName,
+            userId = user.id!!, originalName = originalName,
             contentType = contentType, sizeBytes = file.size,
             storageUri = uploadResult.ref.uri,
             contentHash = contentHash,
         ))
-        log.info("Audio {} stored in GCS at {}", audioMetaId, uploadResult.ref.uri)
+        log.info("Audio {} stored in GCS at {}", audio.id, uploadResult.ref.uri)
 
         val submission = submissionRepo.save(SubmissionEntity(
-            user = user, audio = audio, model = resolvedModel, language = language,
+            userId = user.id!!, audioId = audio.id!!, model = resolvedModel, language = language,
             diarize = diarize, numSpeakers = numSpeakers, summaryMode = summaryMode, source = source,
         ))
         if (telegramChatId != null) {
-            telegramDeliveryRepo.save(TelegramDeliveryEntity(jobId = submission.id!!, chatId = telegramChatId, telegramMessageId = telegramMessageId))
+            telegramDeliveryRepo.save(TelegramDeliveryEntity(jobId = submission.id!!, chatId = telegramChatId, telegramMessageId = telegramMessageId, _isNew = true))
         }
         log.info("Submission accepted: id=${submission.id}, file=$originalName, size=${file.size}B, model=$resolvedModel, language=$language, diarize=$diarize, summaryMode=$summaryMode, source=$source, user=${user.id}")
         org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
@@ -264,16 +264,18 @@ class TranscribeController(
     )
 
     @GetMapping("/transcriptions")
+    @Transactional(readOnly = true)
     fun listTranscriptions(servletRequest: HttpServletRequest): List<TranscriptionSummary> {
         val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
             ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
-        val submissions = submissionRepo.findByUser_IdOrderByCreatedAtDesc(userId)
+        val submissions = submissionRepo.findByUserIdOrderByCreatedAtDesc(userId)
+        val audioById = audioMetaRepo.findAllById(submissions.mapNotNull { it.audioId }).associateBy { it.id }
         val tagsBySubmission = tagRepo.findBySubmissionIdIn(submissions.mapNotNull { it.id })
             .groupBy({ it.submissionId }, { it.tag })
         return submissions.map {
             TranscriptionSummary(
                 jobId = it.id.toString(),
-                fileName = it.audio.originalName,
+                fileName = audioById[it.audioId]?.originalName ?: "unknown",
                 createdAt = it.createdAt.toString(),
                 status = it.status,
                 tags = (tagsBySubmission[it.id] ?: emptyList()).sorted(),
@@ -309,7 +311,7 @@ class TranscribeController(
         }
         val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
             ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
-        if (submission.user.id != userId) throw ResponseStatusException(HttpStatus.FORBIDDEN)
+        if (submission.userId != userId) throw ResponseStatusException(HttpStatus.FORBIDDEN)
 
         val tag = body["tag"]?.trim()?.lowercase()
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing 'tag'")
@@ -337,7 +339,7 @@ class TranscribeController(
         }
         val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
             ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
-        if (submission.user.id != userId) throw ResponseStatusException(HttpStatus.FORBIDDEN)
+        if (submission.userId != userId) throw ResponseStatusException(HttpStatus.FORBIDDEN)
 
         tagRepo.deleteBySubmissionIdAndTag(id, tag)
         return mapOf("tags" to tagRepo.findBySubmissionId(id).map { it.tag }.sorted())

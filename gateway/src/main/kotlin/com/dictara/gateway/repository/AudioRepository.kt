@@ -1,17 +1,13 @@
 package com.dictara.gateway.repository
 
 import com.dictara.gateway.entity.AudioMetaEntity
-import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.data.jpa.repository.Modifying
-import org.springframework.data.jpa.repository.Query
-import org.springframework.transaction.annotation.Transactional
+import org.springframework.data.jdbc.repository.query.Query
+import org.springframework.data.repository.CrudRepository
 import java.util.UUID
 
-interface AudioMetaRepository : JpaRepository<AudioMetaEntity, UUID> {
+interface AudioMetaRepository : CrudRepository<AudioMetaEntity, UUID> {
 
-    @Modifying(clearAutomatically = true)
-    @Transactional
-    @Query(nativeQuery = true, value = """
+    @Query("""
         UPDATE audio_meta am
         SET storage_uri = canonical.uri
         FROM (
@@ -24,6 +20,6 @@ interface AudioMetaRepository : JpaRepository<AudioMetaEntity, UUID> {
     """)
     fun deduplicateStorageUris(): Int
 
-    @Query("SELECT a.storageUri FROM AudioMetaEntity a WHERE a.storageUri IS NOT NULL")
+    @Query("SELECT storage_uri FROM audio_meta WHERE storage_uri IS NOT NULL")
     fun findAllStorageUris(): List<String>
 }
