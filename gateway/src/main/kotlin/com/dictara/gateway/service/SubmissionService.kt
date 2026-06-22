@@ -3,6 +3,7 @@ package com.dictara.gateway.service
 import com.dictara.gateway.entity.AudioMetaEntity
 import com.dictara.gateway.entity.SubmissionEntity
 import com.dictara.gateway.entity.TelegramDeliveryEntity
+import com.dictara.gateway.plan.PlanService
 import com.dictara.gateway.repository.*
 import com.dictara.gateway.storage.UploadResult
 import org.springframework.http.HttpStatus
@@ -24,6 +25,7 @@ class SubmissionService(
     private val diarizationRepo: DiarizationRepository,
     private val summaryRepo: SummaryRepository,
     private val orchestrator: OrchestratorService,
+    private val planService: PlanService,
 ) {
     data class CreateResult(val submissionId: UUID, val dedup: Boolean)
 
@@ -66,6 +68,8 @@ class SubmissionService(
             val duplicate = submissionRepo.findDuplicate(userId, contentHash, model, language, diarize, numSpeakers, summaryMode)
             if (duplicate != null) return CreateResult(duplicate.id!!, dedup = true)
         }
+
+        planService.enforce(userId)
 
         val audio = audioMetaRepo.save(AudioMetaEntity(
             id = audioId, userId = userId, originalName = originalName,

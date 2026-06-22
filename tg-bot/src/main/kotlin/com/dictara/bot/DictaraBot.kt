@@ -419,6 +419,9 @@ class DictaraBot(
                 } finally {
                     audioTmp.delete()
                 }
+            } catch (e: PlanLimitException) {
+                log.info("Plan limit exceeded: chatId={} error={}", chatId, e.message)
+                send(chatId, "⚠️ ${e.message}", replyToMessageId = originalMessageId)
             } catch (e: Exception) {
                 log.error("Failed to process audio: chatId={} fileId={} error={}", chatId, fileId, e.message, e)
                 send(chatId, "Something went wrong, please try again later", replyToMessageId = originalMessageId)

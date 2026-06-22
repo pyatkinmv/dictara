@@ -10,4 +10,5 @@ class UserEntity(
     @Id val id: UUID? = null,
     var displayName: String? = null,
     val createdAt: Instant = Instant.now(),
+    val plan: String = "free",
 )

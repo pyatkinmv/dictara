@@ -3,6 +3,13 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'models.dart';
 
+class ApiException implements Exception {
+  final String message;
+  const ApiException(this.message);
+  @override
+  String toString() => message;
+}
+
 class ApiClient {
   static const _base = '/api';
 
@@ -56,7 +63,7 @@ class ApiClient {
       } catch (_) {
         msg = 'Submit failed: ${res.statusCode}';
       }
-      throw Exception(msg);
+      throw ApiException(msg);
     }
 
     final body = jsonDecode(res.body) as Map<String, dynamic>;
@@ -78,7 +85,7 @@ class ApiClient {
   Future<JobResult> pollJob(String jobId) async {
     final res = await http.get(Uri.parse('$_base/jobs/$jobId'), headers: _authHeaders);
     if (res.statusCode != 200) {
-      throw Exception('Poll failed: ${res.statusCode}');
+      throw ApiException('Poll failed: ${res.statusCode}');
     }
     return JobResult.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
   }

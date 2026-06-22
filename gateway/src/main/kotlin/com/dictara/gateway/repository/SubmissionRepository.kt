@@ -52,4 +52,12 @@ interface SubmissionRepository : CrudRepository<SubmissionEntity, UUID> {
         numSpeakers: Int?,
         summaryMode: String,
     ): SubmissionEntity?
+
+    @Query("""
+        SELECT COUNT(*) FROM submissions
+        WHERE user_id = :userId
+          AND created_at >= date_trunc('month', NOW() AT TIME ZONE 'UTC')
+          AND status <> 'failed'
+    """)
+    fun countCurrentMonthSubmissions(userId: UUID): Long
 }

@@ -279,6 +279,9 @@ class DictaraClient(private val baseUrl: String) {
         val responseBody = response.body?.string() ?: ""
         if (!response.isSuccessful) {
             val message = runCatching { mapper.readTree(responseBody)["message"]?.asText() }.getOrNull()
+            if (response.code == 429) {
+                throw PlanLimitException(message ?: "Monthly transcription limit reached")
+            }
             throw RuntimeException(message ?: "Submit failed (${response.code}): $responseBody")
         }
         val root = mapper.readTree(responseBody)
