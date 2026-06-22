@@ -83,7 +83,7 @@ class OrchestratorService(
     /** Runs on dispatchExecutor only — serialized so no concurrent claims are possible. */
     private fun doDispatch() {
         val submission = stateService.claimNextPendingSubmission() ?: return
-        val audio = audioMetaRepo.findById(submission.audioId!!).orElseThrow()
+        val audio = audioMetaRepo.findById(submission.audioId).orElseThrow()
         log.info("Dispatching submission ${submission.id} (file=${audio.originalName}, model=${submission.model}, language=${submission.language}, diarize=${submission.diarize}, summaryMode=${submission.summaryMode})")
         executor.submit { runTranscription(submission) }
     }
@@ -92,7 +92,7 @@ class OrchestratorService(
 
     private fun runTranscription(submission: SubmissionEntity) {
         val submissionId = submission.id!!
-        val audio = audioMetaRepo.findById(submission.audioId!!).orElseThrow()
+        val audio = audioMetaRepo.findById(submission.audioId).orElseThrow()
         val attempt = stateService.createAttempt(submissionId, "transcription")
         log.info("Transcription attempt ${attempt.attemptNum} started for submission $submissionId")
 

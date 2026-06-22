@@ -20,7 +20,7 @@ class RepositorySmokeTest {
         @DynamicPropertySource @JvmStatic
         fun props(registry: DynamicPropertyRegistry) {
             val pg = SharedTestInfrastructure.postgres
-            registry.add("spring.datasource.url") { pg.jdbcUrl + "" }
+            registry.add("spring.datasource.url") { pg.jdbcUrl }
             registry.add("spring.datasource.username") { pg.username }
             registry.add("spring.datasource.password") { pg.password }
             registry.add("spring.flyway.enabled") { "true" }
@@ -37,16 +37,17 @@ class RepositorySmokeTest {
         val audio = audioMetaRepo.save(AudioMetaEntity(
             userId = user.id!!, originalName = "test.m4a",
             contentType = "audio/mp4", sizeBytes = 1024, contentHash = "abc123",
+            _isNew = true,
         ))
         val submission = submissionRepo.save(SubmissionEntity(
-            userId = user.id!!, audioId = audio.id!!, model = "fast",
+            userId = user.id!!, audioId = audio.id, model = "fast",
             language = "auto", summaryMode = "off",
         ))
 
         val found = submissionRepo.findById(submission.id!!).orElse(null)
         assertThat(found).isNotNull
         assertThat(found.status).isEqualTo("pending")
-        val foundAudio = audioMetaRepo.findById(found.audioId!!).orElseThrow()
+        val foundAudio = audioMetaRepo.findById(found.audioId).orElseThrow()
         assertThat(foundAudio.originalName).isEqualTo("test.m4a")
     }
 }

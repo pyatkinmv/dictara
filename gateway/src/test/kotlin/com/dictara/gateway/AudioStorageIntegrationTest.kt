@@ -69,7 +69,7 @@ class AudioStorageIntegrationTest : AbstractSharedContextIntegrationTest() {
         val jobId = UUID.fromString(response.body!!["job_id"] as String)
         val submission = submissionRepo.findById(jobId).orElseThrow()
 
-        val meta = audioMetaRepo.findById(submission.audioId!!).orElseThrow()
+        val meta = audioMetaRepo.findById(submission.audioId).orElseThrow()
         assertThat(meta.storageUri).isEqualTo(FAKE_URI)
 
         awaitTranscriberSubmission(FAKE_URI)

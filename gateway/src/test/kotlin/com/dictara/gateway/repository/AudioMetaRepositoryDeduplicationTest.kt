@@ -22,7 +22,7 @@ class AudioMetaRepositoryDeduplicationTest {
         @DynamicPropertySource @JvmStatic
         fun props(registry: DynamicPropertyRegistry) {
             val pg = SharedTestInfrastructure.postgres
-            registry.add("spring.datasource.url") { pg.jdbcUrl + "" }
+            registry.add("spring.datasource.url") { pg.jdbcUrl }
             registry.add("spring.datasource.username") { pg.username }
             registry.add("spring.datasource.password") { pg.password }
             registry.add("spring.flyway.enabled") { "true" }
@@ -101,5 +101,6 @@ class AudioMetaRepositoryDeduplicationTest {
         audioMetaRepo.save(AudioMetaEntity(
             userId = user.id!!, originalName = "file.mp4", contentType = "video/mp4",
             sizeBytes = 1024, contentHash = hash, storageUri = uri, createdAt = createdAt,
+            _isNew = true,
         ))
 }

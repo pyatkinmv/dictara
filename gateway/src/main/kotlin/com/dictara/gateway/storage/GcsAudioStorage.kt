@@ -12,6 +12,7 @@ import java.nio.channels.Channels
 import java.security.DigestInputStream
 import java.security.MessageDigest
 import java.time.Instant
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -33,7 +34,7 @@ class GcsAudioStorage(props: DictaraProperties) : AudioStorage {
     override fun upload(audioMetaId: UUID, fileName: String, inputStream: InputStream, sizeBytes: Long, contentType: String): UploadResult {
         val digest = MessageDigest.getInstance("SHA-256")
         val digestStream = DigestInputStream(inputStream, digest)
-        val objectName = "audio/$audioMetaId/$fileName"
+        val objectName = "audio/${LocalDate.now()}/$audioMetaId/$fileName"
         val blobInfo = BlobInfo.newBuilder(BlobId.of(bucket, objectName)).setContentType(contentType).build()
         storage.createFrom(blobInfo, digestStream)
         val uri = "gs://$bucket/$objectName"

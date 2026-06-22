@@ -147,9 +147,8 @@ class TranscribeController(
         val originalName = file.originalFilename ?: "upload"
         val contentType = file.contentType ?: "application/octet-stream"
 
-        // Use a separate UUID for GCS path; DB generates audio_meta.id via gen_random_uuid()
-        val gcsId = UUID.randomUUID()
-        val uploadResult = audioStorage.upload(gcsId, originalName, file.inputStream, file.size, contentType)
+        val audioId = UUID.randomUUID()
+        val uploadResult = audioStorage.upload(audioId, originalName, file.inputStream, file.size, contentType)
         val contentHash = uploadResult.contentHash
 
         // Dedup: if same file + same settings already processed, return existing result without GPU
@@ -162,15 +161,16 @@ class TranscribeController(
         }
 
         val audio = audioMetaRepo.save(AudioMetaEntity(
-            userId = user.id!!, originalName = originalName,
+            id = audioId, userId = user.id!!, originalName = originalName,
             contentType = contentType, sizeBytes = file.size,
             storageUri = uploadResult.ref.uri,
             contentHash = contentHash,
+            _isNew = true,
         ))
         log.info("Audio {} stored in GCS at {}", audio.id, uploadResult.ref.uri)
 
         val submission = submissionRepo.save(SubmissionEntity(
-            userId = user.id!!, audioId = audio.id!!, model = resolvedModel, language = language,
+            userId = user.id!!, audioId = audio.id, model = resolvedModel, language = language,
             diarize = diarize, numSpeakers = numSpeakers, summaryMode = summaryMode, source = source,
         ))
         if (telegramChatId != null) {
