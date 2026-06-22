@@ -4,16 +4,14 @@ import com.dictara.gateway.entity.*
 import com.dictara.gateway.repository.*
 import com.dictara.gateway.storage.AudioStorage
 import com.dictara.gateway.service.OrchestratorService
+import com.dictara.gateway.service.SubmissionService
 import com.dictara.gateway.service.UserService
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import jakarta.servlet.http.HttpServletRequest
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
-import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 import org.springframework.web.server.ResponseStatusException
@@ -23,10 +21,10 @@ import java.util.UUID
 
 @RestController
 class TranscribeController(
+    private val submissionService: SubmissionService,
     private val orchestrator: OrchestratorService,
     private val userService: UserService,
     private val userRepo: UserRepository,
-    private val audioMetaRepo: AudioMetaRepository,
     private val submissionRepo: SubmissionRepository,
     private val transcriptRepo: TranscriptRepository,
     private val diarizationRepo: DiarizationRepository,
@@ -40,25 +38,22 @@ class TranscribeController(
         private val log = LoggerFactory.getLogger(TranscribeController::class.java)
         val SUPPORTED_EXTENSIONS = setOf("mp3", "mp4", "m4a", "wav", "ogg", "oga", "opus", "flac", "webm", "mkv", "avi", "mov")
 
-        // Magic byte signatures for common image formats that must be rejected
         private val IMAGE_SIGNATURES = listOf(
             byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte())          to "JPEG",
             byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47)                      to "PNG",
             byteArrayOf(0x47, 0x49, 0x46)                                     to "GIF",
             byteArrayOf(0x42, 0x4D)                                           to "BMP",
-            byteArrayOf(0x52, 0x49, 0x46, 0x46)                               to "WebP/RIFF",  // check WEBP at offset 8 below
+            byteArrayOf(0x52, 0x49, 0x46, 0x46)                               to "WebP/RIFF",
         )
 
-        /** Returns a human-readable image type name if the bytes match a known image signature, null otherwise. */
         fun detectImageFormat(header: ByteArray): String? {
             for ((signature, name) in IMAGE_SIGNATURES) {
                 if (header.size >= signature.size && header.take(signature.size).toByteArray().contentEquals(signature)) {
-                    // Extra check: RIFF files are WebP only when bytes 8–11 are "WEBP"
                     if (name == "WebP/RIFF") {
                         if (header.size >= 12 &&
                             header[8] == 0x57.toByte() && header[9] == 0x45.toByte() &&
                             header[10] == 0x42.toByte() && header[11] == 0x50.toByte()) return "WebP"
-                        continue  // regular RIFF (WAV, AVI) — not an image
+                        continue
                     }
                     return name
                 }
@@ -67,30 +62,13 @@ class TranscribeController(
         }
     }
 
-    private val mapper = ObjectMapper().registerKotlinModule()
-
     data class SubmitResponse(val jobId: String, val dedup: Boolean = false)
 
-    data class ProgressResponse(
-        val phase: String?,
-        val processedS: Double?,
-        val totalS: Double?,
-        val diarizeProgress: Double?,
-    )
+    data class ProgressResponse(val phase: String?, val processedS: Double?, val totalS: Double?, val diarizeProgress: Double?)
 
-    data class SegmentResponse(
-        val start: Double,
-        val end: Double,
-        val text: String,
-        val speaker: String?,
-    )
+    data class SegmentResponse(val start: Double, val end: Double, val text: String, val speaker: String?)
 
-    data class ResultResponse(
-        val segments: List<SegmentResponse>?,
-        val formattedText: String?,
-        val audioDurationS: Double?,
-        val summary: String?,
-    )
+    data class ResultResponse(val segments: List<SegmentResponse>?, val formattedText: String?, val audioDurationS: Double?, val summary: String?)
 
     data class JobResponse(
         val jobId: String,
@@ -106,7 +84,6 @@ class TranscribeController(
 
     @PostMapping("/transcribe")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    @Transactional
     fun submit(
         @RequestParam("file") file: MultipartFile,
         @RequestParam(defaultValue = "fast") model: String,
@@ -135,6 +112,7 @@ class TranscribeController(
             throw ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "File appears to be a $imageFormat image, not an audio/video file.")
         }
+
         val authenticatedUserId = servletRequest.getAttribute("authenticatedUserId") as UUID?
         fun dec(v: String?) = v?.let { URLDecoder.decode(it, "UTF-8") }
         val user = when {
@@ -142,6 +120,7 @@ class TranscribeController(
             telegramUserId != null -> userService.resolveByTelegramId(telegramUserId, dec(telegramUsername), dec(telegramFirstName), dec(telegramLastName))
             else -> userService.resolveAnonymous()
         }
+
         val resolvedModel = mapOf("fast" to "small", "accurate" to "turbo")[model] ?: model
         val source = if (telegramUserId != null) "telegram" else "web"
         val originalName = file.originalFilename ?: "upload"
@@ -149,40 +128,21 @@ class TranscribeController(
 
         val audioId = UUID.randomUUID()
         val uploadResult = audioStorage.upload(audioId, originalName, file.inputStream, file.size, contentType)
-        val contentHash = uploadResult.contentHash
 
-        // Dedup: if same file + same settings already processed, return existing result without GPU
-        if (contentHash.isNotEmpty()) {
-            val duplicate = submissionRepo.findDuplicate(user.id!!, contentHash, resolvedModel, language, diarize, numSpeakers, summaryMode)
-            if (duplicate != null) {
-                log.info("Duplicate upload: hash={}, reusing submission={}, file={}", contentHash, duplicate.id, originalName)
-                return SubmitResponse(duplicate.id.toString(), dedup = true)
-            }
-        }
-
-        val audio = audioMetaRepo.save(AudioMetaEntity(
-            id = audioId, userId = user.id!!, originalName = originalName,
-            contentType = contentType, sizeBytes = file.size,
-            storageUri = uploadResult.ref.uri,
-            contentHash = contentHash,
-            _isNew = true,
-        ))
-        log.info("Audio {} stored in GCS at {}", audio.id, uploadResult.ref.uri)
-
-        val submission = submissionRepo.save(SubmissionEntity(
-            userId = user.id!!, audioId = audio.id, model = resolvedModel, language = language,
-            diarize = diarize, numSpeakers = numSpeakers, summaryMode = summaryMode, source = source,
-        ))
-        if (telegramChatId != null) {
-            telegramDeliveryRepo.save(TelegramDeliveryEntity(jobId = submission.id!!, chatId = telegramChatId, telegramMessageId = telegramMessageId, _isNew = true))
-        }
-        log.info("Submission accepted: id=${submission.id}, file=$originalName, size=${file.size}B, model=$resolvedModel, language=$language, diarize=$diarize, summaryMode=$summaryMode, source=$source, user=${user.id}")
-        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
-            object : org.springframework.transaction.support.TransactionSynchronization {
-                override fun afterCommit() { orchestrator.signalPending() }
-            }
+        val result = submissionService.createSubmission(
+            userId = user.id!!, audioId = audioId, originalName = originalName,
+            contentType = contentType, sizeBytes = file.size, uploadResult = uploadResult,
+            model = resolvedModel, language = language, diarize = diarize,
+            numSpeakers = numSpeakers, summaryMode = summaryMode, source = source,
+            telegramChatId = telegramChatId, telegramMessageId = telegramMessageId,
         )
-        return SubmitResponse(submission.id.toString())
+
+        if (!result.dedup)
+            log.info("Submission accepted: id=${result.submissionId}, file=$originalName, size=${file.size}B, model=$resolvedModel, language=$language, diarize=$diarize, summaryMode=$summaryMode, source=$source, user=${user.id}")
+        else
+            log.info("Duplicate upload: reusing submission=${result.submissionId}, file=$originalName")
+
+        return SubmitResponse(result.submissionId.toString(), result.dedup)
     }
 
     @GetMapping("/jobs/{jobId}")
@@ -202,8 +162,7 @@ class TranscribeController(
         val segmentsNode = diarization?.segments ?: transcript?.segments
         val formattedText = diarization?.formattedText ?: transcript?.formattedText
 
-        val transcriptionAttempts = stageAttemptRepo
-            .findBySubmissionIdAndStageOrderByAttemptNumDesc(id, "transcription")
+        val transcriptionAttempts = stageAttemptRepo.findBySubmissionIdAndStageOrderByAttemptNumDesc(id, "transcription")
         val latestFailedAttempt = transcriptionAttempts.firstOrNull { it.status == "failed" }
 
         val durationS = if (submission.status in listOf("done", "failed")) {
@@ -211,7 +170,6 @@ class TranscribeController(
         } else null
 
         val latestAttempt = transcriptionAttempts.firstOrNull()
-
         val elapsedS = if (submission.status == "processing" && latestAttempt != null) {
             (Instant.now().toEpochMilli() - latestAttempt.startedAt!!.toEpochMilli()) / 1000.0
         } else null
@@ -227,7 +185,6 @@ class TranscribeController(
 
         val tags = tagRepo.findBySubmissionId(id).map { it.tag }.sorted()
 
-        // 'pending' = waiting in queue; 'processing' = transcriber is actively working (no position).
         val queuePosition = if (submission.status == "pending") {
             submissionRepo.countPendingSubmissionsBefore(submission.createdAt).toInt() + 1
         } else null
@@ -235,9 +192,7 @@ class TranscribeController(
         return JobResponse(
             jobId = jobId,
             status = submission.status,
-            progress = liveProgress?.let {
-                ProgressResponse(it.phase, it.processedS, it.totalS, it.diarizeProgress)
-            },
+            progress = liveProgress?.let { ProgressResponse(it.phase, it.processedS, it.totalS, it.diarizeProgress) },
             result = if (transcript != null) ResultResponse(
                 segments = segments,
                 formattedText = formattedText,
@@ -252,31 +207,14 @@ class TranscribeController(
         )
     }
 
-    data class TranscriptionSummary(
-        val jobId: String,
-        val fileName: String,
-        val createdAt: String,
-        val status: String,
-        val tags: List<String>,
-    )
+    data class TranscriptionSummary(val jobId: String, val fileName: String, val createdAt: String, val status: String, val tags: List<String>)
 
     @GetMapping("/transcriptions")
-    @Transactional(readOnly = true)
     fun listTranscriptions(servletRequest: HttpServletRequest): List<TranscriptionSummary> {
         val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
             ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
-        val submissions = submissionRepo.findByUserIdOrderByCreatedAtDesc(userId)
-        val audioById = audioMetaRepo.findAllById(submissions.mapNotNull { it.audioId }).associateBy { it.id }
-        val tagsBySubmission = tagRepo.findBySubmissionIdIn(submissions.mapNotNull { it.id })
-            .groupBy({ it.submissionId }, { it.tag })
-        return submissions.map {
-            TranscriptionSummary(
-                jobId = it.id.toString(),
-                fileName = audioById[it.audioId]?.originalName ?: "unknown",
-                createdAt = it.createdAt.toString(),
-                status = it.status,
-                tags = (tagsBySubmission[it.id] ?: emptyList()).sorted(),
-            )
+        return submissionService.listForUser(userId).map {
+            TranscriptionSummary(it.jobId.toString(), it.fileName, it.createdAt, it.status, it.tags)
         }
     }
 
@@ -294,52 +232,27 @@ class TranscribeController(
     private val tagRegex = Regex("^[\\w-]{1,64}$")
 
     @PostMapping("/jobs/{jobId}/tags")
-    @Transactional
-    fun addTag(
-        @PathVariable jobId: String,
-        @RequestBody body: Map<String, String>,
-        servletRequest: HttpServletRequest,
-    ): Map<String, List<String>> {
+    fun addTag(@PathVariable jobId: String, @RequestBody body: Map<String, String>, servletRequest: HttpServletRequest): Map<String, List<String>> {
         val id = runCatching { UUID.fromString(jobId) }.getOrElse {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid job ID")
         }
-        val submission = submissionRepo.findById(id).orElseThrow {
-            ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found")
-        }
         val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
             ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
-        if (submission.userId != userId) throw ResponseStatusException(HttpStatus.FORBIDDEN)
-
         val tag = body["tag"]?.trim()?.lowercase()
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing 'tag'")
         if (!tagRegex.matches(tag)) throw ResponseStatusException(HttpStatus.BAD_REQUEST,
             "Tag must be 1–64 word characters or hyphens")
-
-        if (!tagRepo.existsBySubmissionIdAndTag(id, tag)) {
-            tagRepo.save(SubmissionTagEntity(submissionId = id, tag = tag))
-        }
-        return mapOf("tags" to tagRepo.findBySubmissionId(id).map { it.tag }.sorted())
+        return mapOf("tags" to submissionService.addTag(id, userId, tag))
     }
 
     @DeleteMapping("/jobs/{jobId}/tags/{tag}")
-    @Transactional
-    fun removeTag(
-        @PathVariable jobId: String,
-        @PathVariable tag: String,
-        servletRequest: HttpServletRequest,
-    ): Map<String, List<String>> {
+    fun removeTag(@PathVariable jobId: String, @PathVariable tag: String, servletRequest: HttpServletRequest): Map<String, List<String>> {
         val id = runCatching { UUID.fromString(jobId) }.getOrElse {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid job ID")
         }
-        val submission = submissionRepo.findById(id).orElseThrow {
-            ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found")
-        }
         val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
             ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
-        if (submission.userId != userId) throw ResponseStatusException(HttpStatus.FORBIDDEN)
-
-        tagRepo.deleteBySubmissionIdAndTag(id, tag)
-        return mapOf("tags" to tagRepo.findBySubmissionId(id).map { it.tag }.sorted())
+        return mapOf("tags" to submissionService.removeTag(id, userId, tag))
     }
 
     @GetMapping("/formats")
@@ -350,52 +263,33 @@ class TranscribeController(
 
     // ── Telegram delivery tracking ────────────────────────────────────────────
 
-    data class PendingDeliveryResponse(
-        val jobId: String,
-        val chatId: Long,
-        val telegramMessageId: Long?,
-        val status: String,
-        val error: String?,
-    )
+    data class PendingDeliveryResponse(val jobId: String, val chatId: Long, val telegramMessageId: Long?, val status: String, val error: String?)
 
     @GetMapping("/telegram/pending-deliveries")
     fun pendingDeliveries(): List<PendingDeliveryResponse> =
         telegramDeliveryRepo.findPendingDeliveries().map { d ->
             val submission = submissionRepo.findById(d.jobId).orElseThrow()
             val error = if (submission.status == "failed")
-                stageAttemptRepo
-                    .findBySubmissionIdAndStageOrderByAttemptNumDesc(d.jobId, "transcription")
+                stageAttemptRepo.findBySubmissionIdAndStageOrderByAttemptNumDesc(d.jobId, "transcription")
                     .firstOrNull { it.status == "failed" }?.error?.take(150)
             else null
             PendingDeliveryResponse(d.jobId.toString(), d.chatId, d.telegramMessageId, submission.status, error)
         }
 
     @PostMapping("/telegram/deliveries/{jobId}/ack")
-    @Transactional
     fun ackDelivery(@PathVariable jobId: String): Map<String, Boolean> {
         val count = telegramDeliveryRepo.claimDelivery(UUID.fromString(jobId))
         return mapOf("claimed" to (count > 0))
     }
 
     @PostMapping("/telegram/deliveries/{jobId}/delivered")
-    @Transactional
     fun confirmDelivered(@PathVariable jobId: String) {
         telegramDeliveryRepo.confirmDelivered(UUID.fromString(jobId))
     }
 
     @PostMapping("/telegram/deliveries/{jobId}/failed")
-    @Transactional
     fun deliveryFailed(@PathVariable jobId: String, @RequestBody body: Map<String, Any?>) {
-        val id = UUID.fromString(jobId)
         val retryAfterS = (body["retry_after_s"] as? Number)?.toLong()
-        val retryAfterTs = if (retryAfterS != null) {
-            Instant.now().plusSeconds(retryAfterS)
-        } else {
-            val attempt = telegramDeliveryRepo.findById(id).map { it.attemptCount }.orElse(1)
-            Instant.now().plusSeconds(minOf(30L shl (attempt - 1), 3600L))
-        }
-        telegramDeliveryRepo.scheduleRetry(id, retryAfterTs)
+        submissionService.scheduleDeliveryFailure(UUID.fromString(jobId), retryAfterS)
     }
-
-
 }

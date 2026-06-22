@@ -1,34 +1,16 @@
 package com.dictara.gateway.controller
 
-import com.dictara.gateway.entity.AuthIdentityEntity
-import com.dictara.gateway.entity.LoginNotificationEntity
-import com.dictara.gateway.entity.LoginTokenEntity
-import com.dictara.gateway.repository.AuthIdentityRepository
 import com.dictara.gateway.repository.LoginNotificationRepository
 import com.dictara.gateway.repository.LoginTokenRepository
-import com.dictara.gateway.repository.UserRepository
-import com.dictara.gateway.service.JwtTokenProvider
-import com.dictara.gateway.service.UserService
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.node.ObjectNode
-import org.springframework.beans.factory.annotation.Value
-import org.springframework.http.HttpStatus
-import org.springframework.transaction.annotation.Transactional
+import com.dictara.gateway.service.AuthService
 import org.springframework.web.bind.annotation.*
-import org.springframework.web.server.ResponseStatusException
-import java.time.Instant
 import java.util.UUID
 
 @RestController
 class AuthController(
-    private val jwt: JwtTokenProvider,
-    private val userService: UserService,
-    private val userRepo: UserRepository,
+    private val authService: AuthService,
     private val loginTokenRepo: LoginTokenRepository,
     private val loginNotificationRepo: LoginNotificationRepository,
-    private val authIdentityRepo: AuthIdentityRepository,
-    private val mapper: ObjectMapper,
-    @Value("\${telegram.bot-username}") private val botUsername: String,
 ) {
     data class LoginByUsernameRequest(val telegramUsername: String)
     data class LoginByUsernameResponse(val token: String, val status: String, val botUrl: String?)
@@ -44,71 +26,25 @@ class AuthController(
     data class LoginLinkStatusResponse(val confirmed: Boolean, val token: String?, val displayName: String?)
 
     @PostMapping("/auth/bot-started")
-    @Transactional
     fun markBotStarted(@RequestBody body: Map<String, String>) {
         val uid = body["telegram_user_id"] ?: return
-        val identity = authIdentityRepo.findByProviderAndProviderUid("telegram", uid) ?: return
-        val current = (identity.metadata?.deepCopy() as? ObjectNode) ?: mapper.createObjectNode()
-        if (current.get("bot_started")?.asBoolean() == true) return
-        current.put("bot_started", true)
-        authIdentityRepo.save(AuthIdentityEntity(
-            id = identity.id, userId = identity.userId,
-            provider = identity.provider, providerUid = identity.providerUid,
-            credentials = identity.credentials,
-            metadata = current,
-            createdAt = identity.createdAt,
-        ))
+        authService.markBotStarted(uid)
     }
 
     @PostMapping("/auth/login-by-username")
-    @Transactional
     fun loginByUsername(@RequestBody req: LoginByUsernameRequest): LoginByUsernameResponse {
-        val username = req.telegramUsername.trimStart('@')
-        val token = UUID.randomUUID()
-        val identity = authIdentityRepo.findByTelegramUsername(username)
-        val botStarted = identity?.metadata?.get("bot_started")?.asBoolean() == true
-        if (identity != null && botStarted) {
-            loginTokenRepo.save(LoginTokenEntity(
-                token = token,
-                userId = identity.userId,
-                expiresAt = Instant.now().plusSeconds(600),
-                _isNew = true,
-            ))
-            loginNotificationRepo.save(LoginNotificationEntity(
-                tokenId = token,
-                chatId = identity.providerUid,
-            ))
-            return LoginByUsernameResponse(token.toString(), "notified", null)
-        } else {
-            loginTokenRepo.findAllByPendingUsernameAndConfirmedFalseAndRejectedFalse(username)
-                .forEach { it.rejected = true; loginTokenRepo.save(it) }
-            loginTokenRepo.save(LoginTokenEntity(
-                token = token,
-                pendingUsername = username,
-                expiresAt = Instant.now().plusSeconds(600),
-                _isNew = true,
-            ))
-            return LoginByUsernameResponse(token.toString(), "unknown_user", "https://t.me/$botUsername")
-        }
+        val result = authService.loginByUsername(req.telegramUsername.trimStart('@'))
+        return LoginByUsernameResponse(result.token.toString(), result.status, result.botUrl)
     }
 
     @GetMapping("/auth/pending-login-notifications")
     fun getPendingNotifications(): List<Map<String, String>> =
         loginNotificationRepo.findBySentFalse().map {
-            mapOf(
-                "id" to it.id.toString(),
-                "chatId" to it.chatId,
-                "token" to it.tokenId.toString(),
-            )
+            mapOf("id" to it.id.toString(), "chatId" to it.chatId, "token" to it.tokenId.toString())
         }
 
     @PostMapping("/auth/pending-login-notifications/{id}/ack")
-    fun ackNotification(@PathVariable id: Long) {
-        loginNotificationRepo.findById(id).ifPresent {
-            it.sent = true
-            loginNotificationRepo.save(it)
-        }
-    }
+    fun ackNotification(@PathVariable id: Long) = authService.ackNotification(id)
 
     @GetMapping("/auth/pending-login-for-username")
     fun getPendingLoginForUsername(@RequestParam username: String): Map<String, String>? {
@@ -118,42 +54,16 @@ class AuthController(
     }
 
     @PostMapping("/auth/login-link/confirm-callback")
-    @Transactional
-    fun confirmCallback(@RequestBody req: ConfirmCallbackRequest) {
-        val entity = loginTokenRepo.findById(UUID.fromString(req.token))
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND) }
-        if (entity.confirmed || entity.rejected || entity.expiresAt.isBefore(Instant.now()))
-            throw ResponseStatusException(HttpStatus.GONE, "Token expired or already used")
-        val user = userService.resolveByTelegramId(
-            req.telegramUserId, req.telegramUsername, req.telegramFirstName, req.telegramLastName,
-        )
-        entity.userId = user.id
-        entity.confirmed = true
-        loginTokenRepo.save(entity)
-    }
+    fun confirmCallback(@RequestBody req: ConfirmCallbackRequest) =
+        authService.confirmCallback(UUID.fromString(req.token), req.telegramUserId, req.telegramUsername, req.telegramFirstName, req.telegramLastName)
 
     @PostMapping("/auth/login-link/reject")
-    @Transactional
-    fun rejectLogin(@RequestBody body: Map<String, String>) {
-        val entity = loginTokenRepo.findById(UUID.fromString(body["token"]!!))
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND) }
-        entity.rejected = true
-        loginTokenRepo.save(entity)
-    }
+    fun rejectLogin(@RequestBody body: Map<String, String>) =
+        authService.rejectLogin(UUID.fromString(body["token"]!!))
 
     @GetMapping("/auth/login-link/{token}")
-    @Transactional(readOnly = true)
     fun pollLoginLink(@PathVariable token: String): LoginLinkStatusResponse {
-        val entity = loginTokenRepo.findById(UUID.fromString(token))
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND) }
-        if (entity.rejected)
-            throw ResponseStatusException(HttpStatus.GONE, "Login rejected")
-        if (entity.expiresAt.isBefore(Instant.now()))
-            throw ResponseStatusException(HttpStatus.GONE, "Token expired")
-        if (!entity.confirmed || entity.userId == null)
-            return LoginLinkStatusResponse(false, null, null)
-        val user = userRepo.findById(entity.userId!!).orElseThrow()
-        val jwtToken = jwt.issue(entity.userId!!)
-        return LoginLinkStatusResponse(true, jwtToken, user.displayName)
+        val result = authService.pollLoginLink(UUID.fromString(token))
+        return LoginLinkStatusResponse(result.confirmed, result.jwtToken, result.displayName)
     }
 }
