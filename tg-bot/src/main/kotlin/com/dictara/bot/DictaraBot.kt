@@ -273,12 +273,13 @@ class DictaraBot(
 
         log.debug("Message from userId={} chatId={} type={}", userId, chatId, message.chat.type)
 
-        val fileId = when {
+        data class FileInfo(val fileId: String, val nameHint: String?)
+        val fileInfo = when {
             message.hasAnimation() -> return  // GIFs — silently ignore, no message
-            message.hasAudio() -> message.audio.fileId
-            message.hasVoice() -> message.voice.fileId
-            message.hasVideoNote() -> message.videoNote.fileId
-            message.hasVideo() -> message.video.fileId
+            message.hasAudio() -> FileInfo(message.audio.fileId, message.audio.fileName)
+            message.hasVoice() -> FileInfo(message.voice.fileId, null)
+            message.hasVideoNote() -> FileInfo(message.videoNote.fileId, null)
+            message.hasVideo() -> FileInfo(message.video.fileId, message.video.fileName)
             message.hasDocument() -> {
                 val doc = message.document
                 val mime = doc.mimeType ?: ""
@@ -288,13 +289,14 @@ class DictaraBot(
                     send(chatId, "Unsupported format: .$ext\nSupported: ${supportedExtensions.sorted().joinToString(", ")}")
                     return
                 }
-                doc.fileId
+                FileInfo(doc.fileId, doc.fileName)
             }
             else -> {
                 if (!isGroup) send(chatId, "Send me an audio or video file. Use /settings to configure preferences.")
                 return
             }
         }
+        val fileId = fileInfo.fileId
 
         val prefs = UserSettings.get(chatId)
         val modelLabel = prefs.model.replaceFirstChar { it.uppercase() }
@@ -320,14 +322,14 @@ class DictaraBot(
         log.info("Audio received: fileId={} chatId={} prefs={}/{}/{}/{}", fileId, chatId, prefs.model, if (prefs.diarize) "diarize" else "nodiarize", prefs.language, prefs.summaryMode)
         executor.submit {
             try {
-                val audioTmp = downloadAudioFile(fileId)
+                val (audioTmp, originalName) = downloadAudioFile(fileId, fileInfo.nameHint)
                 try {
 
                     // Phase 1: transcribe (with live progress updates)
-                    log.info("Submitting to gateway: chatId={} fileId={} size={}b", chatId, fileId, audioTmp.length())
+                    log.info("Submitting to gateway: chatId={} fileId={} name={} size={}b", chatId, fileId, originalName, audioTmp.length())
                     val sender = message.from
                     val result = client.transcribe(
-                        audioTmp, prefs.model, prefs.diarize,
+                        audioTmp, originalName, prefs.model, prefs.diarize,
                         prefs.summaryMode,
                         prefs.language, prefs.numSpeakers,
                         telegramUserId = sender.id,
@@ -424,7 +426,7 @@ class DictaraBot(
         }
     }
 
-    private fun downloadAudioFile(fileId: String): File {
+    private fun downloadAudioFile(fileId: String, nameHint: String?): Pair<File, String> {
         val maxAttempts = 5
         var delayMs = 2000L
         var lastException: Exception? = null
@@ -439,6 +441,8 @@ class DictaraBot(
                 val tgFile = execute(GetFile().apply { this.fileId = fileId })
                 log.debug("GetFile success: fileId={} localPath={} attempt={}", fileId, tgFile.filePath, attempt)
                 val ext = tgFile.filePath.substringAfterLast('.', "bin")
+                val originalName = nameHint?.takeIf { it.isNotBlank() }
+                    ?: "audio_${System.currentTimeMillis()}.$ext"
                 val audioTmp = Files.createTempFile("dictara-", ".$ext").toFile()
                 val localPath = tgFile.filePath
                 if (fileBaseUrl != "https://api.telegram.org" && localPath.startsWith("/")) {
@@ -453,7 +457,7 @@ class DictaraBot(
                             audioTmp.outputStream().use { input.copyTo(it) }
                         }
                 }
-                return audioTmp
+                return Pair(audioTmp, originalName)
             } catch (e: Exception) {
                 lastException = e
                 log.warn("GetFile attempt {}/{} failed: fileId={} error={}", attempt, maxAttempts, fileId, e.message)

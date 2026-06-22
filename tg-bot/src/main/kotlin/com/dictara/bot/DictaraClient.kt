@@ -183,6 +183,7 @@ class DictaraClient(private val baseUrl: String) {
 
     fun transcribe(
         audioFile: File,
+        originalName: String,
         model: String,
         diarize: Boolean,
         summaryMode: SummaryMode = SummaryMode.AUTO,
@@ -196,13 +197,14 @@ class DictaraClient(private val baseUrl: String) {
         telegramMessageId: Long? = null,
         onProgress: ((String) -> Unit)? = null,
     ): TranscriptResult {
-        val submitResult = submitWithRetry(audioFile, model, diarize, summaryMode, language, numSpeakers,
+        val submitResult = submitWithRetry(audioFile, originalName, model, diarize, summaryMode, language, numSpeakers,
             telegramUserId, telegramUsername, telegramFirstName, telegramLastName, chatId, telegramMessageId, onProgress)
         return pollJob(submitResult.jobId, diarize, summaryMode, onProgress).copy(dedup = submitResult.dedup)
     }
 
     private fun submitWithRetry(
         audioFile: File,
+        originalName: String,
         model: String,
         diarize: Boolean,
         summaryMode: SummaryMode,
@@ -220,7 +222,7 @@ class DictaraClient(private val baseUrl: String) {
         val failureStart = System.currentTimeMillis()
         while (true) {
             try {
-                return submitJob(audioFile, model, diarize, summaryMode, language, numSpeakers,
+                return submitJob(audioFile, originalName, model, diarize, summaryMode, language, numSpeakers,
                     telegramUserId, telegramUsername, telegramFirstName, telegramLastName, chatId, telegramMessageId)
             } catch (e: RuntimeException) {
                 throw e  // non-retryable (e.g. 4xx from gateway)
@@ -236,6 +238,7 @@ class DictaraClient(private val baseUrl: String) {
 
     private fun submitJob(
         file: File,
+        originalName: String,
         model: String,
         diarize: Boolean,
         summaryMode: SummaryMode,
@@ -250,7 +253,7 @@ class DictaraClient(private val baseUrl: String) {
     ): SubmitResult {
         val body = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
-            .addFormDataPart("file", file.name, file.asRequestBody("application/octet-stream".toMediaType()))
+            .addFormDataPart("file", originalName, file.asRequestBody("application/octet-stream".toMediaType()))
             .build()
 
         val url = buildString {
