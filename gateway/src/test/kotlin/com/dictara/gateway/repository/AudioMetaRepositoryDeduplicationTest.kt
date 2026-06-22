@@ -101,6 +101,5 @@ class AudioMetaRepositoryDeduplicationTest {
         audioMetaRepo.save(AudioMetaEntity(
             userId = user.id!!, originalName = "file.mp4", contentType = "video/mp4",
             sizeBytes = 1024, contentHash = hash, storageUri = uri, createdAt = createdAt,
-            _isNew = true,
-        ))
+        ).apply { _isNew = true })
 }

@@ -37,8 +37,7 @@ class RepositorySmokeTest {
         val audio = audioMetaRepo.save(AudioMetaEntity(
             userId = user.id!!, originalName = "test.m4a",
             contentType = "audio/mp4", sizeBytes = 1024, contentHash = "abc123",
-            _isNew = true,
-        ))
+        ).apply { _isNew = true })
         val submission = submissionRepo.save(SubmissionEntity(
             userId = user.id!!, audioId = audio.id, model = "fast",
             language = "auto", summaryMode = "off",

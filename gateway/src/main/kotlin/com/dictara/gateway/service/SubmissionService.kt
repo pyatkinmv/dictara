@@ -71,8 +71,7 @@ class SubmissionService(
             id = audioId, userId = userId, originalName = originalName,
             contentType = contentType, sizeBytes = sizeBytes,
             storageUri = uploadResult.ref.uri, contentHash = contentHash,
-            _isNew = true,
-        ))
+        ).apply { _isNew = true })
         val submission = submissionRepo.save(SubmissionEntity(
             userId = userId, audioId = audio.id, model = model, language = language,
             diarize = diarize, numSpeakers = numSpeakers, summaryMode = summaryMode, source = source,
@@ -80,8 +79,8 @@ class SubmissionService(
         if (telegramChatId != null) {
             telegramDeliveryRepo.save(TelegramDeliveryEntity(
                 jobId = submission.id!!, chatId = telegramChatId,
-                telegramMessageId = telegramMessageId, _isNew = true,
-            ))
+                telegramMessageId = telegramMessageId,
+            ).apply { _isNew = true })
         }
         TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
             override fun afterCommit() { orchestrator.signalPending() }

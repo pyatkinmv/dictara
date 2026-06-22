@@ -17,8 +17,8 @@ class AudioMetaEntity(
     val createdAt: Instant = Instant.now(),
     val storageUri: String? = null,
     val contentHash: String,
-    @Transient val _isNew: Boolean = false,
 ) : Persistable<UUID> {
+    @Transient var _isNew: Boolean = false
     override fun getId(): UUID = id
     override fun isNew(): Boolean = _isNew
 }

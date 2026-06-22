@@ -16,8 +16,8 @@ class TelegramDeliveryEntity(
     var claimedAt: Instant? = null,
     var retryAfterTs: Instant? = null,
     var attemptCount: Int = 0,
-    @Transient val _isNew: Boolean = false,
 ) : Persistable<UUID> {
+    @Transient var _isNew: Boolean = false
     override fun getId(): UUID = jobId
     override fun isNew(): Boolean = _isNew
 }

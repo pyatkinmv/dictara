@@ -35,8 +35,7 @@ class SubmissionStateServiceTest : AbstractSharedContextIntegrationTest() {
         val user = userRepo.save(UserEntity(displayName = "Test"))
         val audio = audioMetaRepo.save(AudioMetaEntity(
             userId = user.id!!, originalName = "a.m4a", contentType = "audio/mp4", sizeBytes = 100, contentHash = "abc123",
-            _isNew = true,
-        ))
+        ).apply { _isNew = true })
         val saved = submissionRepo.save(SubmissionEntity(userId = user.id!!, audioId = audio.id))
         val submissionId = saved.id!!
 

@@ -16,8 +16,8 @@ class LoginTokenEntity(
     val pendingUsername: String? = null,
     val expiresAt: Instant,
     val createdAt: Instant = Instant.now(),
-    @Transient val _isNew: Boolean = false,
 ) : Persistable<UUID> {
+    @Transient var _isNew: Boolean = false
     override fun getId(): UUID = token
     override fun isNew(): Boolean = _isNew
 }

@@ -53,8 +53,8 @@ class AuthService(
         if (identity != null && botStarted) {
             loginTokenRepo.save(LoginTokenEntity(
                 token = token, userId = identity.userId,
-                expiresAt = Instant.now().plusSeconds(600), _isNew = true,
-            ))
+                expiresAt = Instant.now().plusSeconds(600),
+            ).apply { _isNew = true })
             loginNotificationRepo.save(LoginNotificationEntity(tokenId = token, chatId = identity.providerUid))
             return LoginByUsernameResult(token, "notified", null)
         } else {
@@ -62,8 +62,8 @@ class AuthService(
                 .forEach { it.rejected = true; loginTokenRepo.save(it) }
             loginTokenRepo.save(LoginTokenEntity(
                 token = token, pendingUsername = username,
-                expiresAt = Instant.now().plusSeconds(600), _isNew = true,
-            ))
+                expiresAt = Instant.now().plusSeconds(600),
+            ).apply { _isNew = true })
             return LoginByUsernameResult(token, "unknown_user", "https://t.me/$botUsername")
         }
     }
