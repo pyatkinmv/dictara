@@ -1,6 +1,7 @@
 package com.dictara.gateway.repository
 
 import com.dictara.gateway.entity.SubmissionTagEntity
+import org.springframework.data.jdbc.repository.query.Modifying
 import org.springframework.data.jdbc.repository.query.Query
 import org.springframework.data.repository.Repository
 import java.util.UUID
@@ -13,9 +14,11 @@ interface SubmissionTagRepository : Repository<SubmissionTagEntity, UUID> {
     @Query("SELECT * FROM submission_tags WHERE submission_id IN (:submissionIds)")
     fun findBySubmissionIdIn(submissionIds: Collection<UUID>): List<SubmissionTagEntity>
 
+    @Modifying
     @Query("INSERT INTO submission_tags(submission_id, tag) VALUES (:submissionId, :tag)")
     fun insert(submissionId: UUID, tag: String)
 
+    @Modifying
     @Query("DELETE FROM submission_tags WHERE submission_id = :submissionId AND tag = :tag")
     fun deleteBySubmissionIdAndTag(submissionId: UUID, tag: String)
 

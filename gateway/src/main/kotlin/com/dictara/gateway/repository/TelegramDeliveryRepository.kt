@@ -1,6 +1,7 @@
 package com.dictara.gateway.repository
 
 import com.dictara.gateway.entity.TelegramDeliveryEntity
+import org.springframework.data.jdbc.repository.query.Modifying
 import org.springframework.data.jdbc.repository.query.Query
 import org.springframework.data.repository.CrudRepository
 import java.time.Instant
@@ -19,6 +20,7 @@ interface TelegramDeliveryRepository : CrudRepository<TelegramDeliveryEntity, UU
     """)
     fun findPendingDeliveries(): List<TelegramDeliveryEntity>
 
+    @Modifying
     @Query("""
         UPDATE telegram_deliveries
         SET claimed_at = NOW(), attempt_count = attempt_count + 1
@@ -26,9 +28,11 @@ interface TelegramDeliveryRepository : CrudRepository<TelegramDeliveryEntity, UU
     """)
     fun claimDelivery(jobId: UUID): Int
 
+    @Modifying
     @Query("UPDATE telegram_deliveries SET delivered_at = NOW() WHERE job_id = :jobId")
     fun confirmDelivered(jobId: UUID): Int
 
+    @Modifying
     @Query("""
         UPDATE telegram_deliveries
         SET claimed_at = NULL, retry_after_ts = :retryAfterTs

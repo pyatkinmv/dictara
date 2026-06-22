@@ -1,12 +1,14 @@
 package com.dictara.gateway.repository
 
 import com.dictara.gateway.entity.AudioMetaEntity
+import org.springframework.data.jdbc.repository.query.Modifying
 import org.springframework.data.jdbc.repository.query.Query
 import org.springframework.data.repository.CrudRepository
 import java.util.UUID
 
 interface AudioMetaRepository : CrudRepository<AudioMetaEntity, UUID> {
 
+    @Modifying
     @Query("""
         UPDATE audio_meta am
         SET storage_uri = canonical.uri
