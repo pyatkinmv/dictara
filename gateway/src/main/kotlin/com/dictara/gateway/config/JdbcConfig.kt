@@ -12,7 +12,9 @@ import org.springframework.data.jdbc.repository.config.EnableJdbcRepositories
 
 @Configuration
 @EnableJdbcRepositories(basePackages = ["com.dictara.gateway.repository"])
-class JdbcConfig(private val objectMapper: ObjectMapper) : AbstractJdbcConfiguration() {
+class JdbcConfig : AbstractJdbcConfiguration() {
+
+    private val objectMapper = ObjectMapper()
 
     override fun userConverters(): List<Any> = listOf(
         JsonNodeToPgObjectConverter,

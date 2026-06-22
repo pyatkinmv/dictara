@@ -27,14 +27,14 @@ interface TelegramDeliveryRepository : CrudRepository<TelegramDeliveryEntity, UU
     fun claimDelivery(jobId: UUID): Int
 
     @Query("UPDATE telegram_deliveries SET delivered_at = NOW() WHERE job_id = :jobId")
-    fun confirmDelivered(jobId: UUID)
+    fun confirmDelivered(jobId: UUID): Int
 
     @Query("""
         UPDATE telegram_deliveries
         SET claimed_at = NULL, retry_after_ts = :retryAfterTs
         WHERE job_id = :jobId
     """)
-    fun scheduleRetry(jobId: UUID, retryAfterTs: Instant)
+    fun scheduleRetry(jobId: UUID, retryAfterTs: Instant): Int
 
     @Query("SELECT COUNT(*) FROM telegram_deliveries WHERE delivered_at IS NULL AND attempt_count < 10")
     fun countUndelivered(): Long
