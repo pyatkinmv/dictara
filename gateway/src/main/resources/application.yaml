@@ -12,7 +12,7 @@ spring:
       max-file-size: 2GB
       max-request-size: 2GB
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/dictara?stringtype=unspecified}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/dictara}
     username: ${SPRING_DATASOURCE_USERNAME:dictara}
     password: ${SPRING_DATASOURCE_PASSWORD:dictara_dev}
     driver-class-name: org.postgresql.Driver

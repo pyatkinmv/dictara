@@ -199,7 +199,7 @@ class TranscribeController(
         val summary = summaryRepo.findBySubmissionId(id)
         val liveProgress = orchestrator.getLiveProgress(id)
 
-        val segmentsJson = diarization?.segments ?: transcript?.segments
+        val segmentsNode = diarization?.segments ?: transcript?.segments
         val formattedText = diarization?.formattedText ?: transcript?.formattedText
 
         val transcriptionAttempts = stageAttemptRepo
@@ -216,16 +216,13 @@ class TranscribeController(
             (Instant.now().toEpochMilli() - latestAttempt.startedAt!!.toEpochMilli()) / 1000.0
         } else null
 
-        @Suppress("UNCHECKED_CAST")
-        val segments = segmentsJson?.let {
-            (mapper.readValue(it, List::class.java) as List<Map<String, Any?>>).map { seg ->
-                SegmentResponse(
-                    start = (seg["start"] as Number).toDouble(),
-                    end = (seg["end"] as Number).toDouble(),
-                    text = seg["text"] as String,
-                    speaker = seg["speaker"] as String?,
-                )
-            }
+        val segments = segmentsNode?.map { seg ->
+            SegmentResponse(
+                start = seg["start"].asDouble(),
+                end = seg["end"].asDouble(),
+                text = seg["text"].asText(),
+                speaker = seg["speaker"]?.takeIf { !it.isNull }?.asText(),
+            )
         }
 
         val tags = tagRepo.findBySubmissionId(id).map { it.tag }.sorted()

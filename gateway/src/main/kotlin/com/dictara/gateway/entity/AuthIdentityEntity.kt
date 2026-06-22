@@ -1,5 +1,6 @@
 package com.dictara.gateway.entity
 
+import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.data.annotation.Id
 import org.springframework.data.relational.core.mapping.Table
 import java.time.Instant
@@ -11,7 +12,7 @@ class AuthIdentityEntity(
     val userId: UUID,
     val provider: String,
     val providerUid: String,
-    val credentials: String? = null,
-    val metadata: String? = null,
+    val credentials: JsonNode? = null,
+    val metadata: JsonNode? = null,
     val createdAt: Instant = Instant.now(),
 )

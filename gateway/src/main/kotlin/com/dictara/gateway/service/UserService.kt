@@ -4,6 +4,7 @@ import com.dictara.gateway.entity.AuthIdentityEntity
 import com.dictara.gateway.entity.UserEntity
 import com.dictara.gateway.repository.AuthIdentityRepository
 import com.dictara.gateway.repository.UserRepository
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -30,13 +31,11 @@ class UserService(
             else -> uid
         }
         val existing = authIdentityRepo.findByProviderAndProviderUid("telegram", uid)
-        val botStarted = existing?.let {
-            runCatching { mapper.readTree(it.metadata ?: "{}").get("bot_started")?.asBoolean() }.getOrNull() == true
-        } ?: false
+        val botStarted = existing?.metadata?.get("bot_started")?.asBoolean() == true
         val metaMap = mapOf("firstName" to telegramFirstName, "lastName" to telegramLastName, "username" to telegramUsername)
             .filterValues { it != null }
             .let { if (botStarted || uid != "anonymous") it + ("bot_started" to true) else it }
-        val metadata = mapper.writeValueAsString(metaMap)
+        val metadata: JsonNode = mapper.valueToTree(metaMap)
 
         if (existing != null) {
             val user = userRepo.findById(existing.userId).orElseThrow()

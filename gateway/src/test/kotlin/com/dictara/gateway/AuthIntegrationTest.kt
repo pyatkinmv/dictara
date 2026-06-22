@@ -89,7 +89,7 @@ class AuthIntegrationTest {
 
         val identity = authIdentityRepo.findByProviderAndProviderUid("telegram", "uid_eve")
         assertThat(identity).isNotNull()
-        val botStarted = mapper.readTree(identity!!.metadata ?: "{}").get("bot_started")?.asBoolean()
+        val botStarted = identity!!.metadata?.get("bot_started")?.asBoolean()
         assertThat(botStarted).isTrue()
     }
 

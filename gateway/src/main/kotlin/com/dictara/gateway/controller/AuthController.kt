@@ -10,6 +10,7 @@ import com.dictara.gateway.repository.UserRepository
 import com.dictara.gateway.service.JwtTokenProvider
 import com.dictara.gateway.service.UserService
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.node.ObjectNode
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.transaction.annotation.Transactional
@@ -47,16 +48,14 @@ class AuthController(
     fun markBotStarted(@RequestBody body: Map<String, String>) {
         val uid = body["telegram_user_id"] ?: return
         val identity = authIdentityRepo.findByProviderAndProviderUid("telegram", uid) ?: return
-        val current = runCatching { mapper.readTree(identity.metadata ?: "{}") }.getOrNull()
-        if (current?.get("bot_started")?.asBoolean() == true) return
-        @Suppress("UNCHECKED_CAST")
-        val updated = (mapper.convertValue(current, Map::class.java) as Map<String, Any?>).toMutableMap()
-        updated["bot_started"] = true
+        val current = (identity.metadata?.deepCopy() as? ObjectNode) ?: mapper.createObjectNode()
+        if (current.get("bot_started")?.asBoolean() == true) return
+        current.put("bot_started", true)
         authIdentityRepo.save(AuthIdentityEntity(
             id = identity.id, userId = identity.userId,
             provider = identity.provider, providerUid = identity.providerUid,
             credentials = identity.credentials,
-            metadata = mapper.writeValueAsString(updated),
+            metadata = current,
             createdAt = identity.createdAt,
         ))
     }
@@ -67,9 +66,7 @@ class AuthController(
         val username = req.telegramUsername.trimStart('@')
         val token = UUID.randomUUID()
         val identity = authIdentityRepo.findByTelegramUsername(username)
-        val botStarted = identity?.let {
-            runCatching { mapper.readTree(it.metadata ?: "{}").get("bot_started")?.asBoolean() }.getOrNull() == true
-        } ?: false
+        val botStarted = identity?.metadata?.get("bot_started")?.asBoolean() == true
         if (identity != null && botStarted) {
             loginTokenRepo.save(LoginTokenEntity(
                 token = token,

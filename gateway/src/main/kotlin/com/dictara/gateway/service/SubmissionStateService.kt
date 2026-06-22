@@ -2,6 +2,7 @@ package com.dictara.gateway.service
 
 import com.dictara.gateway.entity.*
 import com.dictara.gateway.repository.*
+import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -62,13 +63,13 @@ class SubmissionStateService(
     fun saveTranscriptAndCompleteAttempt(
         submissionId: UUID,
         attemptId: UUID,
-        segmentsJson: String,
+        segments: JsonNode,
         formattedText: String,
         audioDurationS: Double?,
     ) {
         transcriptRepo.save(TranscriptEntity(
             submissionId = submissionId,
-            segments = segmentsJson,
+            segments = segments,
             formattedText = formattedText,
             audioDurationS = audioDurationS,
         ))

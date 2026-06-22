@@ -9,6 +9,7 @@ import com.dictara.gateway.model.SummaryMode
 import com.dictara.gateway.port.SummarizerPort
 import com.dictara.gateway.repository.AudioMetaRepository
 import com.dictara.gateway.repository.TranscriptRepository
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import jakarta.annotation.PostConstruct
@@ -109,11 +110,11 @@ class OrchestratorService(
             log.info("Submission $submissionId submitted to transcriber (externalJobId=$transcriberJobId)")
 
             val snapshot = pollTranscriber(submissionId, transcriberJobId)
-            val segmentsJson = mapper.writeValueAsString(snapshot.segments ?: emptyList<Any>())
+            val segmentsNode = mapper.valueToTree<JsonNode>(snapshot.segments ?: emptyList<Any>())
             val formattedText = formatSegments(snapshot.segments ?: emptyList())
 
             stateService.saveTranscriptAndCompleteAttempt(
-                submissionId, attempt.id, segmentsJson, formattedText, snapshot.audioDurationS,
+                submissionId, attempt.id, segmentsNode, formattedText, snapshot.audioDurationS,
             )
             liveProgress.remove(submissionId)
             log.info("Transcription complete for submission $submissionId (duration=${snapshot.audioDurationS?.let { "%.1fs".format(it) } ?: "unknown"}, segments=${snapshot.segments?.size ?: 0})")
@@ -146,11 +147,11 @@ class OrchestratorService(
         val submissionId = attempt.submissionId
         try {
             val snapshot = pollTranscriber(submissionId, attempt.externalJobId!!)
-            val segmentsJson = mapper.writeValueAsString(snapshot.segments ?: emptyList<Any>())
+            val segmentsNode = mapper.valueToTree<JsonNode>(snapshot.segments ?: emptyList<Any>())
             val formattedText = formatSegments(snapshot.segments ?: emptyList())
 
             stateService.saveTranscriptAndCompleteAttempt(
-                submissionId, attempt.id!!, segmentsJson, formattedText, snapshot.audioDurationS,
+                submissionId, attempt.id!!, segmentsNode, formattedText, snapshot.audioDurationS,
             )
             liveProgress.remove(submissionId)
             log.info("Resumed transcription complete for submission $submissionId (duration=${snapshot.audioDurationS?.let { "%.1fs".format(it) } ?: "unknown"}, segments=${snapshot.segments?.size ?: 0})")
