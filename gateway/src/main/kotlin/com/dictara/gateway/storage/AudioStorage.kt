@@ -12,5 +12,5 @@ interface AudioStorage {
     fun download(ref: AudioRef): InputStream?
     fun listObjects(): List<StorageObject>
     fun delete(ref: AudioRef)
-    fun copyObject(from: AudioRef, toObjectName: String): AudioRef
+    fun uploadBytes(objectName: String, bytes: ByteArray)
 }
