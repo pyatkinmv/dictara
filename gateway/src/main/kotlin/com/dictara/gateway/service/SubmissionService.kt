@@ -2,6 +2,7 @@ package com.dictara.gateway.service
 
 import com.dictara.gateway.entity.AudioMetaEntity
 import com.dictara.gateway.entity.SubmissionEntity
+import com.dictara.gateway.entity.TagEntity
 import com.dictara.gateway.entity.TelegramDeliveryEntity
 import com.dictara.gateway.plan.PlanService
 import com.dictara.gateway.repository.*
@@ -19,7 +20,8 @@ import java.util.UUID
 class SubmissionService(
     private val submissionRepo: SubmissionRepository,
     private val audioMetaRepo: AudioMetaRepository,
-    private val tagRepo: SubmissionTagRepository,
+    private val submissionTagRepo: SubmissionTagRepository,
+    private val tagRepository: TagRepository,
     private val telegramDeliveryRepo: TelegramDeliveryRepository,
     private val transcriptRepo: TranscriptRepository,
     private val summaryRepo: SummaryRepository,
@@ -95,8 +97,14 @@ class SubmissionService(
     fun listForUser(userId: UUID): List<SubmissionSummary> {
         val submissions = submissionRepo.findByUserIdOrderByCreatedAtDesc(userId)
         val audioById = audioMetaRepo.findAllById(submissions.map { it.audioId }).associateBy { it.id }
-        val tagsBySubmission = tagRepo.findBySubmissionIdIn(submissions.mapNotNull { it.id })
-            .groupBy({ it.submissionId }, { it.tag })
+        val submissionIds = submissions.mapNotNull { it.id }
+        val tagsBySubmission: Map<UUID, List<String>> = if (submissionIds.isEmpty()) {
+            emptyMap()
+        } else {
+            val submissionTags = submissionTagRepo.findBySubmissionIdIn(submissionIds)
+            val tagsById = tagRepository.findAllById(submissionTags.map { it.tagId }).associateBy { it.id }
+            submissionTags.groupBy({ it.submissionId }, { tagsById[it.tagId]?.name ?: "" })
+        }
         return submissions.map { s ->
             SubmissionSummary(
                 jobId = s.id!!,
@@ -127,23 +135,27 @@ class SubmissionService(
     }
 
     @Transactional
-    fun addTag(submissionId: UUID, userId: UUID, tag: String): List<String> {
+    fun addTag(submissionId: UUID, userId: UUID, tagName: String): List<String> {
         val submission = submissionRepo.findById(submissionId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found") }
         if (submission.userId != userId) throw ResponseStatusException(HttpStatus.FORBIDDEN)
-        if (!tagRepo.existsBySubmissionIdAndTag(submissionId, tag)) {
-            tagRepo.insert(submissionId, tag)
+        val tag = tagRepository.findByUserIdAndName(userId, tagName)
+            ?: tagRepository.save(TagEntity(userId = userId, name = tagName))
+        if (!submissionTagRepo.existsBySubmissionIdAndTagId(submissionId, tag.id!!)) {
+            submissionTagRepo.insert(submissionId, tag.id)
         }
-        return tagRepo.findBySubmissionId(submissionId).map { it.tag }.sorted()
+        return tagRepository.findBySubmissionId(submissionId).map { it.name }
     }
 
     @Transactional
-    fun removeTag(submissionId: UUID, userId: UUID, tag: String): List<String> {
+    fun removeTag(submissionId: UUID, userId: UUID, tagName: String): List<String> {
         val submission = submissionRepo.findById(submissionId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found") }
         if (submission.userId != userId) throw ResponseStatusException(HttpStatus.FORBIDDEN)
-        tagRepo.deleteBySubmissionIdAndTag(submissionId, tag)
-        return tagRepo.findBySubmissionId(submissionId).map { it.tag }.sorted()
+        tagRepository.findByUserIdAndName(userId, tagName)?.let { tag ->
+            submissionTagRepo.deleteBySubmissionIdAndTagId(submissionId, tag.id!!)
+        }
+        return tagRepository.findBySubmissionId(submissionId).map { it.name }
     }
 
     @Transactional

@@ -29,7 +29,7 @@ class TranscribeController(
     private val transcriptRepo: TranscriptRepository,
     private val summaryRepo: SummaryRepository,
     private val stageAttemptRepo: StageAttemptRepository,
-    private val tagRepo: SubmissionTagRepository,
+    private val tagRepo: TagRepository,
     private val telegramDeliveryRepo: TelegramDeliveryRepository,
     private val audioStorage: AudioStorage,
 ) {
@@ -181,7 +181,7 @@ class TranscribeController(
             )
         }
 
-        val tags = tagRepo.findBySubmissionId(id).map { it.tag }.sorted()
+        val tags = tagRepo.findBySubmissionId(id).map { it.name }
 
         val queuePosition = if (submission.status == "pending") {
             submissionRepo.countPendingSubmissionsBefore(submission.createdAt).toInt() + 1
@@ -226,7 +226,7 @@ class TranscribeController(
             .body(text.toByteArray(Charsets.UTF_8))
     }
 
-    private val tagRegex = Regex("^[\\w-]{1,64}$")
+    private val tagRegex = Regex("^[\\w-]{1,32}$")
 
     @PostMapping("/jobs/{jobId}/tags")
     fun addTag(@PathVariable jobId: String, @RequestBody body: Map<String, String>, servletRequest: HttpServletRequest): Map<String, List<String>> {
@@ -238,7 +238,7 @@ class TranscribeController(
         val tag = body["tag"]?.trim()?.lowercase()
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing 'tag'")
         if (!tagRegex.matches(tag)) throw ResponseStatusException(HttpStatus.BAD_REQUEST,
-            "Tag must be 1–64 word characters or hyphens")
+            "Tag must be 1–32 word characters or hyphens")
         return mapOf("tags" to submissionService.addTag(id, userId, tag))
     }
 

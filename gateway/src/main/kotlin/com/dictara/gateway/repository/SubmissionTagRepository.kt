@@ -15,13 +15,13 @@ interface SubmissionTagRepository : Repository<SubmissionTagEntity, UUID> {
     fun findBySubmissionIdIn(submissionIds: Collection<UUID>): List<SubmissionTagEntity>
 
     @Modifying
-    @Query("INSERT INTO submission_tags(submission_id, tag) VALUES (:submissionId, :tag)")
-    fun insert(submissionId: UUID, tag: String)
+    @Query("INSERT INTO submission_tags(submission_id, tag_id) VALUES (:submissionId, :tagId)")
+    fun insert(submissionId: UUID, tagId: UUID)
 
     @Modifying
-    @Query("DELETE FROM submission_tags WHERE submission_id = :submissionId AND tag = :tag")
-    fun deleteBySubmissionIdAndTag(submissionId: UUID, tag: String)
+    @Query("DELETE FROM submission_tags WHERE submission_id = :submissionId AND tag_id = :tagId")
+    fun deleteBySubmissionIdAndTagId(submissionId: UUID, tagId: UUID)
 
-    @Query("SELECT EXISTS(SELECT 1 FROM submission_tags WHERE submission_id = :submissionId AND tag = :tag)")
-    fun existsBySubmissionIdAndTag(submissionId: UUID, tag: String): Boolean
+    @Query("SELECT EXISTS(SELECT 1 FROM submission_tags WHERE submission_id = :submissionId AND tag_id = :tagId)")
+    fun existsBySubmissionIdAndTagId(submissionId: UUID, tagId: UUID): Boolean
 }
