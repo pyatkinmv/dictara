@@ -5,6 +5,7 @@ import com.dictara.gateway.repository.AuthIdentityRepository
 import com.dictara.gateway.repository.LoginTokenRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -14,6 +15,7 @@ import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import java.time.Instant
@@ -25,17 +27,23 @@ class AuthIntegrationTest {
     @Autowired lateinit var rest: TestRestTemplate
     @Autowired lateinit var loginTokenRepo: LoginTokenRepository
     @Autowired lateinit var authIdentityRepo: AuthIdentityRepository
+    @Autowired lateinit var jdbcTemplate: JdbcTemplate
 
     private val mapper = ObjectMapper()
 
     companion object {
         @DynamicPropertySource @JvmStatic
         fun props(registry: DynamicPropertyRegistry) {
-            val pg = SharedTestInfrastructure.postgres
-            registry.add("spring.datasource.url") { pg.jdbcUrl }
-            registry.add("spring.datasource.username") { pg.username }
-            registry.add("spring.datasource.password") { pg.password }
+            registry.add("spring.datasource.url") { SharedTestInfrastructure.jdbcUrl }
+            registry.add("spring.datasource.username") { SharedTestInfrastructure.dbUsername }
+            registry.add("spring.datasource.password") { SharedTestInfrastructure.dbPassword }
         }
+    }
+
+    @BeforeEach
+    fun cleanAuthState() {
+        jdbcTemplate.execute("TRUNCATE login_tokens CASCADE")
+        jdbcTemplate.execute("TRUNCATE users CASCADE")
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

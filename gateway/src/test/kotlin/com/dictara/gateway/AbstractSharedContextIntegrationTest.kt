@@ -25,10 +25,9 @@ abstract class AbstractSharedContextIntegrationTest {
         @DynamicPropertySource
         @JvmStatic
         fun sharedInfraProps(registry: DynamicPropertyRegistry) {
-            val pg = SharedTestInfrastructure.postgres
-            registry.add("spring.datasource.url") { pg.jdbcUrl }
-            registry.add("spring.datasource.username") { pg.username }
-            registry.add("spring.datasource.password") { pg.password }
+            registry.add("spring.datasource.url") { SharedTestInfrastructure.jdbcUrl }
+            registry.add("spring.datasource.username") { SharedTestInfrastructure.dbUsername }
+            registry.add("spring.datasource.password") { SharedTestInfrastructure.dbPassword }
             registry.add("dictara.transcriber.url") { SharedTestInfrastructure.wireMock.baseUrl() }
             registry.add("dictara.transcriber.poll-interval-ms") { "100" }
         }

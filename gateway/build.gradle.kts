@@ -44,6 +44,21 @@ tasks.test {
         events("failed")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
+
+    // Forward TEST_DB_* vars from root .env to the test JVM for local runs.
+    // CI has no .env → Testcontainers is used instead.
+    if (System.getenv("TEST_DB_URL") == null) {
+        val dotEnv = rootProject.file("../.env")
+        if (dotEnv.exists()) {
+            dotEnv.readLines()
+                .filter { it.startsWith("TEST_DB_") && it.contains("=") }
+                .forEach { line ->
+                    val key = line.substringBefore("=").trim()
+                    val value = line.substringAfter("=").trim().removeSurrounding("\"")
+                    environment(key, value)
+                }
+        }
+    }
 }
 
 kotlin {
