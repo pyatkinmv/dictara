@@ -4,6 +4,7 @@ import com.dictara.gateway.config.DictaraProperties
 import com.google.cloud.storage.BlobId
 import com.google.cloud.storage.BlobInfo
 import com.google.cloud.storage.Storage
+import com.google.cloud.storage.Storage.CopyRequest
 import com.google.cloud.storage.StorageOptions
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
@@ -72,5 +73,17 @@ class GcsAudioStorage(props: DictaraProperties) : AudioStorage {
         val objectName = ref.uri.removePrefix("gs://$bucket/")
         val deleted = storage.delete(BlobId.of(bucket, objectName))
         if (!deleted) log.warn("GCS object not found for deletion: {}", ref.uri)
+    }
+
+    /** Server-side copy within the same bucket. No data flows through the app. */
+    override fun copyObject(from: AudioRef, toObjectName: String): AudioRef {
+        val fromObjectName = from.uri.removePrefix("gs://$bucket/")
+        storage.copy(
+            CopyRequest.newBuilder()
+                .setSource(BlobId.of(bucket, fromObjectName))
+                .setTarget(BlobId.of(bucket, toObjectName))
+                .build()
+        ).getResult()
+        return AudioRef("gs://$bucket/$toObjectName")
     }
 }

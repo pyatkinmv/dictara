@@ -24,4 +24,8 @@ interface AudioMetaRepository : CrudRepository<AudioMetaEntity, UUID> {
 
     @Query("SELECT storage_uri FROM audio_meta WHERE storage_uri IS NOT NULL")
     fun findAllStorageUris(): List<String>
+
+    @Modifying
+    @Query("UPDATE audio_meta SET storage_uri = :newUri WHERE storage_uri = :oldUri")
+    fun updateStorageUri(oldUri: String, newUri: String): Int
 }
