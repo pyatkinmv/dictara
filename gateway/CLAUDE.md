@@ -94,3 +94,41 @@ Every run is recorded in the `job_runs` table (`status`: `running` → `complete
 ```bash
 docker compose build gateway && docker compose up -d gateway
 ```
+
+## Running integration tests locally
+
+In CI, tests use Testcontainers (spins up a throwaway postgres). Locally, Testcontainers doesn't work (Docker Desktop API version mismatch), so tests connect to a real postgres container instead.
+
+**One-time setup:**
+
+1. Start a dedicated local postgres for tests (separate from the compose postgres, different port so it can't accidentally hit the production DB via SSH tunnel):
+
+```powershell
+docker run -d --name postgres-test -p 127.0.0.1:5433:5432 \
+  -e POSTGRES_USER=dictara \
+  -e POSTGRES_PASSWORD=hesoyam \
+  -e POSTGRES_DB=dictara \
+  postgres:16
+```
+
+2. Add to root `.env`:
+
+```
+TEST_DB_URL=jdbc:postgresql://localhost:5433/dictara
+TEST_DB_PASSWORD=hesoyam
+```
+
+`build.gradle.kts` reads these vars from `.env` automatically and passes them to the test JVM — no IntelliJ run-config edits needed.
+
+**Run tests:**
+
+```bash
+./gradlew test
+# or just run them from IntelliJ as usual
+```
+
+Flyway runs all migrations on first connect. If the DB gets into a broken state, wipe and restart:
+
+```powershell
+docker exec postgres-test psql -U dictara -d dictara -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO dictara;"
+```

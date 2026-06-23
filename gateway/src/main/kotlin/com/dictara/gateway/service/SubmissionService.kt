@@ -22,7 +22,6 @@ class SubmissionService(
     private val tagRepo: SubmissionTagRepository,
     private val telegramDeliveryRepo: TelegramDeliveryRepository,
     private val transcriptRepo: TranscriptRepository,
-    private val diarizationRepo: DiarizationRepository,
     private val summaryRepo: SummaryRepository,
     private val orchestrator: OrchestratorService,
     private val planService: PlanService,
@@ -119,8 +118,7 @@ class SubmissionService(
             ExportData(
                 submissionId = id,
                 createdAt = s.createdAt,
-                transcriptText = diarizationRepo.findBySubmissionId(id)?.formattedText
-                    ?: transcriptRepo.findBySubmissionId(id)?.formattedText,
+                transcriptText = transcriptRepo.findBySubmissionId(id)?.formattedText,
                 summaryText = summaryRepo.findBySubmissionId(id)?.text,
                 originalName = audio?.originalName,
                 storageUri = audio?.storageUri,

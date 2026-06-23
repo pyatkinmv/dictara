@@ -27,7 +27,6 @@ class TranscribeController(
     private val userRepo: UserRepository,
     private val submissionRepo: SubmissionRepository,
     private val transcriptRepo: TranscriptRepository,
-    private val diarizationRepo: DiarizationRepository,
     private val summaryRepo: SummaryRepository,
     private val stageAttemptRepo: StageAttemptRepository,
     private val tagRepo: SubmissionTagRepository,
@@ -155,12 +154,11 @@ class TranscribeController(
         }
 
         val transcript = transcriptRepo.findBySubmissionId(id)
-        val diarization = diarizationRepo.findBySubmissionId(id)
         val summary = summaryRepo.findBySubmissionId(id)
         val liveProgress = orchestrator.getLiveProgress(id)
 
-        val segmentsNode = diarization?.segments ?: transcript?.segments
-        val formattedText = diarization?.formattedText ?: transcript?.formattedText
+        val segmentsNode = transcript?.segments
+        val formattedText = transcript?.formattedText
 
         val transcriptionAttempts = stageAttemptRepo.findBySubmissionIdAndStageOrderByAttemptNumDesc(id, "transcription")
         val latestFailedAttempt = transcriptionAttempts.firstOrNull { it.status == "failed" }
@@ -220,8 +218,7 @@ class TranscribeController(
 
     @GetMapping("/transcript")
     fun downloadTranscript(@RequestParam jobId: UUID): ResponseEntity<ByteArray> {
-        val text = diarizationRepo.findBySubmissionId(jobId)?.formattedText
-            ?: transcriptRepo.findBySubmissionId(jobId)?.formattedText
+        val text = transcriptRepo.findBySubmissionId(jobId)?.formattedText
             ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"transcript_$jobId.txt\"")
