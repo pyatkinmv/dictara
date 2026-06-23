@@ -19,7 +19,7 @@ class DatabaseBackupService(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    @Scheduled(cron = "0 30 16 * * *")
+    @Scheduled(cron = "0 45 16 * * *")
     fun backup() = jobTracker.tracked("daily_db_backup") {
         val date = LocalDate.now()
         val tables = jdbcTemplate.queryForList(
