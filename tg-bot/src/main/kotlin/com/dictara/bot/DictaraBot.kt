@@ -273,13 +273,13 @@ class DictaraBot(
 
         log.debug("Message from userId={} chatId={} type={}", userId, chatId, message.chat.type)
 
-        data class FileInfo(val fileId: String, val nameHint: String?)
+        data class FileInfo(val fileId: String, val nameHint: String?, val fileSize: Long?)
         val fileInfo = when {
             message.hasAnimation() -> return  // GIFs — silently ignore, no message
-            message.hasAudio() -> FileInfo(message.audio.fileId, message.audio.fileName)
-            message.hasVoice() -> FileInfo(message.voice.fileId, null)
-            message.hasVideoNote() -> FileInfo(message.videoNote.fileId, null)
-            message.hasVideo() -> FileInfo(message.video.fileId, message.video.fileName)
+            message.hasAudio() -> FileInfo(message.audio.fileId, message.audio.fileName, message.audio.fileSize?.toLong())
+            message.hasVoice() -> FileInfo(message.voice.fileId, null, message.voice.fileSize?.toLong())
+            message.hasVideoNote() -> FileInfo(message.videoNote.fileId, null, message.videoNote.fileSize?.toLong())
+            message.hasVideo() -> FileInfo(message.video.fileId, message.video.fileName, message.video.fileSize?.toLong())
             message.hasDocument() -> {
                 val doc = message.document
                 val mime = doc.mimeType ?: ""
@@ -289,7 +289,7 @@ class DictaraBot(
                     send(chatId, "Unsupported format: .$ext\nSupported: ${supportedExtensions.sorted().joinToString(", ")}")
                     return
                 }
-                FileInfo(doc.fileId, doc.fileName)
+                FileInfo(doc.fileId, doc.fileName, doc.fileSize?.toLong())
             }
             else -> {
                 if (!isGroup) send(chatId, "Send me an audio or video file. Use /settings to configure preferences.")
@@ -312,6 +312,13 @@ class DictaraBot(
         val who = if (senderTag != null) "$senderTag's" else "your"
         val baseLabel = "⏳ Transcribing $who audio...\n\nModel: $modelLabel | Speakers: $speakersLabel | Lang: $langLabel | Summary: $summaryLabel"
         val originalMessageId = message.messageId.toLong()
+
+        val maxUploadBytes = 400L * 1024 * 1024
+        if (fileInfo.fileSize != null && fileInfo.fileSize > maxUploadBytes) {
+            send(chatId, "⚠️ File is too large. Maximum allowed size is 400 MB.", replyToMessageId = originalMessageId)
+            return
+        }
+
         val statusMsg: Message? = try {
             send(chatId, baseLabel, replyToMessageId = originalMessageId)
         } catch (e: Exception) {
@@ -421,6 +428,10 @@ class DictaraBot(
                 }
             } catch (e: PlanLimitException) {
                 log.info("Plan limit exceeded: chatId={} error={}", chatId, e.message)
+                if (statusMsg != null) try { execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build()) } catch (_: Exception) {}
+                send(chatId, "⚠️ ${e.message}", replyToMessageId = originalMessageId)
+            } catch (e: FileTooLargeException) {
+                log.info("File too large: chatId={} error={}", chatId, e.message)
                 if (statusMsg != null) try { execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build()) } catch (_: Exception) {}
                 send(chatId, "⚠️ ${e.message}", replyToMessageId = originalMessageId)
             } catch (e: Exception) {

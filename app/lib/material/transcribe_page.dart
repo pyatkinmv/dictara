@@ -93,6 +93,14 @@ class _TranscribePageState extends State<TranscribePage> {
     );
     if (result == null || result.files.isEmpty) return;
     final file = result.files.first;
+    const maxBytes = 400 * 1024 * 1024;
+    if ((file.bytes?.length ?? 0) > maxBytes) {
+      setState(() {
+        _state = _State.error;
+        _errorMsg = 'File is too large. Maximum allowed size is 400 MB.';
+      });
+      return;
+    }
     setState(() {
       _fileBytes = file.bytes;
       _fileName = file.name;

@@ -282,6 +282,9 @@ class DictaraClient(private val baseUrl: String) {
             if (response.code == 429) {
                 throw PlanLimitException(message ?: "Monthly transcription limit reached")
             }
+            if (response.code == 413) {
+                throw FileTooLargeException(message ?: "File is too large. Maximum allowed size is 400 MB.")
+            }
             throw RuntimeException(message ?: "Submit failed (${response.code}): $responseBody")
         }
         val root = mapper.readTree(responseBody)

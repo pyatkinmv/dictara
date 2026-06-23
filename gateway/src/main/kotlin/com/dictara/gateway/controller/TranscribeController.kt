@@ -36,6 +36,7 @@ class TranscribeController(
     companion object {
         private val log = LoggerFactory.getLogger(TranscribeController::class.java)
         val SUPPORTED_EXTENSIONS = setOf("mp3", "mp4", "m4a", "wav", "ogg", "oga", "opus", "flac", "webm", "mkv", "avi", "mov")
+        private val MAX_UPLOAD_SIZE_BYTES = 400L * 1024 * 1024
 
         private val IMAGE_SIGNATURES = listOf(
             byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte())          to "JPEG",
@@ -98,6 +99,9 @@ class TranscribeController(
         @RequestHeader(name = "X-Telegram-Message-Id", required = false) telegramMessageId: Long?,
         servletRequest: HttpServletRequest,
     ): SubmitResponse {
+        if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+            throw ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "File is too large. Maximum allowed size is 400 MB.")
+        }
         val ext = file.originalFilename?.substringAfterLast('.', "")?.lowercase() ?: ""
         if (ext !in SUPPORTED_EXTENSIONS) {
             log.warn("Rejected upload: unsupported extension '.$ext' (file=${file.originalFilename})")
