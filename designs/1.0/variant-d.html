@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dictara — Variant D: Ink</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet">
+<style>
+:root{
+  --bg:#F6F5F1;
+  --surface:#FFFFFF;
+  --sb-bg:#F2F1ED;
+  --text:#0E0D0B;
+  --text2:#65635C;
+  --text3:#B5B3AB;
+  --border:#E8E5DE;
+  --border2:#D0CECA;
+  --accent:#6366F1;
+  --al:#EEF2FF;
+  --ad:#4338CA;
+  --ok:#16A34A;
+  --ok-bg:#DCFCE7;
+  --warn:#D97706;
+  --warn-bg:#FEF3C7;
+  --err:#DC2626;
+  --err-bg:#FEE2E2;
+  --sp1:#6366F1;
+  --sp2:#0891B2;
+  --sp3:#D97706;
+  --sp4:#16A34A;
+  --sb-w:216px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;}
+.icon{font-family:'Material Symbols Rounded';font-style:normal;line-height:1;}
+
+/* ── SIDEBAR ── */
+.sidebar{
+  width:var(--sb-w);flex-shrink:0;
+  background:var(--sb-bg);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;height:100vh;
+}
+.sb-brand{padding:22px 18px 20px;border-bottom:1px solid var(--border);}
+.sb-brand-name{font-size:17px;font-weight:700;letter-spacing:-.4px;}
+.sb-brand-sub{font-size:11px;color:var(--text3);margin-top:2px;letter-spacing:.1px;}
+.sb-nav{flex:1;padding:10px 8px;}
+.sb-item{
+  display:flex;align-items:center;gap:9px;
+  padding:8px 10px;border-radius:8px;
+  cursor:pointer;color:var(--text2);font-size:13px;font-weight:500;
+  transition:.12s;margin-bottom:1px;
+  user-select:none;
+}
+.sb-item:hover{background:rgba(0,0,0,.05);color:var(--text);}
+.sb-item.active{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.06);font-weight:600;}
+.sb-item .icon{font-size:17px;flex-shrink:0;color:var(--text3);}
+.sb-item.active .icon{color:var(--accent);}
+.sb-count{margin-left:auto;font-size:11px;color:var(--text3);}
+.sb-item.active .sb-count{color:var(--accent);font-weight:700;}
+.sb-sep{height:1px;background:var(--border);margin:8px 2px;}
+.sb-section-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:var(--text3);padding:8px 10px 4px;}
+
+.sb-bottom{padding:12px 8px;border-top:1px solid var(--border);}
+.sb-profile{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:.12s;}
+.sb-profile:hover{background:rgba(0,0,0,.05);}
+.sb-av{
+  width:28px;height:28px;border-radius:8px;
+  background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;flex-shrink:0;
+}
+.sb-un{font-size:12px;font-weight:600;color:var(--text);}
+.sb-role{font-size:10px;color:var(--text3);}
+.sb-logout{margin-left:auto;font-size:16px;color:var(--text3);}
+
+/* ── MAIN ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+/* ── TOPBAR ── */
+.topbar{
+  height:52px;
+  display:flex;align-items:center;gap:10px;
+  padding:0 20px;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.tb-title{font-size:14px;font-weight:700;letter-spacing:-.2px;}
+.tb-search{
+  position:relative;flex:1;max-width:260px;
+}
+.tb-search input{
+  width:100%;padding:6px 12px 6px 32px;
+  background:var(--bg);border:1px solid var(--border);border-radius:7px;
+  font-size:12px;font-family:'Inter';color:var(--text);
+  transition:.15s;
+}
+.tb-search input:focus{outline:none;border-color:var(--accent);background:#fff;}
+.tb-search input::placeholder{color:var(--text3);}
+.tb-search .icon{position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:15px;color:var(--text3);}
+.tb-spacer{flex:1;}
+.tb-new{
+  display:flex;align-items:center;gap:5px;
+  padding:7px 14px;
+  background:var(--accent);color:#fff;
+  border:none;border-radius:7px;
+  font-size:12px;font-weight:600;font-family:'Inter';
+  cursor:pointer;transition:.12s;letter-spacing:.1px;
+}
+.tb-new:hover{background:var(--ad);}
+.tb-new .icon{font-size:15px;}
+.tb-back{
+  display:none;align-items:center;gap:5px;
+  padding:6px 12px;
+  border:1px solid var(--border);border-radius:7px;background:none;
+  font-size:12px;font-weight:500;font-family:'Inter';cursor:pointer;color:var(--text2);
+  transition:.12s;
+}
+.tb-back:hover{background:var(--bg);}
+.tb-back .icon{font-size:15px;}
+
+/* ── FILTER BAR ── */
+.filter-bar{
+  display:flex;align-items:center;gap:6px;
+  padding:10px 20px;background:var(--surface);
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.fc{
+  padding:4px 12px;border-radius:100px;
+  font-size:11px;font-weight:500;
+  border:1px solid var(--border);background:none;
+  color:var(--text2);cursor:pointer;font-family:'Inter';transition:.12s;
+}
+.fc:hover{border-color:var(--border2);color:var(--text);}
+.fc.on{background:var(--text);color:#fff;border-color:transparent;}
+.fdiv{width:1px;height:14px;background:var(--border);}
+
+/* ── LIST VIEW ── */
+.list-view{display:flex;flex-direction:column;flex:1;overflow:hidden;}
+.list{flex:1;overflow-y:auto;}
+
+/* ── ROW ── */
+.row{
+  display:flex;align-items:center;gap:0;
+  padding:0;background:var(--surface);
+  border-bottom:1px solid var(--border);
+  cursor:pointer;transition:background .1s;
+  position:relative;overflow:hidden;
+}
+.row:first-child{border-top:none;}
+.row:hover{background:#FAFAF8;}
+.row:hover .row-chevron{opacity:1;}
+
+/* status accent bar on left */
+.row-accent{width:3px;height:100%;flex-shrink:0;align-self:stretch;}
+.row-accent.done{background:var(--ok);}
+.row-accent.proc{background:var(--warn);}
+.row-accent.pend{background:var(--text3);}
+.row-accent.fail{background:var(--err);}
+
+.row-inner{flex:1;display:flex;align-items:center;gap:12px;padding:13px 16px 13px 14px;}
+
+.row-icon{
+  width:36px;height:36px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;font-size:17px;
+}
+.row-icon.done{background:var(--ok-bg);color:var(--ok);}
+.row-icon.proc{background:var(--warn-bg);color:var(--warn);}
+.row-icon.pend{background:var(--bg);color:var(--text3);}
+.row-icon.fail{background:var(--err-bg);color:var(--err);}
+
+.row-info{flex:1;min-width:0;}
+.row-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.1px;}
+.row-sub{font-size:11px;color:var(--text2);margin-top:2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.row-sub span{display:flex;align-items:center;gap:2px;}
+.row-sub .icon{font-size:12px;color:var(--text3);}
+
+.row-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.badge{
+  padding:2px 9px;border-radius:100px;
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+}
+.badge.done{background:var(--ok-bg);color:var(--ok);}
+.badge.proc{background:var(--warn-bg);color:var(--warn);}
+.badge.pend{background:var(--bg);color:var(--text3);border:1px solid var(--border);}
+.r-dl{
+  width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+  border-radius:5px;border:none;background:none;cursor:pointer;color:var(--text3);
+  transition:.12s;opacity:0;
+}
+.row:hover .r-dl{opacity:1;}
+.r-dl:hover{background:var(--bg);color:var(--accent);}
+.row-chevron{font-size:16px;color:var(--text3);opacity:0;transition:.12s;}
+
+.row-tags-line{display:flex;gap:4px;margin-top:4px;flex-wrap:wrap;}
+.dot-tag{
+  width:7px;height:7px;border-radius:50%;flex-shrink:0;
+  position:relative;
+}
+.dot-tag::after{
+  content:attr(data-label);
+  position:absolute;left:50%;bottom:calc(100%+4px);transform:translateX(-50%);
+  font-size:10px;font-weight:600;color:var(--text);background:var(--surface);
+  border:1px solid var(--border);border-radius:4px;padding:2px 6px;
+  white-space:nowrap;pointer-events:none;opacity:0;transition:.15s;box-shadow:0 2px 6px rgba(0,0,0,.1);
+}
+.dot-tag:hover::after{opacity:1;}
+
+.row-prog{height:2px;background:var(--border);border-radius:100px;overflow:hidden;margin-top:4px;}
+.row-prog-fill{height:100%;background:var(--warn);border-radius:100px;animation:ppulse 2s ease-in-out infinite;}
+@keyframes ppulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* ── DETAIL VIEW ── */
+.detail-view{display:none;flex:1;flex-direction:column;overflow:hidden;}
+.detail-view.on{display:flex;}
+
+/* detail topbar */
+.detail-top{
+  padding:16px 24px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.d-crumb{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text3);margin-bottom:10px;}
+.d-crumb a{color:var(--accent);cursor:pointer;text-decoration:none;}
+.d-crumb a:hover{text-decoration:underline;}
+.d-crumb .icon{font-size:13px;}
+.d-main{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;}
+.d-name-wrap{}
+.d-name{font-size:20px;font-weight:700;letter-spacing:-.4px;line-height:1.2;margin-bottom:7px;}
+.d-meta{display:flex;align-items:center;gap:14px;font-size:12px;color:var(--text2);}
+.d-meta span{display:flex;align-items:center;gap:3px;}
+.d-meta .icon{font-size:13px;color:var(--text3);}
+.d-status{
+  display:flex;align-items:center;gap:5px;
+  padding:3px 10px;border-radius:100px;
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+}
+.d-status.done{background:var(--ok-bg);color:var(--ok);}
+.d-actions{display:flex;gap:6px;flex-shrink:0;}
+.d-btn{
+  display:flex;align-items:center;gap:4px;
+  padding:6px 12px;border-radius:7px;
+  font-size:12px;font-weight:500;font-family:'Inter';cursor:pointer;
+  border:1px solid var(--border);background:var(--surface);color:var(--text2);transition:.12s;
+}
+.d-btn:hover{border-color:var(--accent);color:var(--accent);}
+.d-btn .icon{font-size:14px;}
+
+/* speaker color legend */
+.speaker-legend{display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap;}
+.sp-chip{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);font-weight:500;}
+.sp-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+
+/* detail tabs */
+.detail-tabs{display:flex;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
+.dtab{
+  padding:11px 16px;font-size:12px;font-weight:500;color:var(--text3);
+  cursor:pointer;border-bottom:2px solid transparent;transition:.12s;margin-bottom:-1px;
+}
+.dtab:hover{color:var(--text2);}
+.dtab.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
+
+/* detail content */
+.detail-body{flex:1;overflow-y:auto;}
+.dpane{display:none;}
+.dpane.on{display:grid;}
+
+/* ── TRANSCRIPT TAB ── */
+#dp0{grid-template-columns:1fr 280px;min-height:100%;}
+.tr-main{
+  padding:32px 40px 60px 32px;
+  border-right:1px solid var(--border);
+}
+
+/* Speaker distribution bar */
+.spk-bar{
+  display:flex;height:6px;border-radius:100px;overflow:hidden;margin-bottom:28px;gap:2px;
+}
+.spk-bar-seg{height:100%;border-radius:100px;transition:.3s;}
+
+.tr-body{}
+.ts-block{
+  display:grid;
+  grid-template-columns:52px 1fr;
+  gap:0 16px;
+  margin-bottom:18px;
+}
+.ts-time{
+  font-size:10px;font-weight:700;color:var(--text3);
+  padding-top:3px;text-align:right;letter-spacing:.2px;
+  font-variant-numeric:tabular-nums;
+}
+.ts-content{}
+.ts-speaker{
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
+  margin-bottom:3px;
+}
+.ts-text{
+  font-size:14px;line-height:1.75;color:var(--text2);
+}
+.ts-block:hover .ts-time{color:var(--text2);}
+.ts-block:hover .ts-text{color:var(--text);}
+
+/* transcript sidebar */
+.tr-side{padding:24px 20px;position:sticky;top:0;}
+.ts-card{
+  background:var(--bg);border-radius:10px;padding:16px;margin-bottom:12px;
+  border:1px solid var(--border);
+}
+.ts-card-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--text3);margin-bottom:10px;}
+.ts-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);}
+.ts-row:last-child{border:none;}
+.ts-k{color:var(--text3);}
+.ts-v{font-weight:600;color:var(--text);}
+.ts-tags{display:flex;flex-wrap:wrap;gap:6px;}
+.tag{padding:4px 11px;border-radius:100px;font-size:11px;font-weight:600;color:#fff;}
+.add-tag{
+  padding:4px 11px;border-radius:100px;font-size:11px;font-weight:500;
+  border:1.5px dashed var(--border);background:none;color:var(--text3);cursor:pointer;font-family:'Inter';
+  transition:.12s;
+}
+.add-tag:hover{border-color:var(--accent);color:var(--accent);}
+
+/* ── SUMMARY TAB ── */
+#dp1{display:none;}
+#dp1.on{display:block;padding:32px 40px;}
+.sum-max{max-width:660px;}
+.sum-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--text3);margin-bottom:10px;}
+.sum-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:20px 24px;font-size:14px;line-height:1.8;color:var(--text2);
+  margin-bottom:20px;
+  border-left:3px solid var(--accent);
+}
+
+/* ── DETAILS TAB ── */
+#dp2{display:none;}
+#dp2.on{display:block;padding:32px 40px;}
+.info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:660px;}
+.ic{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.ic-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:5px;}
+.ic-val{font-size:14px;font-weight:600;color:var(--text);}
+
+/* ── SETTINGS PAGE ── */
+.settings-page{display:none;flex:1;overflow-y:auto;padding:32px 32px;}
+.settings-page.on{display:block;}
+.sp-title{font-size:18px;font-weight:700;letter-spacing:-.3px;margin-bottom:24px;}
+.sp-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;}
+.sp-card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);padding:16px 20px 12px;border-bottom:1px solid var(--border);}
+.sp-row{display:flex;align-items:center;justify-content:space-between;padding:13px 20px;border-bottom:1px solid var(--border);font-size:13px;}
+.sp-row:last-child{border:none;}
+.sp-row-lbl{font-weight:500;}
+.sp-row-sub{font-size:11px;color:var(--text3);margin-top:1px;}
+.tog{width:36px;height:20px;border-radius:100px;background:var(--border);border:none;cursor:pointer;position:relative;transition:.2s;}
+.tog::after{content:'';position:absolute;left:3px;top:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 2px rgba(0,0,0,.15);}
+.tog.on{background:var(--accent);}
+.tog.on::after{transform:translateX(16px);}
+.sp-sel{padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:12px;font-family:'Inter';color:var(--text);background:var(--bg);appearance:none;}
+
+/* ── UPLOAD MODAL ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(6px);}
+.modal{
+  background:var(--surface);border-radius:18px;padding:28px;width:480px;max-width:95vw;
+  box-shadow:0 32px 64px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.05);
+  display:flex;flex-direction:column;gap:16px;
+}
+.modal-hd{display:flex;align-items:center;justify-content:space-between;}
+.modal-title{font-size:16px;font-weight:700;letter-spacing:-.2px;}
+.modal-x{width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:6px;border:none;background:none;cursor:pointer;color:var(--text3);}
+.modal-x:hover{background:var(--bg);}
+.mdrop{
+  border:2px dashed var(--border);border-radius:12px;padding:28px 20px;
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  cursor:pointer;text-align:center;background:var(--bg);transition:.2s;
+}
+.mdrop:hover,.mdrop.drag{border-color:var(--accent);background:var(--al);}
+.mdrop.has{border-color:var(--ok);background:var(--ok-bg);border-style:solid;}
+.mdrop-icon{font-size:32px;color:var(--accent);margin-bottom:2px;}
+.mdrop.has .mdrop-icon{color:var(--ok);}
+.mdrop-t{font-size:13px;font-weight:600;}
+.mdrop-s{font-size:12px;color:var(--text2);}
+.mdrop-fmt{font-size:10px;color:var(--text3);margin-top:2px;}
+.m-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.m-field label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);display:block;margin-bottom:6px;}
+.m-chips{display:flex;gap:5px;}
+.m-chip{
+  flex:1;padding:7px;border-radius:7px;text-align:center;
+  font-size:12px;font-weight:500;border:1px solid var(--border);
+  background:var(--bg);color:var(--text2);cursor:pointer;font-family:'Inter';transition:.12s;
+}
+.m-chip.on{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600;}
+.m-sel{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:12px;font-family:'Inter';color:var(--text);background:var(--bg);appearance:none;}
+.m-sel:focus{outline:none;border-color:var(--accent);}
+.m-tog-row{display:flex;align-items:center;justify-content:space-between;padding:3px 0;}
+.m-tog-row span{font-size:13px;font-weight:500;}
+.modal-ft{display:flex;gap:8px;justify-content:flex-end;}
+.btn-cancel{padding:8px 16px;border-radius:7px;border:1px solid var(--border);background:none;font-size:12px;font-family:'Inter';cursor:pointer;color:var(--text2);}
+.btn-cancel:hover{background:var(--bg);}
+.btn-go{padding:8px 18px;border-radius:7px;background:var(--accent);color:#fff;border:none;font-size:12px;font-weight:600;font-family:'Inter';cursor:pointer;transition:.12s;}
+.btn-go:hover{background:var(--ad);}
+.btn-go:disabled{background:var(--border);color:var(--text3);cursor:not-allowed;}
+
+/* ── LOGIN ── */
+.login-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:500;backdrop-filter:blur(8px);}
+.lbox{
+  background:var(--surface);border-radius:18px;padding:32px;width:330px;
+  box-shadow:0 32px 64px rgba(0,0,0,.2),0 0 0 1px rgba(0,0,0,.06);
+  display:flex;flex-direction:column;gap:14px;
+}
+.l-brand{font-size:18px;font-weight:700;letter-spacing:-.3px;color:var(--text);}
+.l-sub{font-size:13px;color:var(--text2);line-height:1.5;}
+.l-iw{display:flex;align-items:center;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg);}
+.l-iw:focus-within{border-color:var(--accent);background:#fff;}
+.l-prefix{padding:0 8px;font-size:13px;color:var(--text3);font-weight:500;}
+.l-input{flex:1;padding:10px 8px 10px 0;border:none;font-size:13px;font-family:'Inter';background:transparent;color:var(--text);}
+.l-input:focus{outline:none;}
+.l-btn{padding:11px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;font-family:'Inter';cursor:pointer;transition:.12s;letter-spacing:.1px;}
+.l-btn:hover{background:var(--ad);}
+.l-wait{display:none;flex-direction:column;align-items:center;gap:12px;text-align:center;padding:8px 0;}
+.spinner{width:34px;height:34px;border:2.5px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.l-wt{font-size:13px;color:var(--text2);line-height:1.55;}
+.l-cancel{font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;font-family:'Inter';text-decoration:underline;}
+.l-hint{font-size:11px;color:var(--text3);}
+.l-hint a{color:var(--accent);}
+
+/* scrollbar */
+::-webkit-scrollbar{width:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:100px;}
+::-webkit-scrollbar-thumb:hover{background:var(--border2);}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="lbox">
+    <div class="l-brand">Dictara</div>
+    <p class="l-sub">Sign in with Telegram to access your transcriptions.</p>
+    <div id="lf1" style="display:flex;flex-direction:column;gap:12px">
+      <div class="l-iw"><span class="l-prefix">@</span><input class="l-input" id="uf" type="text" placeholder="telegram username" autocomplete="off"></div>
+      <button class="l-btn" onclick="doLogin()">Continue with Telegram</button>
+      <p class="l-hint">No account? Start <a href="#">@DictaraBot</a> on Telegram first.</p>
+    </div>
+    <div class="l-wait" id="lf2">
+      <div class="spinner"></div>
+      <p class="l-wt">Check Telegram —<br>tap <strong>Confirm login</strong> in @DictaraBot.</p>
+      <button class="l-cancel" onclick="cancelLogin()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- UPLOAD MODAL -->
+<div class="overlay" id="uploadModal" style="display:none">
+  <div class="modal">
+    <div class="modal-hd">
+      <span class="modal-title">New transcription</span>
+      <button class="modal-x" onclick="closeModal()"><span class="icon">close</span></button>
+    </div>
+    <div class="mdrop" id="mdrop" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="mDrop(event)" onclick="document.getElementById('mfi').click()">
+      <input id="mfi" type="file" accept="audio/*,video/*" style="display:none" onchange="mFile(this.files[0])">
+      <span class="icon mdrop-icon">audio_file</span>
+      <p class="mdrop-t" id="mt">Drop audio or video here</p>
+      <p class="mdrop-s" id="ms">or click to browse</p>
+      <p class="mdrop-fmt" id="mf">MP3 · MP4 · WAV · M4A · OGG · FLAC · up to 2 GB</p>
+    </div>
+    <div class="m-grid">
+      <div class="m-field"><label>Model</label><div class="m-chips"><button class="m-chip on" onclick="mc(this)">Turbo</button><button class="m-chip" onclick="mc(this)">Small</button></div></div>
+      <div class="m-field"><label>Language</label><select class="m-sel"><option>Auto-detect</option><option>Russian</option><option>English</option><option>Ukrainian</option></select></div>
+      <div class="m-field"><label>Summary</label><select class="m-sel"><option>No summary</option><option>Short</option><option>Full</option></select></div>
+      <div class="m-field"><label>Speakers</label><div class="m-tog-row"><span>Diarize</span><button class="tog" onclick="this.classList.toggle('on')"></button></div></div>
+    </div>
+    <div class="modal-ft"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-go" id="mbtn" disabled>Transcribe</button></div>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-brand-name">Dictara</div>
+    <div class="sb-brand-sub">Audio transcription</div>
+  </div>
+  <div class="sb-nav">
+    <div class="sb-item active" id="nav-tr" onclick="showList()">
+      <span class="icon">transcribe</span>
+      Transcriptions
+      <span class="sb-count">47</span>
+    </div>
+    <div class="sb-sep"></div>
+    <div class="sb-item" id="nav-st" onclick="showSettings()">
+      <span class="icon">settings</span>
+      Settings
+    </div>
+  </div>
+  <div class="sb-bottom">
+    <div class="sb-profile" onclick="logout()">
+      <div class="sb-av" id="sbav">P</div>
+      <div>
+        <div class="sb-un" id="sbuname">@pyatkinmv</div>
+        <div class="sb-role">Free plan</div>
+      </div>
+      <span class="icon sb-logout">logout</span>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- TOPBAR LIST -->
+  <div class="topbar" id="topbar-list">
+    <span class="tb-title">Transcriptions</span>
+    <div class="tb-search"><span class="icon">search</span><input type="text" placeholder="Search files, tags…"></div>
+    <div class="tb-spacer"></div>
+    <button class="tb-new" onclick="openModal()"><span class="icon">add</span>New</button>
+  </div>
+
+  <!-- TOPBAR DETAIL -->
+  <div class="topbar" id="topbar-detail" style="display:none">
+    <button class="tb-back" onclick="showList()"><span class="icon">arrow_back</span>Transcriptions</button>
+    <div class="tb-spacer"></div>
+    <button class="tb-new" onclick="openModal()"><span class="icon">add</span>New</button>
+  </div>
+
+  <!-- LIST VIEW -->
+  <div class="list-view" id="list-view">
+    <div class="filter-bar">
+      <button class="fc on" onclick="fc(this)">All</button>
+      <button class="fc" onclick="fc(this)">Done</button>
+      <button class="fc" onclick="fc(this)">Processing</button>
+      <button class="fc" onclick="fc(this)">Pending</button>
+      <div class="fdiv"></div>
+      <button class="fc" onclick="fc(this)">Has summary</button>
+      <button class="fc" onclick="fc(this)">Has tags</button>
+    </div>
+    <div class="list">
+
+      <div class="row" onclick="openDetail(0)">
+        <div class="row-accent done"></div>
+        <div class="row-inner">
+          <div class="row-icon done"><span class="icon">audio_file</span></div>
+          <div class="row-info">
+            <div class="row-name">meeting-recording-june.mp3</div>
+            <div class="row-sub">
+              <span><span class="icon">schedule</span>14 min</span>
+              <span><span class="icon">calendar_today</span>22 Jun</span>
+              <span><span class="icon">bolt</span>Turbo · Auto · Diarize</span>
+            </div>
+            <div class="row-tags-line">
+              <div class="dot-tag" style="background:#2563EB" data-label="meeting"></div>
+              <div class="dot-tag" style="background:#059669" data-label="quarterly"></div>
+            </div>
+          </div>
+          <div class="row-right">
+            <span class="badge done">Done</span>
+            <button class="r-dl" onclick="event.stopPropagation()"><span class="icon">download</span></button>
+            <span class="icon row-chevron">chevron_right</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="row" onclick="openDetail(1)">
+        <div class="row-accent proc"></div>
+        <div class="row-inner">
+          <div class="row-icon proc"><span class="icon">hourglass_top</span></div>
+          <div class="row-info">
+            <div class="row-name">lecture-economics-part2.mp4</div>
+            <div class="row-sub">
+              <span><span class="icon">schedule</span>1h 12min</span>
+              <span><span class="icon">calendar_today</span>22 Jun</span>
+              <span><span class="icon">bolt</span>Turbo · Auto</span>
+            </div>
+            <div class="row-prog"><div class="row-prog-fill" style="width:41%"></div></div>
+          </div>
+          <div class="row-right">
+            <span class="badge proc">41%</span>
+            <span class="icon row-chevron">chevron_right</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="row" onclick="openDetail(2)">
+        <div class="row-accent done"></div>
+        <div class="row-inner">
+          <div class="row-icon done"><span class="icon">audio_file</span></div>
+          <div class="row-info">
+            <div class="row-name">interview-candidate-anna.m4a</div>
+            <div class="row-sub">
+              <span><span class="icon">schedule</span>47 min</span>
+              <span><span class="icon">calendar_today</span>21 Jun</span>
+              <span><span class="icon">bolt</span>Turbo · Russian · Diarize</span>
+            </div>
+            <div class="row-tags-line">
+              <div class="dot-tag" style="background:#7C3AED" data-label="interview"></div>
+              <div class="dot-tag" style="background:#D97706" data-label="hiring"></div>
+            </div>
+          </div>
+          <div class="row-right">
+            <span class="badge done">Done</span>
+            <button class="r-dl" onclick="event.stopPropagation()"><span class="icon">download</span></button>
+            <span class="icon row-chevron">chevron_right</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="row" onclick="openDetail(3)">
+        <div class="row-accent done"></div>
+        <div class="row-inner">
+          <div class="row-icon done"><span class="icon">audio_file</span></div>
+          <div class="row-info">
+            <div class="row-name">voice-memo-product-ideas.ogg</div>
+            <div class="row-sub">
+              <span><span class="icon">schedule</span>12 min</span>
+              <span><span class="icon">calendar_today</span>20 Jun</span>
+              <span><span class="icon">bolt</span>Small · Russian</span>
+            </div>
+            <div class="row-tags-line">
+              <div class="dot-tag" style="background:#0891B2" data-label="ideas"></div>
+            </div>
+          </div>
+          <div class="row-right">
+            <span class="badge done">Done</span>
+            <button class="r-dl" onclick="event.stopPropagation()"><span class="icon">download</span></button>
+            <span class="icon row-chevron">chevron_right</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="row" onclick="openDetail(4)">
+        <div class="row-accent pend"></div>
+        <div class="row-inner">
+          <div class="row-icon pend"><span class="icon">schedule</span></div>
+          <div class="row-info">
+            <div class="row-name">podcast-episode-47.mp3</div>
+            <div class="row-sub">
+              <span><span class="icon">schedule</span>38 min</span>
+              <span><span class="icon">calendar_today</span>22 Jun</span>
+              <span><span class="icon">bolt</span>Small · Auto</span>
+            </div>
+          </div>
+          <div class="row-right">
+            <span class="badge pend">Pending</span>
+            <span class="icon row-chevron">chevron_right</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="row" onclick="openDetail(5)">
+        <div class="row-accent done"></div>
+        <div class="row-inner">
+          <div class="row-icon done"><span class="icon">audio_file</span></div>
+          <div class="row-info">
+            <div class="row-name">standup-daily-june-19.m4a</div>
+            <div class="row-sub">
+              <span><span class="icon">schedule</span>8 min</span>
+              <span><span class="icon">calendar_today</span>19 Jun</span>
+              <span><span class="icon">bolt</span>Turbo · Russian · Diarize</span>
+            </div>
+            <div class="row-tags-line">
+              <div class="dot-tag" style="background:#2563EB" data-label="meeting"></div>
+              <div class="dot-tag" style="background:#6366F1" data-label="standup"></div>
+            </div>
+          </div>
+          <div class="row-right">
+            <span class="badge done">Done</span>
+            <button class="r-dl" onclick="event.stopPropagation()"><span class="icon">download</span></button>
+            <span class="icon row-chevron">chevron_right</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- DETAIL VIEW -->
+  <div class="detail-view" id="detail-view">
+    <div class="detail-top">
+      <div class="d-crumb">
+        <a onclick="showList()">Transcriptions</a>
+        <span class="icon">chevron_right</span>
+        <span id="d-crumb-name">meeting-recording-june.mp3</span>
+      </div>
+      <div class="d-main">
+        <div class="d-name-wrap">
+          <div class="d-name" id="d-name">meeting-recording-june.mp3</div>
+          <div class="d-meta">
+            <span><span class="icon">schedule</span><span id="d-dur">14 min</span></span>
+            <span><span class="icon">calendar_today</span><span id="d-date">22 Jun 2026</span></span>
+            <span><span class="icon">bolt</span><span id="d-cfg">Turbo · Auto · Diarize</span></span>
+            <span class="d-status done" id="d-status">Done</span>
+          </div>
+          <div class="speaker-legend" id="d-legend">
+            <div class="sp-chip"><div class="sp-dot" style="background:var(--sp1)"></div>Speaker 1</div>
+            <div class="sp-chip"><div class="sp-dot" style="background:var(--sp2)"></div>Speaker 2</div>
+            <div class="sp-chip"><div class="sp-dot" style="background:var(--sp3)"></div>Speaker 3</div>
+          </div>
+        </div>
+        <div class="d-actions">
+          <button class="d-btn"><span class="icon">download</span>Download .txt</button>
+          <button class="d-btn"><span class="icon">content_copy</span>Copy</button>
+          <button class="d-btn"><span class="icon">folder_zip</span>ZIP</button>
+        </div>
+      </div>
+    </div>
+    <div class="detail-tabs">
+      <div class="dtab on" onclick="switchDTab(0)">Transcript</div>
+      <div class="dtab" onclick="switchDTab(1)">Summary</div>
+      <div class="dtab" onclick="switchDTab(2)">Details</div>
+    </div>
+    <div class="detail-body">
+
+      <!-- TRANSCRIPT -->
+      <div class="dpane on" id="dp0">
+        <div class="tr-main">
+          <!-- Speaker distribution bar -->
+          <div class="spk-bar">
+            <div class="spk-bar-seg" style="background:var(--sp1);width:48%"></div>
+            <div class="spk-bar-seg" style="background:var(--sp2);width:36%"></div>
+            <div class="spk-bar-seg" style="background:var(--sp3);width:16%"></div>
+          </div>
+
+          <div class="tr-body">
+            <div class="ts-block">
+              <div class="ts-time">00:00</div>
+              <div class="ts-content">
+                <div class="ts-speaker" style="color:var(--sp1)">Speaker 1</div>
+                <div class="ts-text">Добрый день, начнём встречу. Сегодня обсудим результаты квартала и планы на следующий период. У нас довольно плотная повестка.</div>
+              </div>
+            </div>
+            <div class="ts-block">
+              <div class="ts-time">00:18</div>
+              <div class="ts-content">
+                <div class="ts-speaker" style="color:var(--sp2)">Speaker 2</div>
+                <div class="ts-text">По итогам квартала план выполнен на 94%. Все основные показатели выросли по сравнению с предыдущим периодом. MAU вырос на 23%, retention улучшился на 8 процентных пунктов.</div>
+              </div>
+            </div>
+            <div class="ts-block">
+              <div class="ts-time">00:42</div>
+              <div class="ts-content">
+                <div class="ts-speaker" style="color:var(--sp1)">Speaker 1</div>
+                <div class="ts-text">Отлично. У нас три крупных запуска на следующий квартал. Нужно правильно распределить ресурсы и убедиться, что все команды выровнены по целям.</div>
+              </div>
+            </div>
+            <div class="ts-block">
+              <div class="ts-time">01:05</div>
+              <div class="ts-content">
+                <div class="ts-speaker" style="color:var(--sp3)">Speaker 3</div>
+                <div class="ts-text">Есть небольшой блокер по интеграции с новым API. Думаем решить за пару дней, нужно только поставить задачу правильно. Я уже говорил с командой бэкенда.</div>
+              </div>
+            </div>
+            <div class="ts-block">
+              <div class="ts-time">01:28</div>
+              <div class="ts-content">
+                <div class="ts-speaker" style="color:var(--sp2)">Speaker 2</div>
+                <div class="ts-text">Я возьму на себя координацию. Запланируем встречу по блокеру на четверг, все будут в офисе.</div>
+              </div>
+            </div>
+            <div class="ts-block">
+              <div class="ts-time">01:45</div>
+              <div class="ts-content">
+                <div class="ts-speaker" style="color:var(--sp1)">Speaker 1</div>
+                <div class="ts-text">Четверг 15:00 — договорились. Закрываем основную часть. Есть ещё вопросы? Нет. Спасибо, увидимся в четверг.</div>
+              </div>
+            </div>
+            <div class="ts-block">
+              <div class="ts-time">02:01</div>
+              <div class="ts-content">
+                <div class="ts-speaker" style="color:var(--sp3)">Speaker 3</div>
+                <div class="ts-text">Спасибо за встречу.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="tr-side">
+          <div class="ts-card">
+            <div class="ts-card-title">File info</div>
+            <div class="ts-row"><span class="ts-k">Duration</span><span class="ts-v">14 min 32 s</span></div>
+            <div class="ts-row"><span class="ts-k">Size</span><span class="ts-v">32.4 MB</span></div>
+            <div class="ts-row"><span class="ts-k">Model</span><span class="ts-v">Turbo</span></div>
+            <div class="ts-row"><span class="ts-k">Language</span><span class="ts-v">Auto → RU</span></div>
+            <div class="ts-row"><span class="ts-k">Speakers</span><span class="ts-v">3 detected</span></div>
+          </div>
+          <div class="ts-card">
+            <div class="ts-card-title">Tags</div>
+            <div class="ts-tags">
+              <span class="tag" style="background:#2563EB">meeting</span>
+              <span class="tag" style="background:#059669">quarterly</span>
+              <button class="add-tag">+ Add</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUMMARY -->
+      <div class="dpane" id="dp1">
+        <div class="sum-max">
+          <div class="sum-label">Summary</div>
+          <div class="sum-card">
+            Квартальная встреча прошла успешно. План выполнен на 94%: MAU +23%, retention +8 п.п. На следующий квартал запланированы 3 крупных запуска, необходимо выравнивание команд по ресурсам. Команда разработки зафиксировала блокер по интеграции с новым API — оценка решения 2–3 дня. Встреча по блокеру: четверг в 15:00.
+          </div>
+          <div class="sum-label">Tags</div>
+          <div class="ts-tags">
+            <span class="tag" style="background:#2563EB">meeting</span>
+            <span class="tag" style="background:#059669">quarterly</span>
+            <button class="add-tag">+ Add tag</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DETAILS -->
+      <div class="dpane" id="dp2">
+        <div class="info-grid">
+          <div class="ic"><div class="ic-lbl">Duration</div><div class="ic-val">14 min 32 s</div></div>
+          <div class="ic"><div class="ic-lbl">File size</div><div class="ic-val">32.4 MB</div></div>
+          <div class="ic"><div class="ic-lbl">Format</div><div class="ic-val">MP3</div></div>
+          <div class="ic"><div class="ic-lbl">Model</div><div class="ic-val">Turbo</div></div>
+          <div class="ic"><div class="ic-lbl">Language</div><div class="ic-val">Auto → RU</div></div>
+          <div class="ic"><div class="ic-lbl">Speakers</div><div class="ic-val">3 detected</div></div>
+          <div class="ic"><div class="ic-lbl">Summary</div><div class="ic-val">Full</div></div>
+          <div class="ic"><div class="ic-lbl">Created</div><div class="ic-val">22 Jun 2026</div></div>
+          <div class="ic"><div class="ic-lbl">Status</div><div class="ic-val" style="color:var(--ok)">Done</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="settings-page" id="settings-page">
+    <div class="sp-title">Settings</div>
+    <div class="sp-card">
+      <div class="sp-card-title">Transcription defaults</div>
+      <div class="sp-row"><div><div class="sp-row-lbl">Default model</div><div class="sp-row-sub">Applied to every new transcription</div></div><select class="sp-sel"><option>Turbo (faster)</option><option>Small (more accurate)</option></select></div>
+      <div class="sp-row"><div><div class="sp-row-lbl">Default language</div><div class="sp-row-sub">Or let Whisper auto-detect</div></div><select class="sp-sel"><option>Auto-detect</option><option>Russian</option><option>English</option></select></div>
+      <div class="sp-row"><div><div class="sp-row-lbl">Diarize by default</div><div class="sp-row-sub">Split transcript by speaker</div></div><button class="tog on" onclick="this.classList.toggle('on')"></button></div>
+      <div class="sp-row"><div><div class="sp-row-lbl">Generate summary</div><div class="sp-row-sub">Automatic summary after transcription</div></div><button class="tog" onclick="this.classList.toggle('on')"></button></div>
+    </div>
+    <div class="sp-card">
+      <div class="sp-card-title">Account</div>
+      <div class="sp-row"><div><div class="sp-row-lbl">Telegram account</div><div class="sp-row-sub" id="st-uname">@pyatkinmv</div></div><button class="btn-cancel" onclick="logout()">Log out</button></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// AUTH
+setTimeout(()=>{document.getElementById('loginOverlay').style.display='none'},400);
+function doLogin(){
+  const u=document.getElementById('uf').value.replace('@','').trim();
+  if(!u)return;
+  document.getElementById('lf1').style.display='none';
+  document.getElementById('lf2').style.display='flex';
+  setTimeout(()=>finishLogin(u),2000);
+}
+function finishLogin(u){
+  document.getElementById('loginOverlay').style.display='none';
+  document.getElementById('sbuname').textContent='@'+u;
+  document.getElementById('sbav').textContent=u[0].toUpperCase();
+  document.getElementById('st-uname').textContent='@'+u;
+}
+function cancelLogin(){document.getElementById('lf2').style.display='none';document.getElementById('lf1').style.display='flex';}
+function logout(){document.getElementById('lf2').style.display='none';document.getElementById('lf1').style.display='flex';document.getElementById('loginOverlay').style.display='flex';}
+
+// NAV
+function showList(){
+  document.getElementById('list-view').style.display='flex';
+  document.getElementById('detail-view').classList.remove('on');
+  document.getElementById('settings-page').classList.remove('on');
+  document.getElementById('topbar-list').style.display='flex';
+  document.getElementById('topbar-detail').style.display='none';
+  document.getElementById('nav-tr').classList.add('active');
+  document.getElementById('nav-st').classList.remove('active');
+}
+function showSettings(){
+  document.getElementById('list-view').style.display='none';
+  document.getElementById('detail-view').classList.remove('on');
+  document.getElementById('settings-page').classList.add('on');
+  document.getElementById('topbar-list').style.display='none';
+  document.getElementById('topbar-detail').style.display='none';
+  document.getElementById('nav-st').classList.add('active');
+  document.getElementById('nav-tr').classList.remove('active');
+}
+
+// DETAIL
+const items=[
+  {name:'meeting-recording-june.mp3',dur:'14 min',date:'22 Jun 2026',cfg:'Turbo · Auto · Diarize'},
+  {name:'lecture-economics-part2.mp4',dur:'1h 12min',date:'22 Jun 2026',cfg:'Turbo · Auto'},
+  {name:'interview-candidate-anna.m4a',dur:'47 min',date:'21 Jun 2026',cfg:'Turbo · Russian · Diarize'},
+  {name:'voice-memo-product-ideas.ogg',dur:'12 min',date:'20 Jun 2026',cfg:'Small · Russian'},
+  {name:'podcast-episode-47.mp3',dur:'38 min',date:'22 Jun 2026',cfg:'Small · Auto'},
+  {name:'standup-daily-june-19.m4a',dur:'8 min',date:'19 Jun 2026',cfg:'Turbo · Russian · Diarize'},
+];
+function openDetail(i){
+  const d=items[i];
+  document.getElementById('d-name').textContent=d.name;
+  document.getElementById('d-crumb-name').textContent=d.name;
+  document.getElementById('d-dur').textContent=d.dur;
+  document.getElementById('d-date').textContent=d.date;
+  document.getElementById('d-cfg').textContent=d.cfg;
+  document.getElementById('list-view').style.display='none';
+  document.getElementById('settings-page').classList.remove('on');
+  document.getElementById('detail-view').classList.add('on');
+  document.getElementById('topbar-list').style.display='none';
+  document.getElementById('topbar-detail').style.display='flex';
+  document.getElementById('nav-tr').classList.remove('active');
+  switchDTab(0);
+}
+function switchDTab(n){
+  document.querySelectorAll('.dtab').forEach((t,i)=>t.classList.toggle('on',i===n));
+  ['dp0','dp1','dp2'].forEach((id,i)=>{
+    const el=document.getElementById(id);
+    el.classList.toggle('on',i===n);
+    if(i!==0) el.style.display=i===n?'block':'none';
+  });
+}
+
+// MODAL
+function openModal(){document.getElementById('uploadModal').style.display='flex';}
+function closeModal(){document.getElementById('uploadModal').style.display='none';}
+function mDrop(e){e.preventDefault();document.getElementById('mdrop').classList.remove('drag');mFile(e.dataTransfer.files[0]);}
+function mFile(f){
+  if(!f)return;
+  document.getElementById('mdrop').classList.add('has');
+  document.getElementById('mt').textContent=f.name;
+  document.getElementById('ms').textContent=(f.size/1024/1024).toFixed(1)+' MB · click to change';
+  document.getElementById('mf').textContent='';
+  document.getElementById('mbtn').disabled=false;
+  document.getElementById('mbtn').onclick=closeModal;
+}
+function mc(el){el.closest('.m-chips').querySelectorAll('.m-chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');}
+function fc(el){document.querySelectorAll('.fc').forEach(f=>f.classList.remove('on'));el.classList.add('on');}
+</script>
+</body>
+</html>
