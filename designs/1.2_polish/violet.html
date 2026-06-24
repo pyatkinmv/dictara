@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dictara — Violet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20,400,1,0" rel="stylesheet">
+<style>
+:root {
+  --accent:#7C3AED; --al:#F5F3FF; --ad:#6D28D9;
+  --bg:#F8F7FF; --surface:#FFFFFF; --sb-bg:#F4F2FF;
+  --text:#1A1330; --text2:#54496A; --text3:#9D93BE;
+  --border:#E4DEF8;
+  --ok:#16A34A; --ok-bg:#DCFCE7;
+  --warn:#D97706; --warn-bg:#FEF3C7;
+  --sp1:#7C3AED; --sp2:#0891B2; --sp3:#D97706; --sp4:#059669;
+  --radius:10px; --sb-w:220px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex}
+.icon{font-family:'Material Symbols Rounded';font-size:20px;line-height:1;user-select:none}
+.icon.sm{font-size:16px}
+button{cursor:pointer;border:none;background:none;font-family:inherit}
+select{font-family:inherit}
+
+/* ── Sidebar — dark accent strip ── */
+.sidebar{width:var(--sb-w);flex-shrink:0;background:var(--sb-bg);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 12px}
+.sb-brand{display:flex;align-items:center;gap:8px;padding:0 8px;margin-bottom:20px}
+.sb-logo{width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center}
+.sb-logo .icon{font-size:18px;color:#fff}
+.sb-name{font-size:17px;font-weight:800;letter-spacing:-.4px}
+.sb-nav{flex:1;display:flex;flex-direction:column;gap:2px}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;font-size:14px;font-weight:500;color:var(--text2);cursor:pointer;transition:background .15s}
+.sb-item:hover{background:rgba(124,58,237,.07)}
+.sb-item.active{background:var(--al);color:var(--accent)}
+.sb-bottom{border-top:1px solid var(--border);padding-top:12px;margin-top:8px;position:relative}
+.dropdown-wrap{position:relative}
+.sb-profile-wrap{position:relative}
+.sb-profile{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .15s}
+.sb-profile:hover{background:rgba(124,58,237,.07)}
+.sb-avatar{width:30px;height:30px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0}
+.sb-pinfo{flex:1}
+.sb-pname{font-size:13px;font-weight:600}
+.sb-psub{font-size:11px;color:var(--text3)}
+.sb-caret{color:var(--text3);transition:transform .2s}
+.sb-profile-wrap.open .sb-caret{transform:rotate(180deg)}
+
+/* Generic dropdown */
+.dd-panel{position:absolute;top:calc(100% + 6px);left:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px;min-width:200px;box-shadow:0 4px 20px rgba(124,58,237,.12);z-index:200;display:none}
+.dd-panel.open{display:block}
+.profile-dd{top:auto;bottom:calc(100% + 6px);left:0;right:0;min-width:unset}
+.pd-head{padding:4px 8px 8px}
+.pd-name{font-size:13px;font-weight:700}
+.pd-email{font-size:11px;color:var(--text3);margin-top:1px}
+.pd-plan{font-size:10px;font-weight:700;background:var(--al);color:var(--accent);border-radius:100px;padding:1px 7px;margin-left:auto;flex-shrink:0}
+.dd-section{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);padding:4px 8px 2px}
+.dd-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;font-size:13px;cursor:pointer;color:var(--text2)}
+.dd-row:hover{background:var(--al)}
+.dd-row.danger{color:#EF4444}
+.dd-row.danger:hover{background:#FEF2F2}
+.dd-sep{height:1px;background:var(--border);margin:4px 0}
+
+/* ── Main ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:58px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.topbar-title{font-size:16px;font-weight:600}
+.upload-btn{background:var(--accent);color:#fff;border-radius:8px;padding:8px 16px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px}
+.upload-btn:hover{background:var(--ad)}
+.upload-btn .icon{font-size:18px}
+
+/* ── List view ── */
+.list-view{flex:1;overflow-y:auto;padding:20px 24px}
+.filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:16px}
+.search-wrap{flex:1;position:relative}
+.search-input{width:100%;border:1px solid var(--border);background:var(--surface);border-radius:8px;padding:7px 12px 7px 36px;font-size:13px;color:var(--text);outline:none;font-family:inherit}
+.search-input:focus{border-color:var(--accent)}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3)}
+.dd-btn{display:flex;align-items:center;gap:5px;padding:7px 12px;border:1px solid var(--border);background:var(--surface);border-radius:8px;font-size:13px;font-weight:500;color:var(--text2);transition:all .15s;white-space:nowrap}
+.dd-btn:hover{border-color:var(--accent);color:var(--accent)}
+.dd-btn.active{border-color:var(--accent);color:var(--accent);background:var(--al)}
+
+/* ── Row list ── */
+.row-list{display:flex;flex-direction:column;gap:8px}
+.row{background:var(--surface);border-radius:var(--radius);padding:12px 14px;display:flex;align-items:flex-start;gap:12px;cursor:pointer;border:1px solid var(--border);transition:box-shadow .15s,border-color .15s}
+.row:hover{box-shadow:0 2px 12px rgba(124,58,237,.1);border-color:var(--accent)}
+.row-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.row-icon.done{background:var(--ok-bg);color:var(--ok)}
+.row-icon.proc{background:var(--warn-bg);color:var(--warn)}
+.row-icon.pend{background:var(--bg);color:var(--text3)}
+.row-icon .icon{font-size:18px}
+.row-info{flex:1;min-width:0}
+.row-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
+.row-meta{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text2);margin-bottom:6px}
+.row-meta span{display:flex;align-items:center;gap:3px}
+.row-meta .icon{font-size:13px;color:var(--text3)}
+.row-foot{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+.mini-tag{font-size:11px;font-weight:600;color:#fff;padding:2px 8px;border-radius:100px;white-space:nowrap}
+.row-spk{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--text3);border:1px solid var(--border);border-radius:100px;padding:2px 8px;margin-left:2px}
+.row-spk .icon{font-size:13px}
+.row-right{display:flex;align-items:center;gap:6px;flex-shrink:0;margin-top:2px}
+.badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:100px;white-space:nowrap}
+.badge.done{background:var(--ok-bg);color:var(--ok)}
+.badge.proc{background:var(--warn-bg);color:var(--warn)}
+.badge.pend{background:var(--bg);color:var(--text3)}
+.r-dl{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--text3);opacity:0;transition:opacity .15s}
+.r-dl .icon{font-size:16px}
+.r-dl:hover{background:var(--bg);color:var(--text2)}
+.row:hover .r-dl{opacity:1}
+.row-chev{color:var(--text3)}
+.prog-wrap{margin-top:6px}
+.prog-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;background:var(--warn);border-radius:2px;animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+.prog-label{font-size:11px;color:var(--warn);margin-top:3px}
+.empty-state{text-align:center;padding:64px 20px;color:var(--text3);font-size:14px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.empty-state .icon{font-size:44px}
+
+/* ── Detail ── */
+.detail-view{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+.detail-header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 24px;flex-shrink:0}
+.breadcrumb{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text3);margin-bottom:12px}
+.breadcrumb a{color:var(--accent);cursor:pointer}
+.breadcrumb a:hover{text-decoration:underline}
+.breadcrumb .icon{font-size:16px}
+.d-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.d-left{flex:1;min-width:0}
+.d-title{font-size:20px;font-weight:700;letter-spacing:-.3px;margin-bottom:6px}
+.d-meta{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--text2);margin-bottom:10px;flex-wrap:wrap}
+.d-meta .m-item{display:flex;align-items:center;gap:4px}
+.d-meta .icon{font-size:15px;color:var(--text3)}
+.d-tags-row{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+.tag-pill{font-size:12px;font-weight:600;color:#fff;padding:3px 10px;border-radius:100px}
+.add-tag-btn{font-size:12px;font-weight:500;color:var(--text3);border:1px dashed var(--border);border-radius:100px;padding:3px 10px;background:none;cursor:pointer}
+.add-tag-btn:hover{color:var(--accent);border-color:var(--accent)}
+.d-spk-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.d-spk-label{font-size:12px;color:var(--text3);font-weight:500}
+.spk-chip{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:500;color:var(--text2);background:var(--bg);border:1px solid var(--border);border-radius:100px;padding:3px 10px}
+.spk-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.d-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.d-btn{display:flex;align-items:center;gap:5px;padding:7px 12px;border:1px solid var(--border);background:var(--surface);border-radius:8px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer}
+.d-btn:hover{background:var(--bg)}
+.d-btn .icon{font-size:16px}
+
+/* ── Tabs — bold 3px underline ── */
+.tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;padding:0 24px}
+.tab{padding:12px 16px;font-size:14px;font-weight:500;color:var(--text3);cursor:pointer;border-bottom:3px solid transparent;transition:all .15s}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab:hover:not(.active){color:var(--text2)}
+.tab-content{display:none;flex:1;overflow-y:auto}
+.tab-content.active{display:flex;flex-direction:column}
+
+/* ── Transcript: screenplay ── */
+.transcript-area{padding:28px 36px}
+.ts-spk-header{display:flex;align-items:center;gap:10px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;margin-top:24px;margin-bottom:8px}
+.ts-spk-header:first-child{margin-top:0}
+.ts-spk-line{flex:1;height:1px;background:currentColor;opacity:.18}
+.ts-block{display:grid;grid-template-columns:52px 1fr;padding:5px 6px;border-radius:4px;cursor:default}
+.ts-block:hover{background:var(--bg)}
+.ts-time{font-size:11px;font-weight:600;color:var(--text3);padding-top:2px;transition:color .1s;letter-spacing:.02em}
+.ts-block:hover .ts-time{color:var(--text2)}
+.ts-text{font-size:14px;line-height:1.65;color:var(--text2);transition:color .1s}
+.ts-block:hover .ts-text{color:var(--text)}
+
+/* ── Summary ── */
+.summary-area{padding:28px 24px;max-width:680px}
+.s-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 22px}
+.s-card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:12px}
+.s-card p{font-size:14px;line-height:1.7;color:var(--text2)}
+
+/* ── Details ── */
+.details-area{padding:28px 24px;max-width:480px}
+.details-grid{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.det-row{display:flex;padding:11px 16px;border-bottom:1px solid var(--border);font-size:13px}
+.det-row:last-child{border-bottom:none}
+.det-label{width:140px;flex-shrink:0;color:var(--text3);font-weight:500}
+.det-val{color:var(--text2)}
+
+/* ── Upload modal ── */
+.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);backdrop-filter:blur(4px);z-index:300;display:none;align-items:center;justify-content:center}
+.backdrop.open{display:flex}
+.modal{background:var(--surface);border-radius:16px;width:500px;max-width:95vw;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+.modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.modal-title{font-size:17px;font-weight:700}
+.modal-close{width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--text3)}
+.modal-close:hover{background:var(--bg);color:var(--text2)}
+.modal-close .icon{font-size:20px}
+.drop-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:32px;text-align:center;cursor:pointer;transition:all .15s;margin-bottom:16px}
+.drop-zone:hover{border-color:var(--accent);background:var(--al)}
+.drop-icon{font-size:36px;color:var(--text3);margin-bottom:8px}
+.drop-text{font-size:14px;font-weight:600;color:var(--text2);margin-bottom:4px}
+.drop-sub{font-size:12px;color:var(--text3)}
+.modal-fields{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px}
+.m-field label{display:block;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.m-field select{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text);background:var(--bg);outline:none;cursor:pointer}
+.m-field select:focus{border-color:var(--accent);background:var(--surface)}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px}
+.btn-cancel{padding:9px 16px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-weight:500;color:var(--text2);cursor:pointer}
+.btn-cancel:hover{background:var(--bg)}
+.btn-upload{padding:9px 20px;border-radius:8px;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer}
+.btn-upload:hover{background:var(--ad)}
+
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-logo"><span class="icon">mic</span></div>
+    <span class="sb-name">Dictara</span>
+  </div>
+  <div class="sb-nav">
+    <div class="sb-item active" onclick="showList()"><span class="icon">description</span> Transcriptions</div>
+    <div class="sb-item"><span class="icon">settings</span> Settings</div>
+  </div>
+  <div class="sb-bottom">
+    <div class="sb-profile-wrap dropdown-wrap">
+      <div class="sb-profile" onclick="toggleDD('profile-dd')">
+        <div class="sb-avatar">M</div>
+        <div class="sb-pinfo">
+          <div class="sb-pname">Maxim P.</div>
+          <div class="sb-psub">Free plan</div>
+        </div>
+        <span class="icon sm sb-caret">expand_less</span>
+      </div>
+      <div class="dd-panel profile-dd" id="profile-dd">
+        <div class="pd-head">
+          <div class="pd-name">Maxim P.</div>
+          <div class="pd-email">pyatkinmv@gmail.com</div>
+        </div>
+        <div class="dd-sep"></div>
+        <div class="dd-row"><span class="icon sm">star</span> Manage plan<span class="pd-plan">Free</span></div>
+        <div class="dd-row"><span class="icon sm">feedback</span> Give feedback</div>
+        <div class="dd-row"><span class="icon sm">help_outline</span> Support</div>
+        <div class="dd-sep"></div>
+        <div class="dd-row danger"><span class="icon sm">logout</span> Sign out</div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="topbar">
+    <span class="topbar-title" id="topbar-title">Transcriptions</span>
+    <button class="upload-btn" onclick="document.getElementById('upload-modal').classList.add('open')">
+      <span class="icon">upload</span> Upload
+    </button>
+  </div>
+
+  <div class="list-view" id="list-view">
+    <div class="filter-bar">
+      <div class="search-wrap">
+        <span class="icon sm search-icon">search</span>
+        <input class="search-input" type="text" id="search-input" placeholder="Search transcriptions…" oninput="applySortAndRender()">
+      </div>
+      <div class="dropdown-wrap">
+        <button class="dd-btn" id="filter-btn" onclick="toggleDD('filter-dd')">
+          <span class="icon sm">filter_list</span>
+          <span class="filter-label">Filter</span>
+          <span class="icon sm">expand_more</span>
+        </button>
+        <div class="dd-panel" id="filter-dd">
+          <div class="dd-section">Status</div>
+          <label class="dd-row"><input type="checkbox" class="status-check" value="done"> Done</label>
+          <label class="dd-row"><input type="checkbox" class="status-check" value="proc"> Processing</label>
+          <label class="dd-row"><input type="checkbox" class="status-check" value="pend"> Pending</label>
+          <div class="dd-sep"></div>
+          <div class="dd-section">Tags</div>
+          <label class="dd-row"><input type="checkbox" class="tag-check" value="meeting"> <span class="mini-tag" style="background:#2563EB">meeting</span></label>
+          <label class="dd-row"><input type="checkbox" class="tag-check" value="quarterly"> <span class="mini-tag" style="background:#059669">quarterly</span></label>
+          <label class="dd-row"><input type="checkbox" class="tag-check" value="interview"> <span class="mini-tag" style="background:#7C3AED">interview</span></label>
+          <label class="dd-row"><input type="checkbox" class="tag-check" value="hiring"> <span class="mini-tag" style="background:#D97706">hiring</span></label>
+          <label class="dd-row"><input type="checkbox" class="tag-check" value="ideas"> <span class="mini-tag" style="background:#0891B2">ideas</span></label>
+          <label class="dd-row"><input type="checkbox" class="tag-check" value="standup"> <span class="mini-tag" style="background:#6366F1">standup</span></label>
+        </div>
+      </div>
+      <div class="dropdown-wrap">
+        <button class="dd-btn" id="sort-btn" onclick="toggleDD('sort-dd')">
+          <span class="icon sm">sort</span>
+          <span class="sort-label">Sort</span>
+          <span class="icon sm">expand_more</span>
+        </button>
+        <div class="dd-panel" id="sort-dd">
+          <label class="dd-row"><input type="radio" name="sort" value="newest" checked> Newest first</label>
+          <label class="dd-row"><input type="radio" name="sort" value="oldest"> Oldest first</label>
+          <label class="dd-row"><input type="radio" name="sort" value="longest"> Longest</label>
+          <label class="dd-row"><input type="radio" name="sort" value="name"> Name A→Z</label>
+        </div>
+      </div>
+    </div>
+    <div class="row-list" id="row-list"></div>
+  </div>
+
+  <div class="detail-view" id="detail-view" style="display:none">
+    <div class="detail-header">
+      <div class="breadcrumb">
+        <a onclick="showList()">Transcriptions</a>
+        <span class="icon">chevron_right</span>
+        <span>Quarterly Review Meeting</span>
+      </div>
+      <div class="d-top">
+        <div class="d-left">
+          <div class="d-title">Quarterly Review Meeting</div>
+          <div class="d-meta">
+            <span class="m-item"><span class="icon">schedule</span> 14 min</span>
+            <span class="m-item"><span class="icon">calendar_today</span> 22 Jun 2026</span>
+            <span class="badge done">Done</span>
+          </div>
+          <div class="d-tags-row">
+            <span class="tag-pill" style="background:#2563EB">meeting</span>
+            <span class="tag-pill" style="background:#059669">quarterly</span>
+            <button class="add-tag-btn">+ Add tag</button>
+          </div>
+          <div class="d-spk-row">
+            <span class="d-spk-label">Speakers:</span>
+            <span class="spk-chip"><span class="spk-dot" style="background:var(--sp1)"></span>Speaker 1</span>
+            <span class="spk-chip"><span class="spk-dot" style="background:var(--sp2)"></span>Speaker 2</span>
+            <span class="spk-chip"><span class="spk-dot" style="background:var(--sp3)"></span>Speaker 3</span>
+          </div>
+        </div>
+        <div class="d-actions">
+          <button class="d-btn"><span class="icon">download</span> .txt</button>
+          <button class="d-btn"><span class="icon">content_copy</span> Copy</button>
+        </div>
+      </div>
+    </div>
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('transcript',this)">Transcript</div>
+      <div class="tab" onclick="switchTab('summary',this)">Summary</div>
+      <div class="tab" onclick="switchTab('details',this)">Details</div>
+    </div>
+    <div class="tab-content active" id="tab-transcript">
+      <div class="transcript-area" id="transcript-content"></div>
+    </div>
+    <div class="tab-content" id="tab-summary">
+      <div class="summary-area">
+        <div class="s-card">
+          <div class="s-card-title">Auto Summary</div>
+          <p>The team reviewed Q2 performance, noting an 18% quarter-over-quarter revenue increase driven by enterprise growth and new integrations. On the product side, 12 features were shipped versus the 9 planned, though technical debt in the payments module needs to be addressed in Q3. The Q3 plan includes hiring 4 engineers by September to run parallel development tracks, reserving 20% of engineering capacity in July for the payments refactor, and shifting marketing toward content-driven channels — SEO articles, case studies, and a monthly webinar series.</p>
+        </div>
+      </div>
+    </div>
+    <div class="tab-content" id="tab-details">
+      <div class="details-area">
+        <div class="details-grid">
+          <div class="det-row"><span class="det-label">Filename</span><span class="det-val">meeting-recording-june.mp3</span></div>
+          <div class="det-row"><span class="det-label">Duration</span><span class="det-val">14 min 22 sec</span></div>
+          <div class="det-row"><span class="det-label">File size</span><span class="det-val">22.4 MB</span></div>
+          <div class="det-row"><span class="det-label">Uploaded</span><span class="det-val">22 Jun 2026, 10:14</span></div>
+          <div class="det-row"><span class="det-label">Language</span><span class="det-val">Auto-detect → English</span></div>
+          <div class="det-row"><span class="det-label">Speakers</span><span class="det-val">3 detected</span></div>
+          <div class="det-row"><span class="det-label">Words</span><span class="det-val">~1,840</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="backdrop" id="upload-modal">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <span class="modal-title">Upload audio</span>
+      <button class="modal-close" onclick="document.getElementById('upload-modal').classList.remove('open')"><span class="icon">close</span></button>
+    </div>
+    <div class="drop-zone">
+      <div class="icon drop-icon">upload_file</div>
+      <div class="drop-text">Drop file here or click to browse</div>
+      <div class="drop-sub">MP3, MP4, M4A, OGG, WAV, FLAC · max 400 MB</div>
+    </div>
+    <div class="modal-fields">
+      <div class="m-field"><label>Language</label><select><option>Auto-detect</option><option>English</option><option>Russian</option><option>Ukrainian</option></select></div>
+      <div class="m-field"><label>Summary</label><select><option selected>Auto</option><option>Short</option><option>Full</option><option>None</option></select></div>
+      <div class="m-field"><label>Speakers</label><select><option>Auto-detect</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5+</option></select></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="document.getElementById('upload-modal').classList.remove('open')">Cancel</button>
+      <button class="btn-upload">Upload</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const ITEMS=[
+  {id:0,title:'Quarterly Review Meeting',   dur:'14 min',  mins:14, date:'22 Jun',status:'done',tags:[{c:'#2563EB',l:'meeting'},{c:'#059669',l:'quarterly'}],speakers:3},
+  {id:1,title:'Economics Lecture — Part 2',dur:'1h 12min',mins:72, date:'22 Jun',status:'proc',pct:41,tags:[],speakers:0},
+  {id:2,title:'Interview: Anna K.',          dur:'47 min',  mins:47, date:'21 Jun',status:'done',tags:[{c:'#7C3AED',l:'interview'},{c:'#D97706',l:'hiring'}],speakers:2},
+  {id:3,title:'Podcast Episode #47',         dur:'38 min',  mins:38, date:'22 Jun',status:'pend',tags:[],speakers:0},
+  {id:4,title:'Product Ideas — Voice Memo', dur:'12 min',  mins:12, date:'20 Jun',status:'done',tags:[{c:'#0891B2',l:'ideas'}],speakers:0},
+  {id:5,title:'Daily Standup 19 Jun',        dur:'8 min',   mins:8,  date:'19 Jun',status:'done',tags:[{c:'#2563EB',l:'meeting'},{c:'#6366F1',l:'standup'}],speakers:3},
+];
+const TRANSCRIPT=[
+  {time:'0:00',spk:2,text:'Good morning everyone. Let\'s get started — we have a lot to cover today. The main focus is Q2 performance and planning the roadmap for the next quarter.'},
+  {time:'0:34',spk:1,text:'Right. So Q2 was solid overall — revenue is up 18% quarter over quarter. The enterprise segment grew faster than expected, mostly driven by the new integrations we launched in May.'},
+  {time:'1:12',spk:3,text:'On the product side, we shipped 12 features versus the 9 we planned, but we also accumulated some technical debt in the payments module that we need to address in Q3.'},
+  {time:'2:05',spk:2,text:'That\'s great to hear on the feature side. What\'s the plan for Q3? Are we maintaining the same pace or scaling up the team?'},
+  {time:'2:28',spk:1,text:'We\'re planning to hire 4 more engineers by September, which will let us run two parallel development tracks. That should improve throughput significantly without sacrificing quality.'},
+  {time:'3:10',spk:3,text:'And the technical debt? How much time are we allocating to paying that down before we start adding more features on top?'},
+  {time:'3:30',spk:1,text:'We\'re reserving 20% of engineering capacity in July specifically for the payments refactor. It\'s not glamorous but it\'s necessary — otherwise we risk reliability issues in the fall when volume spikes.'},
+  {time:'4:05',spk:2,text:'Makes sense. Alright, let\'s move on to marketing. What\'s the Q3 strategy looking like?'},
+  {time:'4:22',spk:3,text:'We\'re doubling down on content marketing — SEO-driven articles, a revamped case study library, and a monthly webinar series starting in August. These should bring in higher-intent leads than the paid campaigns we\'ve relied on.'},
+  {time:'5:08',spk:1,text:'I like the webinar idea. Can we make sure sales is looped in from the start? They should be co-presenting, not just watching.'},
+];
+const ICO={done:'check_circle',proc:'autorenew',pend:'schedule'};
+const LABEL={done:'Done',proc:'Processing',pend:'Pending'};
+const SPK_COLORS={1:'var(--sp1)',2:'var(--sp2)',3:'var(--sp3)'};
+const SORT_LABELS={newest:'Sort',oldest:'Oldest first',longest:'Longest',name:'A→Z'};
+
+function renderTranscript(){
+  let html='',lastSpk=null;
+  TRANSCRIPT.forEach(seg=>{
+    if(seg.spk!==lastSpk){html+=`<div class="ts-spk-header" style="color:${SPK_COLORS[seg.spk]}">Speaker ${seg.spk}<span class="ts-spk-line"></span></div>`;lastSpk=seg.spk;}
+    html+=`<div class="ts-block"><span class="ts-time">${seg.time}</span><span class="ts-text">${seg.text}</span></div>`;
+  });
+  document.getElementById('transcript-content').innerHTML=html;
+}
+function getActiveFilters(){return{statuses:[...document.querySelectorAll('.status-check:checked')].map(el=>el.value),tags:[...document.querySelectorAll('.tag-check:checked')].map(el=>el.value),query:(document.getElementById('search-input')?.value||'').toLowerCase()};}
+function applyFilters(items){const{statuses,tags,query}=getActiveFilters();return items.filter(item=>{if(statuses.length&&!statuses.includes(item.status))return false;if(tags.length&&!tags.some(t=>item.tags.some(tag=>tag.l===t)))return false;if(query&&!item.title.toLowerCase().includes(query))return false;return true;});}
+function applySortAndRender(){
+  const sort=document.querySelector('input[name="sort"]:checked')?.value||'newest';
+  let items=applyFilters([...ITEMS]);
+  if(sort==='oldest')items.sort((a,b)=>a.id-b.id);
+  else if(sort==='longest')items.sort((a,b)=>b.mins-a.mins);
+  else if(sort==='name')items.sort((a,b)=>a.title.localeCompare(b.title));
+  else items.sort((a,b)=>b.id-a.id);
+  renderList(items);updateFilterBtn();updateSortBtn(sort);
+}
+function updateFilterBtn(){const count=document.querySelectorAll('.status-check:checked,.tag-check:checked').length;const btn=document.getElementById('filter-btn');btn.classList.toggle('active',count>0);btn.querySelector('.filter-label').textContent=count>0?`Filter · ${count}`:'Filter';}
+function updateSortBtn(sort){const btn=document.getElementById('sort-btn');btn.classList.toggle('active',sort!=='newest');btn.querySelector('.sort-label').textContent=sort!=='newest'?SORT_LABELS[sort]:'Sort';}
+function renderList(items){
+  const list=document.getElementById('row-list');
+  if(!items.length){list.innerHTML='<div class="empty-state"><span class="icon">search_off</span><div>No matching transcriptions</div></div>';return;}
+  list.innerHTML=items.map(item=>`
+    <div class="row" onclick="openDetail(${item.id})">
+      <div class="row-icon ${item.status}"><span class="icon">${ICO[item.status]}</span></div>
+      <div class="row-info">
+        <div class="row-name">${item.title}</div>
+        <div class="row-meta"><span><span class="icon">schedule</span>${item.dur}</span><span><span class="icon">calendar_today</span>${item.date}</span></div>
+        <div class="row-foot">${item.tags.map(t=>`<span class="mini-tag" style="background:${t.c}">${t.l}</span>`).join('')}${item.speakers>0?`<span class="row-spk"><span class="icon">record_voice_over</span>${item.speakers} speakers</span>`:''}</div>
+        ${item.status==='proc'?`<div class="prog-wrap"><div class="prog-bar"><div class="prog-fill" style="width:${item.pct}%"></div></div><div class="prog-label">${item.pct}% — transcribing…</div></div>`:''}
+      </div>
+      <div class="row-right"><span class="badge ${item.status}">${LABEL[item.status]}</span>${item.status==='done'?`<button class="r-dl" onclick="event.stopPropagation()"><span class="icon">download</span></button>`:''}<span class="icon row-chev">chevron_right</span></div>
+    </div>`).join('');
+}
+function showList(){document.getElementById('list-view').style.display='';document.getElementById('detail-view').style.display='none';document.getElementById('topbar-title').textContent='Transcriptions';}
+function openDetail(id){document.getElementById('list-view').style.display='none';document.getElementById('detail-view').style.display='';document.getElementById('topbar-title').textContent=ITEMS[id].title;}
+function switchTab(name,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));el.classList.add('active');document.getElementById('tab-'+name).classList.add('active');}
+function toggleDD(id){
+  const all=document.querySelectorAll('.dd-panel');
+  all.forEach(p=>{if(p.id!==id)p.classList.remove('open')});
+  const panel=document.getElementById(id);
+  panel.classList.toggle('open');
+  if(id==='profile-dd')document.querySelector('.sb-profile-wrap').classList.toggle('open',panel.classList.contains('open'));
+}
+document.addEventListener('click',e=>{if(!e.target.closest('.dropdown-wrap')){document.querySelectorAll('.dd-panel').forEach(p=>p.classList.remove('open'));document.querySelector('.sb-profile-wrap').classList.remove('open');}});
+document.getElementById('upload-modal').addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
+document.querySelectorAll('#filter-dd input,#sort-dd input').forEach(el=>el.addEventListener('change',applySortAndRender));
+renderTranscript();
+applySortAndRender();
+</script>
+</body>
+</html>
