@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dictara — card-modal 1.8</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20,400,1,0" rel="stylesheet">
+<style>
+:root{
+  --accent:#3B82F6;--al:#EFF6FF;--ad:#2563EB;
+  --bg:#F0F4F8;--surface:#FFF;--sb-bg:#EBF2FF;
+  --text:#1A202C;--text2:#4A5568;--text3:#A0AEC0;
+  --border:#E2E8F0;
+  --ok:#16A34A;--ok-bg:#DCFCE7;--warn:#D97706;--warn-bg:#FEF3C7;
+  --radius:12px;--sb-w:224px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex}
+.icon{font-family:'Material Symbols Rounded';font-size:20px;line-height:1;user-select:none}
+.icon.sm{font-size:16px}
+button{cursor:pointer;border:none;background:none;font-family:inherit}
+input,textarea,select{font-family:inherit}
+
+/* SIDEBAR */
+.sidebar{width:var(--sb-w);flex-shrink:0;background:var(--sb-bg);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 12px}
+.sb-brand{display:flex;align-items:center;gap:8px;padding:0 8px;margin-bottom:20px}
+.sb-logo{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--ad));display:flex;align-items:center;justify-content:center}
+.sb-logo .icon{font-size:18px;color:#fff}
+.sb-name{font-size:17px;font-weight:700;letter-spacing:-.3px;color:var(--text)}
+.sb-nav{flex:1;display:flex;flex-direction:column;gap:2px}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;font-size:14px;font-weight:500;color:var(--text2);cursor:pointer;transition:background .15s}
+.sb-item:hover{background:rgba(59,130,246,.08)}
+.sb-item.active{background:rgba(59,130,246,.12);color:var(--accent);font-weight:600}
+.sb-sep{height:1px;background:var(--border);margin:8px 4px}
+.sb-usage{padding:10px 10px 12px;border-top:1px solid var(--border);margin-top:6px}
+.sb-usage-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}
+.sb-usage-lbl{font-size:11px;color:var(--text3);font-weight:500}
+.sb-usage-badge{font-size:10px;font-weight:700;padding:1px 8px;border-radius:100px;background:var(--al);color:var(--accent)}
+.sb-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:4px}
+.sb-bar-fill{height:100%;background:var(--accent);border-radius:2px}
+.sb-usage-meta{font-size:11px;color:var(--text3)}
+.sb-upgrade{color:var(--accent);cursor:pointer;font-weight:500}
+.sb-upgrade:hover{text-decoration:underline}
+.sb-bottom{padding-top:8px}
+.dropdown-wrap{position:relative}
+.sb-profile{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .15s}
+.sb-profile:hover{background:rgba(59,130,246,.08)}
+.sb-avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--ad));display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0}
+.sb-pinfo{flex:1}
+.sb-pname{font-size:13px;font-weight:600}
+.sb-psub{font-size:11px;color:var(--text3)}
+.sb-caret{color:var(--text3);transition:transform .2s}
+.dropdown-wrap.open .sb-caret{transform:rotate(180deg)}
+.dd-panel{position:absolute;top:calc(100% + 6px);left:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;min-width:200px;box-shadow:0 4px 20px rgba(59,130,246,.1);z-index:200;display:none}
+.dd-panel.open{display:block}
+.profile-dd{top:auto;bottom:calc(100% + 6px);left:0;right:0;min-width:unset}
+.pd-head{padding:4px 8px 8px}
+.pd-name{font-size:13px;font-weight:700}
+.pd-email{font-size:11px;color:var(--text3);margin-top:1px}
+.dd-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;font-size:13px;cursor:pointer;color:var(--text2)}
+.dd-row:hover{background:var(--al)}
+.dd-row.danger{color:#EF4444}
+.dd-row.danger:hover{background:#FEF2F2}
+.dd-sep{height:1px;background:var(--border);margin:4px 0}
+.pd-plan-badge{font-size:10px;font-weight:700;padding:1px 8px;border-radius:100px;background:var(--al);color:var(--accent);margin-left:auto}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.topbar-title{font-size:16px;font-weight:600}
+.upload-btn{background:linear-gradient(135deg,var(--accent),var(--ad));color:#fff;border-radius:10px;padding:7px 14px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(59,130,246,.25);cursor:pointer}
+.upload-btn .icon{font-size:17px}
+
+.vw{flex:1;display:none;flex-direction:column;overflow:hidden}
+.vw.active{display:flex}
+
+/* PAGE HEADER */
+.page-hdr{padding:20px 28px 0;display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0}
+.page-hdr-title{font-size:18px;font-weight:700;letter-spacing:-.3px;margin-bottom:3px}
+.page-hdr-sub{font-size:13px;color:var(--text3)}
+.primary-btn{display:flex;align-items:center;gap:6px;padding:8px 14px;background:var(--accent);color:#fff;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer}
+.primary-btn .icon{font-size:16px}
+.primary-btn:hover{background:var(--ad)}
+
+/* CARD GRID */
+.cards-body{flex:1;overflow-y:auto;padding:16px 28px}
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+/* TAG CARD */
+.tag-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px;transition:box-shadow .15s;position:relative}
+.tag-card:hover{box-shadow:0 2px 12px rgba(59,130,246,.1)}
+.tag-card-top{display:flex;align-items:center;gap:10px}
+.tag-card-swatch{width:14px;height:14px;border-radius:50%;flex-shrink:0}
+.tag-card-name{font-size:15px;font-weight:700;flex:1}
+.tag-card-desc{font-size:13px;color:var(--text3);line-height:1.5;flex:1;min-height:36px}
+.tag-card-foot{display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border);padding-top:10px;margin-top:2px}
+.tag-card-count{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text3)}
+.tag-card-count .icon{font-size:14px}
+.tag-card-actions{display:flex;gap:3px;opacity:0;transition:opacity .15s}
+.tag-card:hover .tag-card-actions{opacity:1}
+.card-icon-btn{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--text3);cursor:pointer;transition:all .15s}
+.card-icon-btn:hover{background:var(--bg);color:var(--text)}
+.card-icon-btn.del:hover{background:#FEF2F2;color:#EF4444}
+/* ADD CARD */
+.tag-card.add-card{border:2px dashed var(--border);background:transparent;cursor:pointer;align-items:center;justify-content:center;min-height:140px}
+.tag-card.add-card:hover{border-color:var(--accent);background:var(--al)}
+.add-card-inner{display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--text3);transition:color .15s}
+.tag-card.add-card:hover .add-card-inner{color:var(--accent)}
+.add-card-inner .icon{font-size:24px}
+.add-card-inner span{font-size:13px;font-weight:500}
+
+/* SPEAKER CARD — wider, no color swatch */
+.spk-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px;transition:box-shadow .15s}
+.spk-card:hover{box-shadow:0 2px 12px rgba(59,130,246,.1)}
+.spk-card-top{display:flex;align-items:center;gap:12px}
+.spk-initials{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0}
+.spk-card-info{flex:1}
+.spk-card-name{font-size:15px;font-weight:700}
+.spk-card-stats{display:flex;gap:10px;margin-top:2px}
+.spk-stat-item{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:2px}
+.spk-stat-item .icon{font-size:13px}
+.spk-card-desc{font-size:13px;color:var(--text3);line-height:1.5}
+.spk-card-foot{display:flex;align-items:center;justify-content:flex-end;border-top:1px solid var(--border);padding-top:10px;gap:3px;opacity:0;transition:opacity .15s}
+.spk-card:hover .spk-card-foot{opacity:1}
+
+/* EDIT MODAL */
+.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);backdrop-filter:blur(4px);z-index:300;display:none;align-items:center;justify-content:center}
+.backdrop.open{display:flex}
+.edit-modal{background:var(--surface);border-radius:18px;width:480px;max-width:95vw;padding:24px;box-shadow:0 16px 48px rgba(0,0,0,.15)}
+.edit-modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.edit-modal-title{font-size:16px;font-weight:700}
+.modal-close-btn{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text3);cursor:pointer}
+.modal-close-btn:hover{background:var(--bg)}
+.form-field{margin-bottom:14px}
+.form-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px;display:block}
+.form-input{width:100%;border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-size:14px;color:var(--text);outline:none;background:var(--bg)}
+.form-input:focus{border-color:var(--accent);background:var(--surface)}
+.form-textarea{width:100%;border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-size:13.5px;color:var(--text2);outline:none;resize:vertical;min-height:80px;line-height:1.55;background:var(--bg)}
+.form-textarea:focus{border-color:var(--accent);background:var(--surface)}
+.color-swatches{display:flex;gap:7px;flex-wrap:wrap;padding:2px 0}
+.color-sw{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .1s;flex-shrink:0}
+.color-sw:hover{transform:scale(1.15)}
+.color-sw.selected{border-color:var(--text);transform:scale(1.1)}
+.edit-modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
+.btn-cancel{padding:8px 14px;border:1px solid var(--border);border-radius:9px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer}
+.btn-cancel:hover{background:var(--bg)}
+.btn-save{padding:8px 18px;border-radius:9px;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer}
+.btn-save:hover{background:var(--ad)}
+
+/* DELETE CONFIRM */
+.del-dialog{background:var(--surface);border-radius:16px;width:360px;max-width:95vw;padding:24px;box-shadow:0 12px 40px rgba(0,0,0,.15)}
+.del-dialog-icon{width:40px;height:40px;background:#FEF2F2;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+.del-dialog-icon .icon{color:#EF4444;font-size:20px}
+.del-dialog-title{font-size:16px;font-weight:700;margin-bottom:6px}
+.del-dialog-body{font-size:14px;color:var(--text2);line-height:1.55;margin-bottom:20px}
+.del-dialog-foot{display:flex;justify-content:flex-end;gap:8px}
+.btn-del{padding:8px 16px;border-radius:9px;background:#EF4444;color:#fff;font-size:13px;font-weight:600;cursor:pointer}
+.btn-del:hover{background:#DC2626}
+
+/* MINI LIST reused */
+.list-body{flex:1;overflow-y:auto;padding:18px 24px}
+.row-list{display:flex;flex-direction:column;gap:7px}
+.row{background:var(--surface);border-radius:var(--radius);padding:11px 13px;display:flex;align-items:flex-start;gap:11px;cursor:pointer;border:1px solid var(--border)}
+.row-icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.row-icon.done{background:var(--ok-bg);color:var(--ok)}
+.row-icon.proc{background:var(--warn-bg);color:var(--warn)}
+.row-icon.pend{background:var(--bg);color:var(--text3)}
+.row-icon .icon{font-size:17px}
+.row-info{flex:1;min-width:0}
+.row-name{font-size:14px;font-weight:600;margin-bottom:2px}
+.row-meta{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text2);margin-bottom:5px}
+.row-meta span{display:flex;align-items:center;gap:3px}
+.row-meta .icon{font-size:13px;color:var(--text3)}
+.row-foot{display:flex;gap:4px}
+.mini-tag{font-size:11px;font-weight:600;color:#fff;padding:2px 7px;border-radius:100px}
+.row-right{display:flex;align-items:center;gap:5px;flex-shrink:0;margin-top:2px}
+.badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:100px}
+.badge.done{background:var(--ok-bg);color:var(--ok)}
+.badge.proc{background:var(--warn-bg);color:var(--warn)}
+.badge.pend{background:var(--bg);color:var(--text3)}
+.row-chev{color:var(--text3)}
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+<nav class="sidebar">
+  <div class="sb-brand"><div class="sb-logo"><span class="icon">mic</span></div><span class="sb-name">Dictara</span></div>
+  <div class="sb-nav">
+    <div class="sb-item" data-nav="list" onclick="navigate('list')"><span class="icon">description</span> Transcriptions</div>
+    <div class="sb-item" data-nav="threads" onclick="navigate('threads')"><span class="icon">forum</span> Threads</div>
+    <div class="sb-item active" data-nav="tags" onclick="navigate('tags')"><span class="icon">sell</span> Tags</div>
+    <div class="sb-item" data-nav="speakers" onclick="navigate('speakers')"><span class="icon">record_voice_over</span> Speakers</div>
+    <div class="sb-sep"></div>
+    <div class="sb-item" data-nav="settings" onclick="navigate('settings')"><span class="icon">settings</span> Settings</div>
+  </div>
+  <div class="sb-usage">
+    <div class="sb-usage-top"><span class="sb-usage-lbl">Usage this month</span><span class="sb-usage-badge">Free</span></div>
+    <div class="sb-bar"><div class="sb-bar-fill" style="width:63%"></div></div>
+    <div class="sb-usage-meta">38 / 60 min · <span class="sb-upgrade">Upgrade</span></div>
+  </div>
+  <div class="sb-bottom">
+    <div class="dropdown-wrap">
+      <div class="sb-profile" onclick="toggleDD('profile-dd')">
+        <div class="sb-avatar">M</div>
+        <div class="sb-pinfo"><div class="sb-pname">Maxim P.</div><div class="sb-psub">pyatkinmv@gmail.com</div></div>
+        <span class="icon sm sb-caret">expand_less</span>
+      </div>
+      <div class="dd-panel profile-dd" id="profile-dd">
+        <div class="pd-head"><div class="pd-name">Maxim P.</div><div class="pd-email">pyatkinmv@gmail.com</div></div>
+        <div class="dd-sep"></div>
+        <div class="dd-row"><span class="icon sm">star</span> Manage plan <span class="pd-plan-badge">Free</span></div>
+        <div class="dd-row"><span class="icon sm">feedback</span> Give feedback</div>
+        <div class="dd-row"><span class="icon sm">help_outline</span> Support</div>
+        <div class="dd-sep"></div>
+        <div class="dd-row danger"><span class="icon sm">logout</span> Sign out</div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="topbar">
+    <span class="topbar-title" id="topbar-title">Tags</span>
+    <button class="upload-btn" onclick="document.getElementById('upload-modal').classList.add('open')"><span class="icon">upload</span> Upload</button>
+  </div>
+
+  <div class="vw" id="vw-list">
+    <div class="list-body"><div class="row-list" id="row-list"></div></div>
+  </div>
+  <div class="vw" id="vw-threads">
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--text3)"><span class="icon" style="font-size:48px;opacity:.3">forum</span><p style="font-size:14px">Threads — see creative.html for full demo</p></div>
+  </div>
+
+  <!-- TAGS — card grid -->
+  <div class="vw active" id="vw-tags">
+    <div class="page-hdr">
+      <div><div class="page-hdr-title">Tags</div><div class="page-hdr-sub">Descriptions help Dictara auto-tag future transcriptions.</div></div>
+      <button class="primary-btn" onclick="openTagModal(null)"><span class="icon">add</span> Add tag</button>
+    </div>
+    <div class="cards-body">
+      <div class="cards-grid" id="tags-grid"></div>
+    </div>
+  </div>
+
+  <!-- SPEAKERS — card grid, wider layout -->
+  <div class="vw" id="vw-speakers">
+    <div class="page-hdr">
+      <div><div class="page-hdr-title">Speakers</div><div class="page-hdr-sub">Named speakers help identify voices in future transcriptions automatically.</div></div>
+      <button class="primary-btn" onclick="openSpkModal(null)"><span class="icon">add</span> Add speaker</button>
+    </div>
+    <div class="cards-body">
+      <div style="display:flex;flex-direction:column;gap:10px;max-width:780px" id="spk-list"></div>
+    </div>
+  </div>
+
+  <div class="vw" id="vw-settings">
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--text3)"><span class="icon" style="font-size:48px;opacity:.3">settings</span><p style="font-size:14px">Settings coming soon</p></div>
+  </div>
+</div>
+
+<!-- EDIT TAG MODAL -->
+<div class="backdrop" id="tag-modal">
+  <div class="edit-modal" onclick="event.stopPropagation()">
+    <div class="edit-modal-head">
+      <span class="edit-modal-title" id="tag-modal-title">New tag</span>
+      <div class="modal-close-btn" onclick="closeModal('tag-modal')"><span class="icon">close</span></div>
+    </div>
+    <div class="form-field">
+      <label class="form-label">Color</label>
+      <div class="color-swatches" id="tag-color-swatches"></div>
+    </div>
+    <div class="form-field">
+      <label class="form-label">Name</label>
+      <input class="form-input" id="tag-modal-name" placeholder="e.g. meeting">
+    </div>
+    <div class="form-field">
+      <label class="form-label">Description</label>
+      <textarea class="form-textarea" id="tag-modal-desc" placeholder="Describe when this tag should be applied. This helps Dictara auto-tag future transcriptions."></textarea>
+    </div>
+    <div class="edit-modal-foot">
+      <button class="btn-cancel" onclick="closeModal('tag-modal')">Cancel</button>
+      <button class="btn-save" onclick="saveTagModal()">Save tag</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT SPEAKER MODAL -->
+<div class="backdrop" id="spk-modal">
+  <div class="edit-modal" onclick="event.stopPropagation()">
+    <div class="edit-modal-head">
+      <span class="edit-modal-title" id="spk-modal-title">New speaker</span>
+      <div class="modal-close-btn" onclick="closeModal('spk-modal')"><span class="icon">close</span></div>
+    </div>
+    <div class="form-field">
+      <label class="form-label">Full name</label>
+      <input class="form-input" id="spk-modal-name" placeholder="e.g. Alexei Sorokin">
+    </div>
+    <div class="form-field">
+      <label class="form-label">Description</label>
+      <textarea class="form-textarea" id="spk-modal-desc" placeholder="Describe this speaker — their role, speech style, typical topics. This helps Dictara recognize them automatically."></textarea>
+    </div>
+    <div class="edit-modal-foot">
+      <button class="btn-cancel" onclick="closeModal('spk-modal')">Cancel</button>
+      <button class="btn-save" onclick="saveSpeakerModal()">Save speaker</button>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE CONFIRM -->
+<div class="backdrop" id="del-modal">
+  <div class="del-dialog" onclick="event.stopPropagation()">
+    <div class="del-dialog-icon"><span class="icon">delete</span></div>
+    <div class="del-dialog-title">Delete "<span id="del-name"></span>"?</div>
+    <div class="del-dialog-body">This <span id="del-type-label">tag</span> will be removed from <strong><span id="del-count"></span> transcription(s)</strong>. This cannot be undone.</div>
+    <div class="del-dialog-foot">
+      <button class="btn-cancel" onclick="closeModal('del-modal')">Cancel</button>
+      <button class="btn-del" id="del-confirm-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- UPLOAD MODAL -->
+<div class="backdrop" id="upload-modal">
+  <div class="edit-modal" onclick="event.stopPropagation()" style="width:500px">
+    <div class="edit-modal-head"><span class="edit-modal-title">Upload audio</span><div class="modal-close-btn" onclick="closeModal('upload-modal')"><span class="icon">close</span></div></div>
+    <div style="border:2px dashed var(--border);border-radius:var(--radius);padding:24px;text-align:center;margin-bottom:14px"><div class="icon" style="font-size:28px;color:var(--accent);opacity:.5;margin-bottom:6px">upload_file</div><div style="font-size:14px;font-weight:600;color:var(--text2);margin-bottom:3px">Drop file here or click to browse</div><div style="font-size:12px;color:var(--text3)">MP3, MP4, M4A, OGG, WAV, FLAC · max 400 MB</div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px"><div><label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;display:block;margin-bottom:5px">Language</label><select style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:9px;font-size:13px;background:var(--bg);outline:none"><option>Auto-detect</option></select></div><div><label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;display:block;margin-bottom:5px">Summary</label><select style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:9px;font-size:13px;background:var(--bg);outline:none"><option>Auto</option></select></div><div><label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;display:block;margin-bottom:5px">Speakers</label><select style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:9px;font-size:13px;background:var(--bg);outline:none"><option>Auto</option></select></div></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn-cancel" onclick="closeModal('upload-modal')">Cancel</button><button class="btn-save">Upload</button></div>
+  </div>
+</div>
+
+<script>
+const COLORS=['#2563EB','#059669','#7C3AED','#D97706','#0891B2','#6366F1','#EF4444','#EC4899','#0D9488','#F59E0B'];
+let TAGS=[
+  {id:0,label:'meeting',color:'#2563EB',count:3,desc:'Regular team meetings, standups, and group discussions. Typically involve multiple speakers and action items.'},
+  {id:1,label:'quarterly',color:'#059669',count:1,desc:'End-of-quarter review sessions covering revenue, performance metrics, and roadmap planning.'},
+  {id:2,label:'interview',color:'#7C3AED',count:1,desc:'Candidate interviews for open positions. Used to track hiring pipeline conversations.'},
+  {id:3,label:'hiring',color:'#D97706',count:1,desc:'Recruitment-related recordings including HR screens, technical interviews, and debrief calls.'},
+  {id:4,label:'ideas',color:'#0891B2',count:1,desc:'Brainstorming sessions and exploratory discussions about product direction and new features.'},
+  {id:5,label:'standup',color:'#6366F1',count:1,desc:'Daily standup recordings. Short format, typically under 15 minutes, multiple speakers.'},
+];
+let SPEAKERS=[
+  {id:0,name:'Alexei Sorokin',color:'#0D9488',count:4,totalMin:'42 min',desc:'Product lead. Discusses roadmap, feature prioritization, and team updates. Measured and deliberate speech pattern.'},
+  {id:1,name:'Maria Chen',color:'#7C3AED',count:3,totalMin:'28 min',desc:'Head of Engineering. Covers technical architecture, sprint planning, and code quality. Uses extensive technical terminology.'},
+  {id:2,name:'James Wright',color:'#D97706',count:2,totalMin:'16 min',desc:'Sales & Marketing lead. Focuses on customer acquisition, webinars, and go-to-market strategy.'},
+];
+let ITEMS=[{id:0,title:'Quarterly Review Meeting',dur:'14 min',date:'22 Jun',status:'done',tags:[{c:'#2563EB',l:'meeting'},{c:'#059669',l:'quarterly'}]},{id:1,title:'Economics Lecture — Part 2',dur:'1h 12min',date:'22 Jun',status:'proc',pct:41,tags:[]},{id:2,title:'Interview: Anna K.',dur:'47 min',date:'21 Jun',status:'done',tags:[{c:'#7C3AED',l:'interview'}]},{id:3,title:'Daily Standup 19 Jun',dur:'8 min',date:'19 Jun',status:'done',tags:[{c:'#2563EB',l:'meeting'}]}];
+let editTagId=null,editSpkId=null,modalTagColor=null,nextId=10;
+const PAGE_TITLES={list:'Transcriptions',threads:'Threads',tags:'Tags',speakers:'Speakers',settings:'Settings'};
+
+function navigate(page){
+  document.querySelectorAll('[data-nav]').forEach(i=>i.classList.toggle('active',i.dataset.nav===page));
+  document.querySelectorAll('.vw').forEach(v=>v.classList.remove('active'));
+  document.getElementById('vw-'+page)?.classList.add('active');
+  document.getElementById('topbar-title').textContent=PAGE_TITLES[page]||page;
+  if(page==='tags')renderTags();
+  if(page==='speakers')renderSpeakers();
+  if(page==='list')renderList();
+}
+
+function renderTags(){
+  const grid=document.getElementById('tags-grid');
+  grid.innerHTML=TAGS.map(t=>`
+    <div class="tag-card">
+      <div class="tag-card-top">
+        <div class="tag-card-swatch" style="background:${t.color}"></div>
+        <span class="tag-card-name">${t.label}</span>
+      </div>
+      <div class="tag-card-desc">${t.desc||'<span style="color:var(--text3);font-style:italic">No description yet</span>'}</div>
+      <div class="tag-card-foot">
+        <div class="tag-card-count"><span class="icon">description</span>${t.count} file${t.count!==1?'s':''}</div>
+        <div class="tag-card-actions">
+          <div class="card-icon-btn" onclick="openTagModal(${t.id})" title="Edit"><span class="icon sm">edit</span></div>
+          <div class="card-icon-btn del" onclick="confirmDel(${t.id},'tag')" title="Delete"><span class="icon sm">delete</span></div>
+        </div>
+      </div>
+    </div>`).join('')+`
+    <div class="tag-card add-card" onclick="openTagModal(null)">
+      <div class="add-card-inner"><span class="icon">add_circle</span><span>Add tag</span></div>
+    </div>`;
+}
+
+function renderSpeakers(){
+  document.getElementById('spk-list').innerHTML=SPEAKERS.map(s=>`
+    <div class="spk-card">
+      <div class="spk-card-top">
+        <div class="spk-initials" style="background:${s.color}">${s.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
+        <div class="spk-card-info">
+          <div class="spk-card-name">${s.name}</div>
+          <div class="spk-card-stats">
+            <span class="spk-stat-item"><span class="icon">description</span>${s.count} files</span>
+            <span class="spk-stat-item"><span class="icon">schedule</span>${s.totalMin}</span>
+          </div>
+        </div>
+      </div>
+      <div class="spk-card-desc">${s.desc||'<span style="font-style:italic">No description yet</span>'}</div>
+      <div class="spk-card-foot">
+        <div class="card-icon-btn" onclick="openSpkModal(${s.id})"><span class="icon sm">edit</span></div>
+        <div class="card-icon-btn del" onclick="confirmDel(${s.id},'speaker')"><span class="icon sm">delete</span></div>
+      </div>
+    </div>`).join('');
+}
+
+function buildColorSwatches(selected){
+  document.getElementById('tag-color-swatches').innerHTML=COLORS.map(c=>`<div class="color-sw${c===modalTagColor?' selected':''}" style="background:${c}" onclick="selectModalColor('${c}')"></div>`).join('');
+}
+function selectModalColor(c){modalTagColor=c;buildColorSwatches(c);}
+
+function openTagModal(id){
+  editTagId=id;
+  const t=id!==null?TAGS.find(x=>x.id===id):null;
+  modalTagColor=t?t.color:COLORS[0];
+  document.getElementById('tag-modal-title').textContent=t?'Edit tag':'New tag';
+  document.getElementById('tag-modal-name').value=t?t.label:'';
+  document.getElementById('tag-modal-desc').value=t?t.desc:'';
+  buildColorSwatches(modalTagColor);
+  document.getElementById('tag-modal').classList.add('open');
+}
+function saveTagModal(){
+  const name=document.getElementById('tag-modal-name').value.trim();if(!name)return;
+  const desc=document.getElementById('tag-modal-desc').value.trim();
+  if(editTagId!==null){const t=TAGS.find(x=>x.id===editTagId);if(t){t.label=name;t.desc=desc;t.color=modalTagColor||t.color;}}
+  else{TAGS.push({id:nextId++,label:name,color:modalTagColor||COLORS[0],count:0,desc});}
+  closeModal('tag-modal');renderTags();
+}
+
+function openSpkModal(id){
+  editSpkId=id;
+  const s=id!==null?SPEAKERS.find(x=>x.id===id):null;
+  document.getElementById('spk-modal-title').textContent=s?'Edit speaker':'New speaker';
+  document.getElementById('spk-modal-name').value=s?s.name:'';
+  document.getElementById('spk-modal-desc').value=s?s.desc:'';
+  document.getElementById('spk-modal').classList.add('open');
+}
+function saveSpeakerModal(){
+  const name=document.getElementById('spk-modal-name').value.trim();if(!name)return;
+  const desc=document.getElementById('spk-modal-desc').value.trim();
+  if(editSpkId!==null){const s=SPEAKERS.find(x=>x.id===editSpkId);if(s){s.name=name;s.desc=desc;}}
+  else{SPEAKERS.push({id:nextId++,name,color:COLORS[nextId%COLORS.length],count:0,totalMin:'0 min',desc});}
+  closeModal('spk-modal');renderSpeakers();
+}
+
+function confirmDel(id,type){
+  const item=type==='tag'?TAGS.find(t=>t.id===id):SPEAKERS.find(s=>s.id===id);
+  document.getElementById('del-name').textContent=type==='tag'?item.label:item.name;
+  document.getElementById('del-count').textContent=item.count;
+  document.getElementById('del-type-label').textContent=type;
+  document.getElementById('del-confirm-btn').onclick=()=>{
+    if(type==='tag'){TAGS=TAGS.filter(t=>t.id!==id);renderTags();}
+    else{SPEAKERS=SPEAKERS.filter(s=>s.id!==id);renderSpeakers();}
+    closeModal('del-modal');
+  };
+  document.getElementById('del-modal').classList.add('open');
+}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+function renderList(){
+  const ICO={done:'check_circle',proc:'autorenew',pend:'schedule'};const LBL={done:'Done',proc:'Processing',pend:'Pending'};
+  document.getElementById('row-list').innerHTML=ITEMS.map(i=>`<div class="row"><div class="row-icon ${i.status}"><span class="icon">${ICO[i.status]}</span></div><div class="row-info"><div class="row-name">${i.title}</div><div class="row-meta"><span><span class="icon">schedule</span>${i.dur}</span><span><span class="icon">calendar_today</span>${i.date}</span></div><div class="row-foot">${i.tags.map(t=>`<span class="mini-tag" style="background:${t.c}">${t.l}</span>`).join('')}</div></div><div class="row-right"><span class="badge ${i.status}">${LBL[i.status]}</span><span class="icon row-chev">chevron_right</span></div></div>`).join('');
+}
+function toggleDD(id){document.querySelectorAll('.dd-panel').forEach(p=>{if(p.id!==id)p.classList.remove('open')});document.querySelectorAll('.dropdown-wrap').forEach(w=>w.classList.remove('open'));const p=document.getElementById(id);p.classList.toggle('open');if(p.classList.contains('open'))p.closest('.dropdown-wrap')?.classList.add('open');}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.dropdown-wrap')){document.querySelectorAll('.dd-panel').forEach(p=>p.classList.remove('open'));document.querySelectorAll('.dropdown-wrap').forEach(w=>w.classList.remove('open'));}
+  ['tag-modal','spk-modal','del-modal','upload-modal'].forEach(id=>{if(e.target===document.getElementById(id))closeModal(id);});
+});
+renderTags();renderList();
+</script>
+</body>
+</html>

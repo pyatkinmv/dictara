@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dictara — list-inline 1.8</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20,400,1,0" rel="stylesheet">
+<style>
+:root{
+  --accent:#0D9488;--al:#F0FDF9;--ad:#0F766E;
+  --bg:#F2F7F6;--surface:#FFF;--sb-bg:#E8F4F2;
+  --text:#0F2922;--text2:#4B6E6A;--text3:#8FAEAC;
+  --border:#D1E7E5;
+  --ok:#16A34A;--ok-bg:#DCFCE7;--warn:#D97706;--warn-bg:#FEF3C7;
+  --sp1:#0D9488;--sp2:#7C3AED;--sp3:#D97706;
+  --radius:12px;--sb-w:220px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex}
+.icon{font-family:'Material Symbols Rounded';font-size:20px;line-height:1;user-select:none}
+.icon.sm{font-size:16px}
+button{cursor:pointer;border:none;background:none;font-family:inherit}
+input,textarea,select{font-family:inherit}
+
+/* SIDEBAR */
+.sidebar{width:var(--sb-w);flex-shrink:0;background:var(--sb-bg);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 12px}
+.sb-brand{display:flex;align-items:center;gap:8px;padding:0 8px;margin-bottom:20px}
+.sb-logo{width:32px;height:32px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center}
+.sb-logo .icon{font-size:18px;color:#fff}
+.sb-name{font-size:17px;font-weight:700;letter-spacing:-.3px;color:var(--accent)}
+.sb-nav{flex:1;display:flex;flex-direction:column;gap:2px}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;font-size:14px;font-weight:500;color:var(--text2);cursor:pointer;transition:background .15s}
+.sb-item:hover{background:rgba(13,148,136,.08)}
+.sb-item.active{background:rgba(13,148,136,.13);color:var(--accent);font-weight:600}
+.sb-sep{height:1px;background:var(--border);margin:8px 4px}
+.sb-usage{padding:10px 10px 12px;border-top:1px solid var(--border);margin-top:6px}
+.sb-usage-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}
+.sb-usage-lbl{font-size:11px;color:var(--text3);font-weight:500}
+.sb-usage-badge{font-size:10px;font-weight:700;padding:1px 8px;border-radius:100px;background:var(--al);color:var(--accent)}
+.sb-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:4px}
+.sb-bar-fill{height:100%;background:var(--accent);border-radius:2px}
+.sb-usage-meta{font-size:11px;color:var(--text3)}
+.sb-upgrade{color:var(--accent);cursor:pointer;font-weight:500}
+.sb-upgrade:hover{text-decoration:underline}
+.sb-bottom{padding-top:8px}
+.dropdown-wrap{position:relative}
+.sb-profile{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .15s}
+.sb-profile:hover{background:rgba(13,148,136,.08)}
+.sb-avatar{width:30px;height:30px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0}
+.sb-pinfo{flex:1}
+.sb-pname{font-size:13px;font-weight:600}
+.sb-psub{font-size:11px;color:var(--text3)}
+.sb-caret{color:var(--text3);transition:transform .2s}
+.dropdown-wrap.open .sb-caret{transform:rotate(180deg)}
+.dd-panel{position:absolute;top:calc(100% + 6px);left:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;min-width:200px;box-shadow:0 4px 20px rgba(13,148,136,.12);z-index:200;display:none}
+.dd-panel.open{display:block}
+.profile-dd{top:auto;bottom:calc(100% + 6px);left:0;right:0;min-width:unset}
+.pd-head{padding:4px 8px 8px}
+.pd-name{font-size:13px;font-weight:700}
+.pd-email{font-size:11px;color:var(--text3);margin-top:1px}
+.dd-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;font-size:13px;cursor:pointer;color:var(--text2)}
+.dd-row:hover{background:var(--al)}
+.dd-row.danger{color:#EF4444}
+.dd-row.danger:hover{background:#FEF2F2}
+.dd-sep{height:1px;background:var(--border);margin:4px 0}
+.pd-plan-badge{font-size:10px;font-weight:700;padding:1px 8px;border-radius:100px;background:var(--al);color:var(--accent);margin-left:auto}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.topbar-title{font-size:16px;font-weight:600}
+.upload-btn{background:linear-gradient(135deg,var(--accent),var(--ad));color:#fff;border-radius:10px;padding:7px 14px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(13,148,136,.25);cursor:pointer}
+.upload-btn .icon{font-size:17px}
+
+/* VIEWS */
+.vw{flex:1;display:none;flex-direction:column;overflow:hidden}
+.vw.active{display:flex}
+
+/* PAGE HEADER */
+.page-hdr{padding:20px 28px 0;display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0}
+.page-hdr-left{}
+.page-hdr-title{font-size:18px;font-weight:700;letter-spacing:-.3px;margin-bottom:3px}
+.page-hdr-sub{font-size:13px;color:var(--text3)}
+.primary-btn{display:flex;align-items:center;gap:6px;padding:8px 14px;background:var(--accent);color:#fff;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.primary-btn .icon{font-size:16px}
+.primary-btn:hover{background:var(--ad)}
+
+/* TAGS TABLE */
+.tags-body{flex:1;overflow-y:auto;padding:14px 28px}
+.tags-table{width:100%;border-collapse:collapse}
+.tags-table thead th{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);padding:0 12px 8px;text-align:left;border-bottom:1px solid var(--border)}
+.tags-table thead th:last-child{text-align:right}
+.tags-table tbody tr{border-bottom:1px solid var(--border);transition:background .12s}
+.tags-table tbody tr:hover:not(.editing-row){background:rgba(13,148,136,.03)}
+.tags-table tbody td{padding:10px 12px;vertical-align:middle}
+/* Normal row */
+.tag-row-name{display:flex;align-items:center;gap:10px}
+.tag-swatch{width:12px;height:12px;border-radius:50%;flex-shrink:0;cursor:pointer}
+.tag-label{font-size:14px;font-weight:600}
+.tag-desc-cell{font-size:13px;color:var(--text3);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag-count{font-size:13px;font-weight:500;color:var(--text2)}
+.row-actions{display:flex;align-items:center;justify-content:flex-end;gap:4px;opacity:0;transition:opacity .15s}
+.tags-table tbody tr:hover .row-actions{opacity:1}
+.icon-btn{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--text3);cursor:pointer;transition:all .15s}
+.icon-btn:hover{background:var(--bg);color:var(--text)}
+.icon-btn.del:hover{background:#FEF2F2;color:#EF4444}
+/* Editing row */
+.editing-row{background:var(--al)!important}
+.editing-row td{padding:8px 12px;vertical-align:top}
+.color-swatches{display:flex;gap:5px;flex-wrap:wrap;align-items:center;padding-top:4px}
+.color-sw{width:18px;height:18px;border-radius:50%;cursor:pointer;flex-shrink:0;transition:transform .1s;border:2px solid transparent}
+.color-sw:hover{transform:scale(1.2)}
+.color-sw.selected{border-color:var(--text);transform:scale(1.15)}
+.edit-name{border:1px solid var(--border);border-radius:7px;padding:5px 8px;font-size:14px;font-weight:600;color:var(--text);outline:none;width:100%;background:var(--surface)}
+.edit-name:focus{border-color:var(--accent)}
+.edit-desc{border:1px solid var(--border);border-radius:7px;padding:6px 8px;font-size:13px;color:var(--text2);outline:none;width:100%;resize:vertical;min-height:54px;background:var(--surface);line-height:1.5}
+.edit-desc:focus{border-color:var(--accent)}
+.save-actions{display:flex;gap:5px;justify-content:flex-end;padding-top:2px}
+.save-btn{display:flex;align-items:center;gap:4px;padding:5px 11px;background:var(--accent);color:#fff;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer}
+.cancel-btn{display:flex;align-items:center;gap:4px;padding:5px 11px;border:1px solid var(--border);border-radius:7px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer}
+.cancel-btn:hover{background:var(--bg)}
+/* Add-new ghost row */
+.add-row td{padding:10px 12px}
+.add-row-btn{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--text3);cursor:pointer;transition:color .15s}
+.add-row-btn:hover{color:var(--accent)}
+
+/* SPEAKERS — same table style, no color picker */
+.spk-row-name{display:flex;align-items:center;gap:10px}
+.spk-dot-lg{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.spk-label{font-size:14px;font-weight:600}
+
+/* DELETE CONFIRMATION */
+.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);backdrop-filter:blur(4px);z-index:300;display:none;align-items:center;justify-content:center}
+.backdrop.open{display:flex}
+.del-dialog{background:var(--surface);border-radius:16px;width:380px;max-width:95vw;padding:24px;box-shadow:0 12px 40px rgba(0,0,0,.15)}
+.del-dialog-icon{width:40px;height:40px;background:#FEF2F2;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+.del-dialog-icon .icon{color:#EF4444;font-size:20px}
+.del-dialog-title{font-size:16px;font-weight:700;margin-bottom:6px}
+.del-dialog-body{font-size:14px;color:var(--text2);line-height:1.55;margin-bottom:20px}
+.del-dialog-foot{display:flex;justify-content:flex-end;gap:8px}
+.btn-cancel{padding:8px 14px;border:1px solid var(--border);border-radius:9px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer}
+.btn-cancel:hover{background:var(--bg)}
+.btn-del{padding:8px 16px;border-radius:9px;background:#EF4444;color:#fff;font-size:13px;font-weight:600;cursor:pointer}
+.btn-del:hover{background:#DC2626}
+
+/* UPLOAD MODAL */
+.modal{background:var(--surface);border-radius:20px;width:500px;max-width:95vw;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+.modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.modal-title{font-size:17px;font-weight:700}
+.modal-close{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text3);cursor:pointer}
+.modal-close:hover{background:var(--bg)}
+.drop-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:28px;text-align:center;cursor:pointer;margin-bottom:14px;transition:all .15s}
+.drop-zone:hover{border-color:var(--accent);background:var(--al)}
+.drop-icon{font-size:32px;color:var(--accent);opacity:.5;margin-bottom:7px}
+.drop-text{font-size:14px;font-weight:600;color:var(--text2);margin-bottom:4px}
+.drop-sub{font-size:12px;color:var(--text3)}
+.modal-fields{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px}
+.m-field label{display:block;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.m-field select{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:9px;font-size:13px;color:var(--text);background:var(--bg);outline:none}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px}
+.btn-upload{padding:8px 18px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--ad));color:#fff;font-size:13px;font-weight:600;cursor:pointer}
+
+/* TRANSCRIPTIONS (reused from 1.7) */
+.list-body{flex:1;overflow-y:auto;padding:18px 24px}
+.filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.search-wrap{flex:1;position:relative}
+.search-input{width:100%;border:1px solid var(--border);background:var(--surface);border-radius:10px;padding:7px 12px 7px 34px;font-size:13px;color:var(--text);outline:none}
+.search-input:focus{border-color:var(--accent)}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3)}
+.dd-btn{display:flex;align-items:center;gap:5px;padding:7px 11px;border:1px solid var(--border);background:var(--surface);border-radius:10px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;white-space:nowrap}
+.dd-btn:hover{border-color:var(--accent);color:var(--accent)}
+.row-list{display:flex;flex-direction:column;gap:7px}
+.row{background:var(--surface);border-radius:var(--radius);padding:11px 13px;display:flex;align-items:flex-start;gap:11px;cursor:pointer;border:1px solid var(--border);transition:box-shadow .15s}
+.row:hover{box-shadow:0 2px 10px rgba(13,148,136,.12)}
+.row-icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.row-icon.done{background:var(--ok-bg);color:var(--ok)}
+.row-icon.proc{background:var(--warn-bg);color:var(--warn)}
+.row-icon.pend{background:var(--bg);color:var(--text3)}
+.row-icon .icon{font-size:17px}
+.row-info{flex:1;min-width:0}
+.row-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+.row-meta{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text2);margin-bottom:5px}
+.row-meta span{display:flex;align-items:center;gap:3px}
+.row-meta .icon{font-size:13px;color:var(--text3)}
+.row-foot{display:flex;gap:4px;flex-wrap:wrap}
+.mini-tag{font-size:11px;font-weight:600;color:#fff;padding:2px 7px;border-radius:100px}
+.row-right{display:flex;align-items:center;gap:5px;flex-shrink:0;margin-top:2px}
+.badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:100px}
+.badge.done{background:var(--ok-bg);color:var(--ok)}
+.badge.proc{background:var(--warn-bg);color:var(--warn)}
+.badge.pend{background:var(--bg);color:var(--text3)}
+.row-chev{color:var(--text3)}
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+<nav class="sidebar">
+  <div class="sb-brand"><div class="sb-logo"><span class="icon">mic</span></div><span class="sb-name">Dictara</span></div>
+  <div class="sb-nav">
+    <div class="sb-item" data-nav="list" onclick="navigate('list')"><span class="icon">description</span> Transcriptions</div>
+    <div class="sb-item" data-nav="threads" onclick="navigate('threads')"><span class="icon">forum</span> Threads</div>
+    <div class="sb-item active" data-nav="tags" onclick="navigate('tags')"><span class="icon">sell</span> Tags</div>
+    <div class="sb-item" data-nav="speakers" onclick="navigate('speakers')"><span class="icon">record_voice_over</span> Speakers</div>
+    <div class="sb-sep"></div>
+    <div class="sb-item" data-nav="settings" onclick="navigate('settings')"><span class="icon">settings</span> Settings</div>
+  </div>
+  <div class="sb-usage">
+    <div class="sb-usage-top"><span class="sb-usage-lbl">Usage this month</span><span class="sb-usage-badge">Free</span></div>
+    <div class="sb-bar"><div class="sb-bar-fill" style="width:63%"></div></div>
+    <div class="sb-usage-meta">38 / 60 min · <span class="sb-upgrade">Upgrade</span></div>
+  </div>
+  <div class="sb-bottom">
+    <div class="dropdown-wrap">
+      <div class="sb-profile" onclick="toggleDD('profile-dd')">
+        <div class="sb-avatar">M</div>
+        <div class="sb-pinfo"><div class="sb-pname">Maxim P.</div><div class="sb-psub">pyatkinmv@gmail.com</div></div>
+        <span class="icon sm sb-caret">expand_less</span>
+      </div>
+      <div class="dd-panel profile-dd" id="profile-dd">
+        <div class="pd-head"><div class="pd-name">Maxim P.</div><div class="pd-email">pyatkinmv@gmail.com</div></div>
+        <div class="dd-sep"></div>
+        <div class="dd-row"><span class="icon sm">star</span> Manage plan <span class="pd-plan-badge">Free</span></div>
+        <div class="dd-row"><span class="icon sm">feedback</span> Give feedback</div>
+        <div class="dd-row"><span class="icon sm">help_outline</span> Support</div>
+        <div class="dd-sep"></div>
+        <div class="dd-row danger"><span class="icon sm">logout</span> Sign out</div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="topbar">
+    <span class="topbar-title" id="topbar-title">Tags</span>
+    <button class="upload-btn" onclick="document.getElementById('upload-modal').classList.add('open')"><span class="icon">upload</span> Upload</button>
+  </div>
+
+  <!-- TRANSCRIPTIONS -->
+  <div class="vw" id="vw-list">
+    <div class="list-body">
+      <div class="filter-bar"><div class="search-wrap"><span class="icon sm search-icon">search</span><input class="search-input" placeholder="Search…"></div></div>
+      <div class="row-list" id="row-list"></div>
+    </div>
+  </div>
+
+  <!-- THREADS placeholder -->
+  <div class="vw" id="vw-threads">
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--text3)"><span class="icon" style="font-size:48px;opacity:.3">forum</span><p style="font-size:14px">Threads — see creative.html for full demo</p></div>
+  </div>
+
+  <!-- TAGS — inline table edit -->
+  <div class="vw active" id="vw-tags">
+    <div class="page-hdr">
+      <div class="page-hdr-left">
+        <div class="page-hdr-title">Tags</div>
+        <div class="page-hdr-sub">Add descriptions to help auto-tag future transcriptions.</div>
+      </div>
+      <button class="primary-btn" onclick="addTag()"><span class="icon">add</span> Add tag</button>
+    </div>
+    <div class="tags-body">
+      <table class="tags-table">
+        <thead><tr><th style="width:220px">Color & Name</th><th>Description</th><th style="width:70px">Files</th><th style="width:80px"></th></tr></thead>
+        <tbody id="tags-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SPEAKERS — same inline table, no color picker -->
+  <div class="vw" id="vw-speakers">
+    <div class="page-hdr">
+      <div class="page-hdr-left">
+        <div class="page-hdr-title">Speakers</div>
+        <div class="page-hdr-sub">Named speakers are used for automatic speaker identification in future transcriptions.</div>
+      </div>
+      <button class="primary-btn" onclick="addSpeaker()"><span class="icon">add</span> Add speaker</button>
+    </div>
+    <div class="tags-body">
+      <table class="tags-table">
+        <thead><tr><th style="width:220px">Name</th><th>Description</th><th style="width:70px">Files</th><th style="width:80px"></th></tr></thead>
+        <tbody id="speakers-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="vw" id="vw-settings">
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--text3)"><span class="icon" style="font-size:48px;opacity:.3">settings</span><p style="font-size:14px">Settings coming soon</p></div>
+  </div>
+</div>
+
+<!-- DELETE CONFIRM -->
+<div class="backdrop" id="del-modal">
+  <div class="del-dialog" onclick="event.stopPropagation()">
+    <div class="del-dialog-icon"><span class="icon">delete</span></div>
+    <div class="del-dialog-title">Delete "<span id="del-name"></span>"?</div>
+    <div class="del-dialog-body">This <span id="del-type-label">tag</span> will be removed from <strong><span id="del-count"></span> transcription(s)</strong>. This cannot be undone.</div>
+    <div class="del-dialog-foot">
+      <button class="btn-cancel" onclick="closeDelModal()">Cancel</button>
+      <button class="btn-del" id="del-confirm-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- UPLOAD MODAL -->
+<div class="backdrop" id="upload-modal">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-head"><span class="modal-title">Upload audio</span><button class="modal-close" onclick="document.getElementById('upload-modal').classList.remove('open')"><span class="icon">close</span></button></div>
+    <div class="drop-zone"><div class="icon drop-icon">upload_file</div><div class="drop-text">Drop file here or click to browse</div><div class="drop-sub">MP3, MP4, M4A, OGG, WAV, FLAC · max 400 MB</div></div>
+    <div class="modal-fields"><div class="m-field"><label>Language</label><select><option>Auto-detect</option><option>English</option></select></div><div class="m-field"><label>Summary</label><select><option>Auto</option><option>None</option></select></div><div class="m-field"><label>Speakers</label><select><option>Auto-detect</option></select></div></div>
+    <div class="modal-foot"><button class="btn-cancel" onclick="document.getElementById('upload-modal').classList.remove('open')">Cancel</button><button class="btn-upload">Upload</button></div>
+  </div>
+</div>
+
+<script>
+const COLORS=['#2563EB','#059669','#7C3AED','#D97706','#0891B2','#6366F1','#EF4444','#EC4899','#0D9488','#F59E0B'];
+let TAGS=[
+  {id:0,label:'meeting',color:'#2563EB',count:3,desc:'Regular team meetings, standups, and group discussions. Typically involve multiple speakers and action items.'},
+  {id:1,label:'quarterly',color:'#059669',count:1,desc:'End-of-quarter review sessions covering revenue, performance metrics, and roadmap planning.'},
+  {id:2,label:'interview',color:'#7C3AED',count:1,desc:'Candidate interviews for open positions. Used to track hiring pipeline conversations.'},
+  {id:3,label:'hiring',color:'#D97706',count:1,desc:'Recruitment-related recordings including HR screens, technical interviews, and debrief calls.'},
+  {id:4,label:'ideas',color:'#0891B2',count:1,desc:'Brainstorming sessions and exploratory discussions about product direction and new features.'},
+  {id:5,label:'standup',color:'#6366F1',count:1,desc:'Daily standup recordings. Short format, typically under 15 minutes, multiple speakers.'},
+];
+let SPEAKERS=[
+  {id:0,name:'Alexei Sorokin',color:'#0D9488',count:4,totalMin:'42 min',desc:'Product lead. Discusses roadmap, feature prioritization, and team updates. Measured and deliberate speech pattern.'},
+  {id:1,name:'Maria Chen',color:'#7C3AED',count:3,totalMin:'28 min',desc:'Head of Engineering. Covers technical architecture, sprint planning, and code quality. Uses extensive technical terminology.'},
+  {id:2,name:'James Wright',color:'#D97706',count:2,totalMin:'16 min',desc:'Sales & Marketing lead. Focuses on customer acquisition, webinars, and go-to-market strategy.'},
+];
+let ITEMS=[{id:0,title:'Quarterly Review Meeting',dur:'14 min',date:'22 Jun',status:'done',tags:[{c:'#2563EB',l:'meeting'},{c:'#059669',l:'quarterly'}]},{id:1,title:'Economics Lecture — Part 2',dur:'1h 12min',date:'22 Jun',status:'proc',pct:41,tags:[]},{id:2,title:'Interview: Anna K.',dur:'47 min',date:'21 Jun',status:'done',tags:[{c:'#7C3AED',l:'interview'}]},{id:3,title:'Podcast Episode #47',dur:'38 min',date:'22 Jun',status:'pend',tags:[]},{id:4,title:'Daily Standup 19 Jun',dur:'8 min',date:'19 Jun',status:'done',tags:[{c:'#2563EB',l:'meeting'}]}];
+let editingTagId=null,editingSpkId=null,tagEditColor=null,nextTagId=10,nextSpkId=10;
+const PAGE_TITLES={list:'Transcriptions',threads:'Threads',tags:'Tags',speakers:'Speakers',settings:'Settings'};
+
+function navigate(page){
+  document.querySelectorAll('[data-nav]').forEach(i=>i.classList.toggle('active',i.dataset.nav===page));
+  document.querySelectorAll('.vw').forEach(v=>v.classList.remove('active'));
+  document.getElementById('vw-'+page)?.classList.add('active');
+  document.getElementById('topbar-title').textContent=PAGE_TITLES[page]||page;
+  editingTagId=null;editingSpkId=null;
+  if(page==='tags')renderTags();
+  if(page==='speakers')renderSpeakers();
+  if(page==='list')renderList();
+}
+
+function colorSwatches(selected,onPick){
+  return`<div class="color-swatches">${COLORS.map(c=>`<div class="color-sw${c===selected?' selected':''}" style="background:${c}" onclick="(${onPick})('${c}')"></div>`).join('')}</div>`;
+}
+
+function renderTags(){
+  const tbody=document.getElementById('tags-tbody');
+  tbody.innerHTML=TAGS.map(t=>{
+    if(t.id===editingTagId){
+      const tc=tagEditColor||t.color;
+      return`<tr class="editing-row">
+        <td>
+          ${colorSwatches(tc,'function(c){window.tagEditColor=c;document.querySelectorAll(".color-sw").forEach(s=>s.classList.toggle("selected",s.style.background===c||window.rgbToHex&&false));renderTags();}')}
+          <input class="edit-name" id="edit-tag-name" value="${t.label}" style="margin-top:6px">
+        </td>
+        <td><textarea class="edit-desc" id="edit-tag-desc">${t.desc}</textarea></td>
+        <td><span style="font-size:13px;color:var(--text3)">${t.count}</span></td>
+        <td><div class="save-actions"><button class="cancel-btn" onclick="cancelTagEdit()">Cancel</button><button class="save-btn" onclick="saveTag(${t.id})">Save</button></div></td>
+      </tr>`;
+    }
+    return`<tr>
+      <td><div class="tag-row-name"><div class="tag-swatch" style="background:${t.color}" title="Color"></div><span class="tag-label">${t.label}</span></div></td>
+      <td><span class="tag-desc-cell">${t.desc||'—'}</span></td>
+      <td><span class="tag-count">${t.count}</span></td>
+      <td><div class="row-actions"><button class="icon-btn" onclick="editTag(${t.id})" title="Edit"><span class="icon sm">edit</span></button><button class="icon-btn del" onclick="confirmDel(${t.id},'tag')" title="Delete"><span class="icon sm">delete</span></button></div></td>
+    </tr>`;
+  }).join('');
+}
+
+function editTag(id){editingTagId=id;tagEditColor=TAGS.find(t=>t.id===id)?.color||null;renderTags();}
+function cancelTagEdit(){editingTagId=null;tagEditColor=null;renderTags();}
+function saveTag(id){
+  const t=TAGS.find(x=>x.id===id);if(!t)return;
+  t.label=document.getElementById('edit-tag-name').value.trim()||t.label;
+  t.desc=document.getElementById('edit-tag-desc').value.trim();
+  if(tagEditColor)t.color=tagEditColor;
+  editingTagId=null;tagEditColor=null;renderTags();
+}
+function addTag(){
+  const newTag={id:nextTagId++,label:'New tag',color:COLORS[Math.floor(Math.random()*COLORS.length)],count:0,desc:''};
+  TAGS.unshift(newTag);editingTagId=newTag.id;tagEditColor=newTag.color;renderTags();
+}
+
+function renderSpeakers(){
+  const tbody=document.getElementById('speakers-tbody');
+  tbody.innerHTML=SPEAKERS.map(s=>{
+    if(s.id===editingSpkId){
+      return`<tr class="editing-row">
+        <td><input class="edit-name" id="edit-spk-name" value="${s.name}"></td>
+        <td><textarea class="edit-desc" id="edit-spk-desc">${s.desc}</textarea></td>
+        <td><span style="font-size:13px;color:var(--text3)">${s.count}</span></td>
+        <td><div class="save-actions"><button class="cancel-btn" onclick="cancelSpkEdit()">Cancel</button><button class="save-btn" onclick="saveSpeaker(${s.id})">Save</button></div></td>
+      </tr>`;
+    }
+    return`<tr>
+      <td><div class="spk-row-name"><div class="spk-dot-lg" style="background:${s.color}"></div><span class="spk-label">${s.name}</span></div></td>
+      <td><span class="tag-desc-cell">${s.desc||'—'}</span></td>
+      <td><span class="tag-count">${s.count}</span></td>
+      <td><div class="row-actions"><button class="icon-btn" onclick="editSpeaker(${s.id})"><span class="icon sm">edit</span></button><button class="icon-btn del" onclick="confirmDel(${s.id},'speaker')"><span class="icon sm">delete</span></button></div></td>
+    </tr>`;
+  }).join('');
+}
+function editSpeaker(id){editingSpkId=id;renderSpeakers();}
+function cancelSpkEdit(){editingSpkId=null;renderSpeakers();}
+function saveSpeaker(id){
+  const s=SPEAKERS.find(x=>x.id===id);if(!s)return;
+  s.name=document.getElementById('edit-spk-name').value.trim()||s.name;
+  s.desc=document.getElementById('edit-spk-desc').value.trim();
+  editingSpkId=null;renderSpeakers();
+}
+function addSpeaker(){
+  const ns={id:nextSpkId++,name:'New speaker',color:COLORS[Math.floor(Math.random()*COLORS.length)],count:0,totalMin:'0 min',desc:''};
+  SPEAKERS.unshift(ns);editingSpkId=ns.id;renderSpeakers();
+}
+
+function confirmDel(id,type){
+  const item=type==='tag'?TAGS.find(t=>t.id===id):SPEAKERS.find(s=>s.id===id);
+  document.getElementById('del-name').textContent=type==='tag'?item.label:item.name;
+  document.getElementById('del-count').textContent=item.count;
+  document.getElementById('del-type-label').textContent=type;
+  document.getElementById('del-confirm-btn').onclick=()=>doDelete(id,type);
+  document.getElementById('del-modal').classList.add('open');
+}
+function doDelete(id,type){
+  if(type==='tag'){TAGS=TAGS.filter(t=>t.id!==id);renderTags();}
+  else{SPEAKERS=SPEAKERS.filter(s=>s.id!==id);renderSpeakers();}
+  closeDelModal();
+}
+function closeDelModal(){document.getElementById('del-modal').classList.remove('open');}
+
+function renderList(){
+  const ICO={done:'check_circle',proc:'autorenew',pend:'schedule'};const LBL={done:'Done',proc:'Processing',pend:'Pending'};
+  document.getElementById('row-list').innerHTML=ITEMS.map(i=>`<div class="row"><div class="row-icon ${i.status}"><span class="icon">${ICO[i.status]}</span></div><div class="row-info"><div class="row-name">${i.title}</div><div class="row-meta"><span><span class="icon">schedule</span>${i.dur}</span><span><span class="icon">calendar_today</span>${i.date}</span></div><div class="row-foot">${i.tags.map(t=>`<span class="mini-tag" style="background:${t.c}">${t.l}</span>`).join('')}</div></div><div class="row-right"><span class="badge ${i.status}">${LBL[i.status]}</span><span class="icon row-chev">chevron_right</span></div></div>`).join('');
+}
+function toggleDD(id){
+  document.querySelectorAll('.dd-panel').forEach(p=>{if(p.id!==id)p.classList.remove('open')});
+  document.querySelectorAll('.dropdown-wrap').forEach(w=>w.classList.remove('open'));
+  const p=document.getElementById(id);p.classList.toggle('open');if(p.classList.contains('open'))p.closest('.dropdown-wrap')?.classList.add('open');
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.dropdown-wrap')){document.querySelectorAll('.dd-panel').forEach(p=>p.classList.remove('open'));document.querySelectorAll('.dropdown-wrap').forEach(w=>w.classList.remove('open'));}
+  if(e.target===document.getElementById('del-modal'))closeDelModal();
+  if(e.target===document.getElementById('upload-modal'))document.getElementById('upload-modal').classList.remove('open');
+});
+renderTags();renderList();
+
+/* Color swatch picker — global function */
+window.pickTagColor=function(c){tagEditColor=c;document.querySelectorAll('.color-sw').forEach(s=>{s.classList.toggle('selected',s.style.backgroundColor===hexToRgb(c)||s.style.background===c);});};
+function hexToRgb(hex){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgb(${r}, ${g}, ${b})`;}
+</script>
+</body>
+</html>
