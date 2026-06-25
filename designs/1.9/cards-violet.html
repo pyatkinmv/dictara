@@ -11,9 +11,9 @@
 :root{
   --accent:#7C3AED;--al:#F5F3FF;--ad:#6D28D9;
   --bg:#F8F7FF;--surface:#FFF;
-  --sb-bg:#111827;--sb-text:#9CA3AF;--sb-active:#F9FAFB;--sb-hover:rgba(255,255,255,.06);--sb-border:rgba(255,255,255,.07);
+  --sb-bg:#111827;
   --text:#1A1330;--text2:#54496A;--text3:#9D93BE;
-  --border:#E4DEF8;--hover-shadow:rgba(124,58,237,.1);
+  --border:#E4DEF8;
   --ok:#16A34A;--ok-bg:#DCFCE7;--warn:#D97706;--warn-bg:#FEF3C7;
   --radius:12px;--sb-w:220px;
 }
@@ -22,116 +22,64 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
 .icon{font-family:'Material Symbols Rounded';font-size:20px;line-height:1;user-select:none}
 .icon.sm{font-size:16px}
 button{cursor:pointer;border:none;background:none;font-family:inherit}
-input,textarea,select{font-family:inherit}
+select,input,textarea{font-family:inherit}
 
 /* SIDEBAR — dark */
-.sidebar{width:var(--sb-w);flex-shrink:0;background:var(--sb-bg);display:flex;flex-direction:column;padding:20px 12px}
-.sb-brand{display:flex;align-items:center;gap:9px;padding:0 8px;margin-bottom:24px}
-.sb-logo{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--ad));display:flex;align-items:center;justify-content:center}
+.sidebar{width:var(--sb-w);flex-shrink:0;background:var(--sb-bg);border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;padding:20px 12px}
+.sb-brand{display:flex;align-items:center;gap:8px;padding:0 8px;margin-bottom:20px}
+.sb-logo{width:32px;height:32px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center}
 .sb-logo .icon{font-size:18px;color:#fff}
-.sb-name{font-size:17px;font-weight:700;letter-spacing:-.3px;color:#F9FAFB}
+.sb-name{font-size:17px;font-weight:700;letter-spacing:-.3px;color:#fff}
 .sb-nav{flex:1;display:flex;flex-direction:column;gap:2px}
-.sb-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;font-size:14px;font-weight:500;color:var(--sb-text);cursor:pointer;transition:background .15s}
-.sb-item:hover{background:var(--sb-hover);color:#E5E7EB}
-.sb-item.active{background:rgba(124,58,237,.18);color:var(--sb-active);font-weight:600}
-.sb-item.active .icon{color:#A78BFA}
-.sb-sep{height:1px;background:var(--sb-border);margin:8px 4px}
-.sb-usage{padding:10px 10px 12px;border-top:1px solid var(--sb-border);margin-top:6px}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;font-size:14px;font-weight:500;color:#9CA3AF;cursor:pointer;transition:background .15s}
+.sb-item:hover{background:rgba(255,255,255,.06);color:#E5E7EB}
+.sb-item.active{background:rgba(124,58,237,.3);color:#fff;font-weight:600}
+.sb-sep{height:1px;background:rgba(255,255,255,.08);margin:8px 4px}
+.sb-usage{padding:10px 10px 12px;border-top:1px solid rgba(255,255,255,.08);margin-top:4px}
 .sb-usage-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}
-.sb-usage-lbl{font-size:11px;color:rgba(156,163,175,.7)}
-.sb-usage-badge{font-size:10px;font-weight:700;padding:1px 8px;border-radius:100px;background:rgba(124,58,237,.3);color:#C4B5FD}
+.sb-usage-lbl{font-size:11px;color:#6B7280;font-weight:500}
+.sb-usage-badge{font-size:10px;font-weight:700;padding:1px 8px;border-radius:100px;background:rgba(124,58,237,.2);color:#A78BFA}
 .sb-bar{height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;margin-bottom:4px}
-.sb-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),#A78BFA);border-radius:2px}
-.sb-usage-meta{font-size:11px;color:rgba(156,163,175,.5)}
+.sb-bar-fill{height:100%;background:var(--accent);border-radius:2px}
+.sb-usage-meta{font-size:11px;color:#6B7280}
 .sb-upgrade{color:#A78BFA;cursor:pointer;font-weight:500}
-.sb-upgrade:hover{text-decoration:underline}
+.sb-upgrade:hover{color:#C4B5FD;text-decoration:underline}
 .sb-bottom{padding-top:4px}
 .dropdown-wrap{position:relative}
-.sb-profile{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;cursor:pointer;transition:background .15s}
-.sb-profile:hover{background:var(--sb-hover)}
-.sb-avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--ad));display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0}
+.sb-profile{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .15s}
+.sb-profile:hover{background:rgba(255,255,255,.06)}
+.sb-avatar{width:30px;height:30px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0}
 .sb-pinfo{flex:1}
-.sb-pname{font-size:13px;font-weight:600;color:#E5E7EB}
-.sb-psub{font-size:11px;color:rgba(156,163,175,.6)}
-.sb-caret{color:rgba(156,163,175,.5);transition:transform .2s}
+.sb-pname{font-size:13px;font-weight:600;color:#F9FAFB}
+.sb-psub{font-size:11px;color:#6B7280}
+.sb-caret{color:#6B7280;transition:transform .2s}
 .dropdown-wrap.open .sb-caret{transform:rotate(180deg)}
-.dd-panel{position:absolute;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;min-width:200px;box-shadow:0 4px 24px rgba(0,0,0,.15);z-index:200;display:none;top:calc(100% + 6px);left:0}
+/* Profile dropdown floats on dark sidebar — use white surface */
+.dd-panel{position:absolute;top:calc(100% + 6px);left:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;min-width:200px;box-shadow:0 4px 24px rgba(124,58,237,.18);z-index:200;display:none}
 .dd-panel.open{display:block}
 .profile-dd{top:auto;bottom:calc(100% + 6px);left:0;right:0;min-width:unset}
 .pd-head{padding:4px 8px 8px}
 .pd-name{font-size:13px;font-weight:700}
 .pd-email{font-size:11px;color:var(--text3);margin-top:1px}
+.pd-plan-badge{font-size:10px;font-weight:700;padding:1px 8px;border-radius:100px;background:var(--al);color:var(--accent);margin-left:auto;flex-shrink:0}
+.dd-section{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);padding:4px 8px 2px}
 .dd-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;font-size:13px;cursor:pointer;color:var(--text2)}
 .dd-row:hover{background:var(--al)}
 .dd-row.danger{color:#EF4444}
 .dd-row.danger:hover{background:#FEF2F2}
 .dd-sep{height:1px;background:var(--border);margin:4px 0}
-.pd-plan-badge{font-size:10px;font-weight:700;padding:1px 8px;border-radius:100px;background:var(--al);color:var(--accent);margin-left:auto}
 
 /* MAIN */
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .topbar-title{font-size:16px;font-weight:600}
 .upload-btn{background:linear-gradient(135deg,var(--accent),var(--ad));color:#fff;border-radius:10px;padding:7px 14px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(124,58,237,.3);cursor:pointer}
-.upload-btn:hover{opacity:.9}
+.upload-btn:hover{box-shadow:0 4px 14px rgba(124,58,237,.4)}
 .upload-btn .icon{font-size:17px}
 .vw{flex:1;display:none;flex-direction:column;overflow:hidden}
 .vw.active{display:flex}
 
-/* PAGE HEADER */
-.page-hdr{padding:20px 28px 16px;display:flex;align-items:flex-end;justify-content:space-between;flex-shrink:0;border-bottom:1px solid var(--border)}
-.page-hdr-title{font-size:20px;font-weight:800;letter-spacing:-.4px}
-.page-hdr-sub{font-size:13px;color:var(--text3);margin-top:3px}
-.primary-btn{display:flex;align-items:center;gap:6px;padding:8px 14px;background:var(--accent);color:#fff;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0;border:none}
-.primary-btn .icon{font-size:16px}
-.primary-btn:hover{background:var(--ad)}
-
-/* CARD GRID */
-.cards-body{flex:1;overflow-y:auto;padding:20px 28px}
-.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
-.cards-grid.wider{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
-
-/* CARD — left-border accent style */
-.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 16px 16px 19px;display:flex;flex-direction:column;transition:box-shadow .15s,border-color .15s;position:relative;overflow:hidden}
-.card:hover{box-shadow:0 3px 18px var(--hover-shadow);border-color:rgba(124,58,237,.3)}
-.card-border{position:absolute;top:0;left:0;bottom:0;width:4px;border-radius:14px 0 0 14px}
-.card-top{display:flex;align-items:center;gap:9px;margin-bottom:9px}
-.card-name{font-size:15px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.card-actions{display:flex;gap:1px;opacity:0;transition:opacity .15s;flex-shrink:0}
-.card:hover .card-actions{opacity:1}
-.card-icon-btn{width:27px;height:27px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--text3);cursor:pointer;transition:all .12s}
-.card-icon-btn:hover{background:var(--bg);color:var(--text2)}
-.card-icon-btn.del:hover{background:#FEF2F2;color:#EF4444}
-.card-desc{font-size:13px;color:var(--text3);line-height:1.55;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;flex:1}
-.card-divider{height:1px;background:var(--border);margin:12px 0 10px}
-/* stats row: two numbers side by side */
-.card-stats-row{display:flex;gap:16px;margin-bottom:8px}
-.card-stat-block{}
-.card-stat-num{font-size:17px;font-weight:800;letter-spacing:-.3px;color:var(--text)}
-.card-stat-lbl{font-size:10px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.05em;margin-top:1px}
-/* files */
-.card-files{display:flex;flex-wrap:wrap;gap:4px}
-.fc{font-size:11px;color:var(--text2);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:2px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;cursor:default;transition:border-color .12s}
-.fc:hover{border-color:var(--accent);color:var(--accent)}
-.fc-more{font-size:11px;color:var(--text3);padding:2px 4px;cursor:pointer}
-.fc-more:hover{color:var(--accent)}
-/* Speaker card */
-.spk-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:9px}
-.spk-av{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0}
-.spk-info{flex:1;min-width:0}
-.spk-name{font-size:15px;font-weight:700;line-height:1.2}
-.spk-stats{display:flex;gap:10px;margin-top:3px}
-.spk-stat{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:2px}
-.spk-stat .icon{font-size:12px}
-/* ADD CARD */
-.add-card{border:2px dashed var(--border)!important;background:transparent!important;cursor:pointer;align-items:center;justify-content:center;min-height:164px;padding-left:16px!important}
-.add-card:hover{border-color:var(--accent)!important;background:var(--al)!important;box-shadow:none!important}
-.add-card-inner{display:flex;flex-direction:column;align-items:center;gap:7px;color:var(--text3)}
-.add-card:hover .add-card-inner{color:var(--accent)}
-.add-card-inner .icon{font-size:26px}
-.add-card-inner span{font-size:13px;font-weight:500}
-
-/* TRANSCRIPTIONS */
+/* LIST VIEW */
 .list-body{flex:1;overflow-y:auto;padding:18px 24px}
 .filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:14px}
 .search-wrap{flex:1;position:relative}
@@ -143,7 +91,7 @@ input,textarea,select{font-family:inherit}
 .dd-btn.active{border-color:var(--accent);color:var(--accent);background:var(--al)}
 .row-list{display:flex;flex-direction:column;gap:7px}
 .row{background:var(--surface);border-radius:var(--radius);padding:11px 13px;display:flex;align-items:flex-start;gap:11px;cursor:pointer;border:1px solid var(--border);transition:box-shadow .15s}
-.row:hover{box-shadow:0 2px 10px rgba(124,58,237,.1);border-color:rgba(124,58,237,.2)}
+.row:hover{box-shadow:0 2px 10px rgba(124,58,237,.12)}
 .row-icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
 .row-icon.done{background:var(--ok-bg);color:var(--ok)}
 .row-icon.proc{background:var(--warn-bg);color:var(--warn)}
@@ -156,11 +104,17 @@ input,textarea,select{font-family:inherit}
 .row-meta .icon{font-size:13px;color:var(--text3)}
 .row-foot{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
 .mini-tag{font-size:11px;font-weight:600;color:#fff;padding:2px 7px;border-radius:100px}
+.row-spk{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--text3);border:1px solid var(--border);border-radius:100px;padding:2px 7px}
+.row-spk .icon{font-size:13px}
 .row-right{display:flex;align-items:center;gap:5px;flex-shrink:0;margin-top:2px}
 .badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:100px}
 .badge.done{background:var(--ok-bg);color:var(--ok)}
 .badge.proc{background:var(--warn-bg);color:var(--warn)}
 .badge.pend{background:var(--bg);color:var(--text3)}
+.r-dl{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--text3);opacity:0;transition:opacity .15s;cursor:pointer}
+.r-dl .icon{font-size:15px}
+.r-dl:hover{background:var(--bg);color:var(--text2)}
+.row:hover .r-dl{opacity:1}
 .row-chev{color:var(--text3)}
 .prog-wrap{margin-top:5px}
 .prog-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden}
@@ -168,16 +122,115 @@ input,textarea,select{font-family:inherit}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .prog-label{font-size:11px;color:var(--warn);margin-top:3px}
 
-/* THREADS — flat list */
+/* DETAIL VIEW */
+.detail-header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;flex-shrink:0}
+.breadcrumb{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text3);margin-bottom:10px}
+.breadcrumb a{color:var(--accent);cursor:pointer}
+.breadcrumb a:hover{text-decoration:underline}
+.breadcrumb .icon{font-size:16px}
+.d-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.d-title-wrap{display:flex;align-items:center;gap:6px;margin-bottom:5px;min-width:0;min-height:32px}
+.d-title{font-size:20px;font-weight:700;letter-spacing:-.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;border-radius:6px;padding:2px 6px;margin:-2px -6px;transition:background .15s}
+.d-title:hover{background:var(--bg)}
+.d-title-input{font-size:20px;font-weight:700;letter-spacing:-.4px;border:none;border-bottom:2px solid var(--accent);outline:none;background:transparent;color:var(--text);padding:2px 4px;margin:-2px -4px;flex:1;min-width:0;display:none}
+.d-title-hint{color:var(--text3);opacity:0;transition:opacity .15s;flex-shrink:0;pointer-events:none}
+.d-title-wrap:hover .d-title-hint{opacity:1}
+.page-hint{display:flex;align-items:flex-start;gap:9px;padding:11px 14px;background:var(--al);border:1px solid var(--border);border-radius:10px;font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:18px}
+.page-hint .icon{color:var(--accent);font-size:18px;flex-shrink:0;margin-top:1px}
+.d-meta{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text2);margin-bottom:8px;flex-wrap:wrap;padding:0 6px}
+.d-meta .m-item{display:flex;align-items:center;gap:4px}
+.d-meta .icon{font-size:14px;color:var(--text3)}
+.d-tags-row{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-bottom:7px;padding:0 6px}
+.tag-pill{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#fff;padding:2px 6px 2px 10px;border-radius:100px}
+.tag-x{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:rgba(255,255,255,.25);font-size:12px;line-height:1;cursor:pointer;font-style:normal;transition:background .12s,opacity .12s;opacity:0}
+.tag-x:hover{background:rgba(255,255,255,.45)}
+.tag-pill:hover .tag-x{opacity:1}
+.add-tag-btn{font-size:12px;font-weight:500;color:var(--text3);border:1px dashed var(--border);border-radius:100px;padding:2px 10px;background:none;cursor:pointer;white-space:nowrap}
+.add-tag-btn:hover{color:var(--accent);border-color:var(--accent);border-style:solid;background:var(--al)}
+.tag-dd{position:absolute;top:calc(100% + 5px);left:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;min-width:200px;box-shadow:0 4px 24px rgba(124,58,237,.18);z-index:200;display:none}
+.tag-dd.open{display:block}
+.tag-dd-search-wrap{padding:8px 8px 4px;border-bottom:1px solid var(--border)}
+.tag-dd-search{width:100%;border:1px solid var(--border);border-radius:7px;padding:5px 9px;font-size:12.5px;color:var(--text);outline:none;background:var(--bg)}
+.tag-dd-search:focus{border-color:var(--accent);background:var(--surface)}
+.tag-dd-list{padding:4px 6px;max-height:180px;overflow-y:auto}
+.tag-dd-row{display:flex;align-items:center;gap:7px;padding:5px 6px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text2)}
+.tag-dd-row:hover{background:var(--al)}
+.tag-dd-create{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:7px;cursor:pointer;font-size:12.5px;color:var(--accent);border-top:1px solid var(--border);margin:2px -6px 0;padding-left:12px}
+.tag-dd-create:hover{background:var(--al)}
+.tag-dd-create .icon{font-size:14px}
+.tag-dd-empty{padding:8px 10px;font-size:12px;color:var(--text3);font-style:italic;text-align:center}
+.d-spk-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:0 6px}
+.d-spk-label{font-size:12px;color:var(--text3);font-weight:500}
+.spk-chip{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:500;color:var(--text2);background:var(--bg);border:1px solid var(--border);border-radius:100px;padding:2px 9px}
+.spk-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.d-actions{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.d-btn{display:flex;align-items:center;gap:5px;padding:6px 11px;border:1px solid var(--border);background:var(--surface);border-radius:9px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer}
+.d-btn:hover{background:var(--al);border-color:var(--accent);color:var(--accent)}
+.d-btn .icon{font-size:15px}
+.tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;padding:0 24px}
+.tab{padding:10px 14px;font-size:14px;font-weight:500;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-content{display:none;flex:1;overflow-y:auto}
+.tab-content.active{display:block}
+
+/* TRANSCRIPT */
+.transcript-pane{padding:14px 24px;display:flex;flex-direction:column;gap:5px}
+.spk-run{border-left:3px solid;padding:6px 0 6px 12px;border-radius:0 6px 6px 0;transition:background .12s}
+.run-hdr{display:flex;align-items:center;gap:6px;margin-bottom:4px;cursor:pointer;padding:3px 6px 3px 0;border-radius:6px;transition:background .12s;width:fit-content}
+.run-hdr:hover{background:rgba(0,0,0,.04)}
+.run-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.run-name{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.07em}
+.run-edit-ico{opacity:0;transition:opacity .15s;font-size:13px!important;color:var(--text3)}
+.run-hdr:hover .run-edit-ico{opacity:1}
+.run-segs{display:flex;flex-direction:column;gap:2px}
+.seg-row{display:grid;grid-template-columns:36px 1fr;gap:8px;align-items:baseline}
+.seg-time{font-size:11px;color:var(--text3)}
+.seg-text{font-size:13.5px;line-height:1.52;color:var(--text2)}
+.spk-run:hover .seg-text{color:var(--text)}
+.spk-picker{position:fixed;z-index:600;background:var(--surface);border:1px solid var(--border);border-radius:14px;width:280px;box-shadow:0 8px 32px rgba(124,58,237,.16);overflow:hidden;display:none}
+.spk-picker-search{display:flex;align-items:center;gap:7px;padding:10px 12px;border-bottom:1px solid var(--border)}
+.spk-picker-search .icon{color:var(--text3);font-size:16px;flex-shrink:0}
+.spk-picker-input{flex:1;border:none;outline:none;font-size:13px;color:var(--text);background:transparent}
+.spk-picker-input::placeholder{color:var(--text3)}
+.spk-picker-list{max-height:180px;overflow-y:auto;padding:6px}
+.spk-pick-item{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--text2);transition:background .12s}
+.spk-pick-item:hover{background:var(--al);color:var(--text)}
+.spk-pick-av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.spk-pick-create{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--accent);border-top:1px solid var(--border);margin:0 -6px;padding-left:14px;background:transparent;transition:background .12s}
+.spk-pick-create:hover{background:var(--al)}
+.spk-pick-create .icon{font-size:15px}
+.spk-pick-empty{padding:12px 10px;font-size:12px;color:var(--text3);text-align:center;font-style:italic}
+.spk-picker-scope{padding:10px 14px;border-top:1px solid var(--border);background:var(--bg)}
+.spk-scope-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px}
+.spk-scope-opt{display:flex;align-items:flex-start;gap:7px;font-size:12px;color:var(--text2);cursor:pointer;padding:3px 0;line-height:1.4}
+.spk-scope-opt+.spk-scope-opt{margin-top:2px}
+.spk-scope-opt input{margin-top:2px;accent-color:var(--accent);flex-shrink:0}
+
+/* OVERVIEW */
+.ov-pane{padding:20px 24px;display:grid;grid-template-columns:1fr 224px;gap:18px;align-items:start}
+.summ-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px}
+.summ-sec+.summ-sec{margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.summ-sec-lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin-bottom:8px}
+.summ-para{font-size:13.5px;line-height:1.7;color:var(--text2)}
+.summ-list{list-style:none;display:flex;flex-direction:column;gap:7px}
+.summ-list li{display:flex;align-items:flex-start;gap:8px;font-size:13.5px;line-height:1.55;color:var(--text2)}
+.bl-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:7px}
+.det-panel{position:sticky;top:20px}
+.det-title{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:10px}
+.det-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.det-chip{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 10px;display:flex;flex-direction:column;gap:2px}
+.det-chip-icon{font-size:18px;color:var(--accent);margin-bottom:4px;display:block}
+.det-chip-val{font-size:14px;font-weight:700;color:var(--text);line-height:1.2}
+.det-chip-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-top:2px}
+
+/* THREADS */
 .view-header{padding:18px 24px 0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .view-header-title{font-size:18px;font-weight:800;letter-spacing:-.3px}
-.new-btn{display:flex;align-items:center;gap:5px;padding:7px 13px;background:var(--accent);color:#fff;border-radius:10px;font-size:13px;font-weight:600;border:none;cursor:pointer}
-.new-btn .icon{font-size:16px}
+.new-btn{display:flex;align-items:center;gap:5px;padding:7px 13px;background:var(--accent);color:#fff;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:none}
 .new-btn:hover{background:var(--ad)}
 .threads-body{flex:1;overflow-y:auto;padding:14px 24px}
-.thread-list{display:flex;flex-direction:column;gap:8px}
 .thread-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;cursor:pointer;transition:box-shadow .15s}
-.thread-card:hover{box-shadow:0 2px 10px rgba(124,58,237,.1);border-color:rgba(124,58,237,.2)}
+.thread-card:hover{box-shadow:0 2px 10px rgba(124,58,237,.12)}
 .thread-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px}
 .thread-name{font-size:15px;font-weight:700}
 .thread-meta{font-size:11px;color:var(--text3);display:flex;gap:8px;align-items:center;flex-shrink:0}
@@ -185,15 +238,16 @@ input,textarea,select{font-family:inherit}
 .thread-file-chip{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text2);background:var(--bg);border:1px solid var(--border);border-radius:100px;padding:2px 8px}
 .thread-file-chip .icon{font-size:13px;color:var(--text3)}
 .thread-preview{font-size:12.5px;color:var(--text3);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.thread-detail-hdr{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
-.thread-back{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--accent);cursor:pointer;font-weight:500}
-.thread-back .icon{font-size:16px}
-.thread-back:hover{opacity:.75}
+.thread-detail-header{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
+.thread-detail-back{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--accent);cursor:pointer;font-weight:500}
+.thread-detail-back:hover{opacity:.75}
 .thread-detail-name{font-size:15px;font-weight:700}
 .thread-ctx-bar{background:var(--bg);border-bottom:1px solid var(--border);padding:9px 24px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex-shrink:0}
 .ctx-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-right:2px}
 .ctx-chip{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;color:var(--accent);background:var(--al);border:1px solid var(--border);border-radius:100px;padding:3px 10px}
 .ctx-chip .icon{font-size:13px}
+.ctx-add{font-size:12px;color:var(--text3);border:1px dashed var(--border);border-radius:100px;padding:3px 9px;cursor:pointer;background:none}
+.ctx-add:hover{color:var(--accent);border-color:var(--accent)}
 .chat-area{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:14px}
 .chat-msg{display:flex;flex-direction:column;max-width:72%}
 .chat-msg.ai{align-self:flex-start}
@@ -204,6 +258,7 @@ input,textarea,select{font-family:inherit}
 .chat-bubble{border-radius:12px;padding:10px 14px;font-size:13.5px;line-height:1.55}
 .chat-msg.ai .chat-bubble{background:var(--surface);border:1px solid var(--border);color:var(--text2)}
 .chat-msg.user .chat-bubble{background:var(--accent);color:#fff}
+.chat-bubble ul{margin-top:6px;padding-left:16px;display:flex;flex-direction:column;gap:3px}
 .chat-input-area{padding:12px 24px;border-top:1px solid var(--border);display:flex;gap:8px;background:var(--surface);flex-shrink:0}
 .chat-input{flex:1;border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13.5px;outline:none;background:var(--bg);resize:none}
 .chat-input:focus{border-color:var(--accent);background:var(--surface)}
@@ -211,37 +266,58 @@ input,textarea,select{font-family:inherit}
 .chat-send .icon{font-size:18px}
 .chat-send:hover{background:var(--ad)}
 
-/* TRANSCRIPT DETAIL */
-.ts-hdr{padding:16px 24px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface)}
-.ts-back{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--accent);cursor:pointer;font-weight:500;margin-bottom:10px}
-.ts-back .icon{font-size:16px}
-.ts-back:hover{opacity:.75}
-.ts-title{font-size:19px;font-weight:800;letter-spacing:-.3px;margin-bottom:6px}
-.ts-meta-row{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text2);margin-bottom:6px}
-.ts-meta-row span{display:flex;align-items:center;gap:3px}
-.ts-meta-row .icon{font-size:13px;color:var(--text3)}
-.ts-area{flex:1;overflow-y:auto;padding:20px 28px}
-.ts-spk-hdr{display:flex;align-items:center;gap:12px;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;margin:24px 0 8px}
-.ts-spk-hdr:first-child{margin-top:0}
-.ts-spk-hdr::after{content:'';flex:1;height:1px;background:currentColor;opacity:.15}
-.ts-block{display:grid;grid-template-columns:48px 1fr;gap:10px;padding:5px 6px;border-radius:6px;cursor:default;transition:background .12s}
-.ts-block:hover{background:var(--bg)}
-.ts-ts{font-size:12px;color:var(--text3);padding-top:2px;font-variant-numeric:tabular-nums}
-.ts-block:hover .ts-ts{color:var(--text2)}
-.ts-txt{font-size:14px;line-height:1.6;color:var(--text2)}
-.ts-block:hover .ts-txt{color:var(--text)}
-.ts-actions{display:flex;gap:8px;margin-top:10px}
-.ts-action-btn{display:flex;align-items:center;gap:5px;padding:6px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;background:none;transition:all .12s}
-.ts-action-btn:hover{border-color:var(--accent);color:var(--accent)}
-.ts-action-btn .icon{font-size:15px}
+/* CARD GRID */
+.page-hdr{padding:20px 28px 16px;display:flex;align-items:flex-end;justify-content:space-between;flex-shrink:0;border-bottom:1px solid var(--border)}
+.page-hdr-title{font-size:20px;font-weight:800;letter-spacing:-.4px}
+.page-hdr-sub{font-size:13px;color:var(--text3);margin-top:3px}
+.primary-btn{display:flex;align-items:center;gap:6px;padding:8px 14px;background:var(--accent);color:#fff;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0;border:none}
+.primary-btn .icon{font-size:16px}
+.primary-btn:hover{background:var(--ad)}
+.cards-body{flex:1;overflow-y:auto;padding:20px 28px}
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.cards-grid.wider{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;display:flex;flex-direction:column;transition:box-shadow .15s,border-color .15s;position:relative;overflow:hidden}
+.card:hover{box-shadow:0 3px 16px rgba(124,58,237,.1);border-color:rgba(124,58,237,.3)}
+.card-accent{position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0}
+.card-top{display:flex;align-items:center;gap:9px;margin-top:6px;margin-bottom:9px}
+.card-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0}
+.card-name{font-size:15px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card-actions{display:flex;gap:1px;opacity:0;transition:opacity .15s;flex-shrink:0}
+.card:hover .card-actions{opacity:1}
+.card-icon-btn{width:27px;height:27px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--text3);cursor:pointer;transition:all .12s}
+.card-icon-btn:hover{background:var(--bg);color:var(--text2)}
+.card-icon-btn.del:hover{background:#FEF2F2;color:#EF4444}
+.card-desc{font-size:13px;color:var(--text3);line-height:1.55;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;flex:1}
+.card-divider{height:1px;background:var(--border);margin:12px 0 10px}
+.card-stat{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text3);margin-bottom:6px}
+.card-stat .icon{font-size:13px}
+.card-files{display:flex;flex-wrap:wrap;gap:4px}
+.fc{font-size:11px;color:var(--text2);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:2px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;cursor:default;transition:border-color .12s}
+.fc:hover{border-color:var(--accent);color:var(--accent)}
+.fc-more{font-size:11px;color:var(--text3);padding:2px 4px;cursor:pointer}
+.fc-more:hover{color:var(--accent)}
+.spk-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:9px}
+.spk-av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0}
+.spk-info{flex:1;min-width:0}
+.spk-name{font-size:15px;font-weight:700;line-height:1.2}
+.spk-stats{display:flex;gap:10px;margin-top:3px}
+.spk-stat{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:2px}
+.spk-stat .icon{font-size:12px}
+.add-card{border:2px dashed var(--border)!important;background:transparent!important;cursor:pointer;align-items:center;justify-content:center;min-height:164px}
+.add-card:hover{border-color:var(--accent)!important;background:var(--al)!important;box-shadow:none!important}
+.add-card-inner{display:flex;flex-direction:column;align-items:center;gap:7px;color:var(--text3)}
+.add-card:hover .add-card-inner{color:var(--accent)}
+.add-card-inner .icon{font-size:26px}
+.add-card-inner span{font-size:13px;font-weight:500}
 
 /* MODALS */
-.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(5px);z-index:300;display:none;align-items:center;justify-content:center}
+.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);z-index:300;display:none;align-items:center;justify-content:center}
 .backdrop.open{display:flex}
+.modal{background:var(--surface);border-radius:20px;width:500px;max-width:95vw;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
 .edit-modal{background:var(--surface);border-radius:18px;width:460px;max-width:95vw;padding:24px;box-shadow:0 16px 48px rgba(0,0,0,.15)}
 .modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
 .modal-title{font-size:16px;font-weight:700}
-.modal-close{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text3);cursor:pointer}
+.modal-close{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text3);cursor:pointer}
 .modal-close:hover{background:var(--bg)}
 .form-field{margin-bottom:14px}
 .form-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px;display:block}
@@ -251,11 +327,19 @@ input,textarea,select{font-family:inherit}
 .form-textarea:focus{border-color:var(--accent);background:var(--surface)}
 .form-hint{font-size:12px;color:var(--text3);margin-top:4px;line-height:1.45}
 .modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+.drop-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:28px;text-align:center;cursor:pointer;transition:all .15s;margin-bottom:14px}
+.drop-zone:hover{border-color:var(--accent);background:var(--al)}
+.drop-icon{font-size:32px;color:var(--accent);opacity:.5;margin-bottom:7px}
+.drop-text{font-size:14px;font-weight:600;color:var(--text2);margin-bottom:4px}
+.drop-sub{font-size:12px;color:var(--text3)}
+.modal-fields{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px}
+.m-field label{display:block;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.m-field select{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:9px;font-size:13px;color:var(--text);background:var(--bg);outline:none}
 .btn-cancel{padding:8px 14px;border:1px solid var(--border);border-radius:9px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;background:none}
 .btn-cancel:hover{background:var(--bg)}
 .btn-save{padding:8px 18px;border-radius:9px;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;border:none}
 .btn-save:hover{background:var(--ad)}
-.del-dialog{background:var(--surface);border-radius:16px;width:360px;max-width:95vw;padding:24px;box-shadow:0 12px 40px rgba(0,0,0,.15)}
+.del-dialog{background:var(--surface);border-radius:16px;width:360px;max-width:95vw;padding:24px;box-shadow:0 12px 40px rgba(0,0,0,.2)}
 .del-ico{width:40px;height:40px;background:#FEF2F2;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:14px}
 .del-ico .icon{color:#EF4444;font-size:20px}
 .del-title{font-size:16px;font-weight:700;margin-bottom:6px}
@@ -266,7 +350,7 @@ input,textarea,select{font-family:inherit}
 
 ::-webkit-scrollbar{width:5px}
 ::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:3px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1)}
 .main ::-webkit-scrollbar-thumb{background:var(--border)}
 </style>
 </head>
@@ -274,9 +358,9 @@ input,textarea,select{font-family:inherit}
 <nav class="sidebar">
   <div class="sb-brand"><div class="sb-logo"><span class="icon">mic</span></div><span class="sb-name">Dictara</span></div>
   <div class="sb-nav">
-    <div class="sb-item" data-nav="list" onclick="navigate('list')"><span class="icon">description</span> Transcriptions</div>
+    <div class="sb-item active" data-nav="list" onclick="navigate('list')"><span class="icon">description</span> Transcriptions</div>
     <div class="sb-item" data-nav="threads" onclick="navigate('threads')"><span class="icon">forum</span> Threads</div>
-    <div class="sb-item active" data-nav="tags" onclick="navigate('tags')"><span class="icon">sell</span> Tags</div>
+    <div class="sb-item" data-nav="tags" onclick="navigate('tags')"><span class="icon">sell</span> Tags</div>
     <div class="sb-item" data-nav="speakers" onclick="navigate('speakers')"><span class="icon">record_voice_over</span> Speakers</div>
     <div class="sb-sep"></div>
     <div class="sb-item" data-nav="settings" onclick="navigate('settings')"><span class="icon">settings</span> Settings</div>
@@ -290,13 +374,13 @@ input,textarea,select{font-family:inherit}
     <div class="dropdown-wrap">
       <div class="sb-profile" onclick="toggleDD('profile-dd')">
         <div class="sb-avatar">M</div>
-        <div class="sb-pinfo"><div class="sb-pname">Maxim P.</div><div class="sb-psub">pyatkinmv@gmail.com</div></div>
+        <div class="sb-pinfo"><div class="sb-pname">Maxim P.</div><div class="sb-psub">Free plan</div></div>
         <span class="icon sm sb-caret">expand_less</span>
       </div>
       <div class="dd-panel profile-dd" id="profile-dd">
         <div class="pd-head"><div class="pd-name">Maxim P.</div><div class="pd-email">pyatkinmv@gmail.com</div></div>
         <div class="dd-sep"></div>
-        <div class="dd-row"><span class="icon sm">star</span> Manage plan <span class="pd-plan-badge">Free</span></div>
+        <div class="dd-row" style="justify-content:space-between"><span style="display:flex;align-items:center;gap:8px"><span class="icon sm">star</span> Manage plan</span><span class="pd-plan-badge">Free</span></div>
         <div class="dd-row"><span class="icon sm">feedback</span> Give feedback</div>
         <div class="dd-row"><span class="icon sm">help_outline</span> Support</div>
         <div class="dd-sep"></div>
@@ -308,15 +392,14 @@ input,textarea,select{font-family:inherit}
 
 <div class="main">
   <div class="topbar">
-    <span class="topbar-title" id="topbar-title">Tags</span>
-    <button class="upload-btn" onclick="openModal('upload-modal')"><span class="icon">upload</span> Upload</button>
+    <span class="topbar-title" id="topbar-title">Transcriptions</span>
+    <button class="upload-btn" onclick="document.getElementById('upload-modal').classList.add('open')"><span class="icon">upload</span> Upload</button>
   </div>
 
-  <!-- TRANSCRIPTIONS -->
-  <div class="vw" id="vw-list">
+  <div class="vw active" id="vw-list">
     <div class="list-body">
       <div class="filter-bar">
-        <div class="search-wrap"><span class="icon sm search-icon">search</span><input class="search-input" id="search-input" type="text" placeholder="Search transcriptions…" oninput="applySortAndRender()"></div>
+        <div class="search-wrap"><span class="icon sm search-icon">search</span><input class="search-input" type="text" id="search-input" placeholder="Search transcriptions…" oninput="applySortAndRender()"></div>
         <div class="dropdown-wrap">
           <button class="dd-btn" id="filter-btn" onclick="toggleDD('filter-dd')"><span class="icon sm">filter_list</span><span class="filter-label">Filter</span><span class="icon sm">expand_more</span></button>
           <div class="dd-panel" id="filter-dd">
@@ -348,21 +431,72 @@ input,textarea,select{font-family:inherit}
     </div>
   </div>
 
-  <!-- THREADS — flat list -->
-  <div class="vw" id="vw-threads">
-    <div class="view-header">
-      <span class="view-header-title">Threads</span>
-      <button class="new-btn"><span class="icon">add</span> New thread</button>
+  <div class="vw" id="vw-detail">
+    <div class="detail-header">
+      <div class="breadcrumb"><a onclick="navigate('list')">Transcriptions</a><span class="icon">chevron_right</span><span id="detail-breadcrumb">—</span></div>
+      <div class="d-top">
+        <div class="d-left" style="flex:1;min-width:0">
+          <div class="d-title-wrap">
+            <div class="d-title" id="detail-title" onclick="startTitleEdit()">—</div>
+            <input class="d-title-input" id="detail-title-input" onblur="saveTitleEdit()" onkeydown="titleKeydown(event)">
+            <span class="icon sm d-title-hint">edit</span>
+          </div>
+          <div class="d-meta" id="detail-meta"></div>
+          <div class="d-tags-row" id="detail-tags-row">
+            <div id="detail-tags-pills" style="display:contents"></div>
+            <div class="dropdown-wrap" id="tag-add-wrap">
+              <button class="add-tag-btn" onclick="toggleTagDD(event)">+ Add tag</button>
+              <div class="tag-dd" id="tag-add-dd">
+                <div class="tag-dd-search-wrap"><input class="tag-dd-search" id="tag-dd-search" placeholder="Search or create tag…" oninput="filterTagDD()" onkeydown="tagSearchKey(event)" autocomplete="off"></div>
+                <div class="tag-dd-list" id="tag-dd-list"></div>
+              </div>
+            </div>
+          </div>
+          <div class="d-spk-row" id="detail-spk-row"></div>
+        </div>
+        <div class="d-actions">
+          <button class="d-btn"><span class="icon">download</span> .txt</button>
+          <button class="d-btn"><span class="icon">content_copy</span> Copy</button>
+        </div>
+      </div>
     </div>
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('transcript',this)">Transcript</div>
+      <div class="tab" onclick="switchTab('overview',this)">Overview</div>
+    </div>
+    <div class="tab-content active" id="tab-transcript"><div class="transcript-pane" id="transcript-content"></div></div>
+    <div class="tab-content" id="tab-overview">
+      <div class="ov-pane">
+        <div class="summ-card">
+          <div class="summ-sec"><div class="summ-sec-lbl">Summary</div><p class="summ-para">Q2 closed strong: revenue up 18% QoQ, 12 features shipped vs. 9 planned. Heading into Q3, the team will hire 4 engineers, reserve 20% of capacity for a payments refactor, and pivot marketing to content-driven channels with a monthly webinar series launching in August.</p></div>
+          <div class="summ-sec"><div class="summ-sec-lbl">Key Points</div><ul class="summ-list"><li><span class="bl-dot"></span>Revenue up 18% QoQ — enterprise growth and May integrations as primary drivers</li><li><span class="bl-dot"></span>12 features shipped vs. 9 planned; technical debt in payments module flagged for Q3</li><li><span class="bl-dot"></span>4 engineers to be hired by September for parallel development tracks</li><li><span class="bl-dot"></span>Marketing pivoting to SEO content, case studies, and monthly webinars from August</li></ul></div>
+          <div class="summ-sec"><div class="summ-sec-lbl">Action Items</div><ul class="summ-list"><li><span class="bl-dot"></span>Reserve 20% engineering capacity in July for payments refactor</li><li><span class="bl-dot"></span>Begin recruitment for 4 engineering roles — target: September</li><li><span class="bl-dot"></span>Sales team to co-present webinar series starting August</li></ul></div>
+        </div>
+        <div class="det-panel">
+          <div class="det-title">Details</div>
+          <div class="det-grid">
+            <div class="det-chip"><span class="icon det-chip-icon">schedule</span><div class="det-chip-val">14:22</div><div class="det-chip-lbl">Duration</div></div>
+            <div class="det-chip"><span class="icon det-chip-icon">record_voice_over</span><div class="det-chip-val">3</div><div class="det-chip-lbl">Speakers</div></div>
+            <div class="det-chip"><span class="icon det-chip-icon">translate</span><div class="det-chip-val">EN</div><div class="det-chip-lbl">Language</div></div>
+            <div class="det-chip"><span class="icon det-chip-icon">text_fields</span><div class="det-chip-val">~1,840</div><div class="det-chip-lbl">Words</div></div>
+            <div class="det-chip"><span class="icon det-chip-icon">storage</span><div class="det-chip-val">22.4 MB</div><div class="det-chip-lbl">File size</div></div>
+            <div class="det-chip"><span class="icon det-chip-icon">calendar_today</span><div class="det-chip-val">22 Jun</div><div class="det-chip-lbl">Uploaded</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="vw" id="vw-threads">
+    <div class="view-header"><span class="view-header-title">Threads</span><button class="new-btn"><span class="icon">add</span> New Thread</button></div>
     <div class="threads-body"><div class="thread-list" id="thread-list"></div></div>
   </div>
 
-  <!-- THREAD DETAIL -->
   <div class="vw" id="vw-thread">
-    <div class="thread-detail-hdr">
-      <div class="thread-back" onclick="navigate('threads')"><span class="icon">arrow_back</span> Threads</div>
+    <div class="thread-detail-header">
+      <div class="thread-detail-back" onclick="navigate('threads')"><span class="icon sm">arrow_back</span> Threads</div>
       <span class="thread-detail-name" id="thread-detail-name"></span>
-      <div style="width:60px"></div>
+      <button class="d-btn"><span class="icon">edit</span></button>
     </div>
     <div class="thread-ctx-bar" id="thread-ctx-bar"></div>
     <div class="chat-area" id="chat-area"></div>
@@ -372,322 +506,186 @@ input,textarea,select{font-family:inherit}
     </div>
   </div>
 
-  <!-- TRANSCRIPT DETAIL -->
-  <div class="vw" id="vw-transcript">
-    <div class="ts-hdr">
-      <div class="ts-back" onclick="navigate('list')"><span class="icon">arrow_back</span> Transcriptions</div>
-      <div class="ts-title" id="ts-title"></div>
-      <div class="ts-meta-row" id="ts-meta"></div>
-      <div class="row-foot" id="ts-tags" style="margin-bottom:8px"></div>
-      <div class="ts-actions">
-        <button class="ts-action-btn"><span class="icon">download</span> Download</button>
-        <button class="ts-action-btn"><span class="icon">forum</span> Open thread</button>
-        <button class="ts-action-btn"><span class="icon">sell</span> Edit tags</button>
-      </div>
-    </div>
-    <div class="ts-area" id="ts-body"></div>
-  </div>
-
-  <!-- TAGS -->
-  <div class="vw active" id="vw-tags">
+  <div class="vw" id="vw-tags">
     <div class="page-hdr">
       <div><div class="page-hdr-title">Tags</div><div class="page-hdr-sub" id="tags-sub">—</div></div>
       <button class="primary-btn" onclick="openItemModal('tag',null)"><span class="icon">add</span> Add tag</button>
     </div>
-    <div class="cards-body"><div class="cards-grid" id="tags-grid"></div></div>
+    <div class="cards-body">
+      <div class="page-hint"><span class="icon">auto_awesome</span> Tag descriptions help Dictara automatically suggest and apply tags to new transcriptions.</div>
+      <div class="cards-grid" id="tags-grid"></div>
+    </div>
   </div>
 
-  <!-- SPEAKERS -->
   <div class="vw" id="vw-speakers">
     <div class="page-hdr">
       <div><div class="page-hdr-title">Speakers</div><div class="page-hdr-sub" id="spk-sub">—</div></div>
       <button class="primary-btn" onclick="openItemModal('speaker',null)"><span class="icon">add</span> Add speaker</button>
     </div>
-    <div class="cards-body"><div class="cards-grid wider" id="spk-grid"></div></div>
+    <div class="cards-body">
+      <div class="page-hint"><span class="icon">record_voice_over</span> Named speakers help identify voices in future transcriptions automatically.</div>
+      <div class="cards-grid wider" id="spk-grid"></div>
+    </div>
   </div>
 
   <div class="vw" id="vw-settings">
-    <div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--text3)"><span class="icon" style="font-size:48px;opacity:.25">settings</span><p style="font-size:14px">Settings coming soon</p></div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--text3)"><span class="icon" style="font-size:48px;opacity:.3">settings</span><p style="font-size:14px">Settings coming soon</p></div>
   </div>
 </div>
 
-<!-- SHARED ITEM MODAL -->
+<div id="spk-picker" class="spk-picker">
+  <div class="spk-picker-search"><span class="icon">search</span><input class="spk-picker-input" id="spk-search" placeholder="Search speakers…" oninput="filterSpkPicker()" onkeydown="spkSearchKey(event)" autocomplete="off"></div>
+  <div class="spk-picker-list" id="spk-list"></div>
+  <div class="spk-picker-scope">
+    <div class="spk-scope-title">Apply to</div>
+    <label class="spk-scope-opt"><input type="radio" name="spk-scope" value="one" checked> This segment only</label>
+    <label class="spk-scope-opt"><input type="radio" name="spk-scope" value="all"> All segments by <strong id="spk-current-lbl">—</strong></label>
+  </div>
+</div>
+
 <div class="backdrop" id="item-modal">
   <div class="edit-modal" onclick="event.stopPropagation()">
-    <div class="modal-head">
-      <span class="modal-title" id="modal-title">New tag</span>
-      <div class="modal-close" onclick="closeModal('item-modal')"><span class="icon">close</span></div>
-    </div>
-    <div class="form-field">
-      <label class="form-label" id="modal-name-lbl">Name</label>
-      <input class="form-input" id="modal-name" placeholder="e.g. meeting">
-    </div>
-    <div class="form-field">
-      <label class="form-label">Description</label>
-      <textarea class="form-textarea" id="modal-desc" placeholder="Describe when this applies…"></textarea>
-      <div class="form-hint" id="modal-hint">Descriptions help Dictara auto-tag future transcriptions.</div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn-cancel" onclick="closeModal('item-modal')">Cancel</button>
-      <button class="btn-save" onclick="saveItem()">Save</button>
-    </div>
+    <div class="modal-head"><span class="modal-title" id="modal-title">New tag</span><div class="modal-close" onclick="closeModal('item-modal')"><span class="icon">close</span></div></div>
+    <div class="form-field"><label class="form-label" id="modal-name-lbl">Name</label><input class="form-input" id="modal-name"></div>
+    <div class="form-field"><label class="form-label">Description</label><textarea class="form-textarea" id="modal-desc"></textarea><div class="form-hint" id="modal-hint"></div></div>
+    <div class="modal-foot"><button class="btn-cancel" onclick="closeModal('item-modal')">Cancel</button><button class="btn-save" onclick="saveItem()">Save</button></div>
   </div>
 </div>
 
-<!-- DELETE -->
 <div class="backdrop" id="del-modal">
   <div class="del-dialog" onclick="event.stopPropagation()">
     <div class="del-ico"><span class="icon">delete</span></div>
     <div class="del-title">Delete "<span id="del-name"></span>"?</div>
     <div class="del-body">This <span id="del-type-lbl">tag</span> will be removed from <strong><span id="del-count"></span> transcription(s)</strong>. This cannot be undone.</div>
-    <div class="del-foot">
-      <button class="btn-cancel" onclick="closeModal('del-modal')">Cancel</button>
-      <button class="btn-del" id="del-btn">Delete</button>
-    </div>
+    <div class="del-foot"><button class="btn-cancel" onclick="closeModal('del-modal')">Cancel</button><button class="btn-del" id="del-btn">Delete</button></div>
   </div>
 </div>
 
-<!-- UPLOAD -->
 <div class="backdrop" id="upload-modal">
-  <div class="edit-modal" onclick="event.stopPropagation()" style="width:500px;max-width:95vw">
+  <div class="modal" onclick="event.stopPropagation()">
     <div class="modal-head"><span class="modal-title">Upload audio</span><div class="modal-close" onclick="closeModal('upload-modal')"><span class="icon">close</span></div></div>
-    <div style="border:2px dashed var(--border);border-radius:var(--radius);padding:28px;text-align:center;margin-bottom:14px;cursor:pointer">
-      <span class="icon" style="font-size:28px;color:var(--accent);opacity:.5;display:block;margin-bottom:6px">upload_file</span>
-      <div style="font-size:14px;font-weight:600;color:var(--text2);margin-bottom:3px">Drop file here or click to browse</div>
-      <div style="font-size:12px;color:var(--text3)">MP3, MP4, M4A, OGG, WAV, FLAC · max 400 MB</div>
+    <div class="drop-zone"><div class="icon drop-icon">upload_file</div><div class="drop-text">Drop file here or click to browse</div><div class="drop-sub">MP3, MP4, M4A, OGG, WAV, FLAC · max 400 MB</div></div>
+    <div class="modal-fields">
+      <div class="m-field"><label>Language</label><select><option>Auto-detect</option><option>English</option><option>Russian</option></select></div>
+      <div class="m-field"><label>Summary</label><select><option>Auto</option><option>Short</option><option>Full</option><option>None</option></select></div>
+      <div class="m-field"><label>Speakers</label><select><option>Auto-detect</option><option>1</option><option>2</option><option>3</option><option>4+</option></select></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-      <div><label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;display:block;margin-bottom:5px">Language</label><select style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:9px;font-size:13px;background:var(--bg);outline:none"><option>Auto-detect</option><option>English</option><option>Russian</option></select></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;display:block;margin-bottom:5px">Speaker diarization</label><select style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:9px;font-size:13px;background:var(--bg);outline:none"><option>Auto</option><option>Off</option></select></div>
-    </div>
-    <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn-cancel" onclick="closeModal('upload-modal')">Cancel</button><button class="btn-save">Upload</button></div>
+    <div class="modal-foot"><button class="btn-cancel" onclick="closeModal('upload-modal')">Cancel</button><button class="btn-save">Upload</button></div>
   </div>
 </div>
 
 <script>
 const COLORS=['#2563EB','#059669','#7C3AED','#D97706','#0891B2','#6366F1','#EF4444','#EC4899','#0D9488','#F59E0B'];
+let ITEMS=[
+  {id:0,title:'Quarterly Review Meeting',   dur:'14 min', mins:14,date:'22 Jun',status:'done',tags:[{c:'#2563EB',l:'meeting'},{c:'#059669',l:'quarterly'}],speakers:3},
+  {id:1,title:'Economics Lecture — Part 2', dur:'1h 12min',mins:72,date:'22 Jun',status:'proc',pct:41,tags:[],speakers:0},
+  {id:2,title:'Interview: Anna K.',          dur:'47 min', mins:47,date:'21 Jun',status:'done',tags:[{c:'#7C3AED',l:'interview'},{c:'#D97706',l:'hiring'}],speakers:2},
+  {id:3,title:'Podcast Episode #47',         dur:'38 min', mins:38,date:'22 Jun',status:'pend',tags:[],speakers:0},
+  {id:4,title:'Product Ideas — Voice Memo', dur:'12 min', mins:12,date:'20 Jun',status:'done',tags:[{c:'#0891B2',l:'ideas'}],speakers:0},
+  {id:5,title:'Daily Standup 19 Jun',        dur:'8 min',  mins:8, date:'19 Jun',status:'done',tags:[{c:'#2563EB',l:'meeting'},{c:'#6366F1',l:'standup'}],speakers:3},
+];
+const THREADS_DATA=[
+  {id:0,name:'Q2 Planning',files:['Quarterly Review Meeting','Interview: Anna K.'],date:'22 Jun',msgCount:5,preview:'How many speakers were involved across both files?'},
+  {id:1,name:'All-hands Week',files:['Daily Standup 19 Jun','Quarterly Review Meeting','Product Ideas — Voice Memo'],date:'20 Jun',msgCount:3,preview:'Summarize the key decisions made across all three sessions'},
+];
+const CHAT_MSGS=[
+  {role:'ai',text:"I've analyzed 2 transcriptions. Ask me anything about them."},
+  {role:'user',text:'What were the main action items?'},
+  {role:'ai',text:'Based on both files, here are the key action items:<ul><li>Reserve 20% engineering capacity in July for payments refactor</li><li>Begin recruitment for 4 engineering roles — target: September</li><li>Sales team to co-present webinar series starting August</li></ul>'},
+  {role:'user',text:'How many speakers were involved?'},
+  {role:'ai',text:'Across both transcriptions there were 4 unique speakers. Speaker 1 appears in both sessions.'},
+];
+const TRANSCRIPT=[
+  {time:'0:00',spk:1,text:"Good morning everyone. Let's get started — we have a lot to cover today. The main focus is Q2 performance and planning the roadmap for the next quarter."},
+  {time:'0:34',spk:2,text:'Right. So Q2 was solid overall — revenue is up 18% quarter over quarter. The enterprise segment grew faster than expected, mostly driven by the new integrations we launched in May.'},
+  {time:'1:12',spk:3,text:"On the product side, we shipped 12 features versus the 9 we planned, but we also accumulated some technical debt in the payments module that we need to address in Q3."},
+  {time:'2:05',spk:1,text:"That's great to hear on the feature side. What's the plan for Q3? Are we maintaining the same pace or scaling up the team?"},
+  {time:'2:28',spk:2,text:"We're planning to hire 4 more engineers by September, which will let us run two parallel development tracks. That should improve throughput significantly without sacrificing quality."},
+  {time:'3:10',spk:3,text:"And the technical debt? How much time are we allocating to paying that down before we start adding more features on top?"},
+  {time:'3:30',spk:2,text:"We're reserving 20% of engineering capacity in July specifically for the payments refactor. It's not glamorous but it's necessary — otherwise we risk reliability issues in the fall when volume spikes."},
+  {time:'4:05',spk:1,text:"Makes sense. Alright, let's move on to marketing. What's the Q3 strategy looking like?"},
+  {time:'4:22',spk:3,text:"We're doubling down on content marketing — SEO-driven articles, a revamped case study library, and a monthly webinar series starting in August. These should bring in higher-intent leads."},
+  {time:'5:08',spk:2,text:"I like the webinar idea. Can we make sure sales is looped in from the start? They should be co-presenting, not just watching."},
+];
+const ICO={done:'check_circle',proc:'autorenew',pend:'schedule'};
+const LABEL={done:'Done',proc:'Processing',pend:'Pending'};
+const PAGE_TITLES={list:'Transcriptions',threads:'Threads',tags:'Tags',speakers:'Speakers',settings:'Settings'};
 let TAGS=[
-  {id:0,label:'meeting',color:'#2563EB',count:3,desc:'Regular team meetings, standups, and group discussions. Typically involve multiple speakers and action items.',files:['Quarterly Review Meeting','Daily Standup 19 Jun','Weekly Sync — Design']},
-  {id:1,label:'quarterly',color:'#059669',count:1,desc:'End-of-quarter review sessions covering revenue, performance metrics, and roadmap planning.',files:['Quarterly Review Meeting']},
-  {id:2,label:'interview',color:'#7C3AED',count:1,desc:'Candidate interviews for open positions. Used to track hiring pipeline conversations.',files:['Interview: Anna K.']},
-  {id:3,label:'hiring',color:'#D97706',count:1,desc:'Recruitment-related recordings including HR screens, technical interviews, and debrief calls.',files:['Interview: Anna K.']},
-  {id:4,label:'ideas',color:'#0891B2',count:1,desc:'Brainstorming sessions and exploratory discussions about product direction and new features.',files:['Product Ideas — Voice Memo']},
-  {id:5,label:'standup',color:'#6366F1',count:1,desc:'Daily standup recordings. Short format, typically under 15 minutes, multiple speakers.',files:['Daily Standup 19 Jun']},
+  {id:0,label:'meeting',color:'#2563EB',count:3,desc:'Regular team meetings, standups, and group discussions.',files:['Quarterly Review Meeting','Daily Standup 19 Jun','Weekly Sync — Design']},
+  {id:1,label:'quarterly',color:'#059669',count:1,desc:'End-of-quarter review sessions covering performance and roadmap.',files:['Quarterly Review Meeting']},
+  {id:2,label:'interview',color:'#7C3AED',count:1,desc:'Candidate interviews for open positions.',files:['Interview: Anna K.']},
+  {id:3,label:'hiring',color:'#D97706',count:1,desc:'Recruitment-related recordings including screens and debriefs.',files:['Interview: Anna K.']},
+  {id:4,label:'ideas',color:'#0891B2',count:1,desc:'Brainstorming sessions and exploratory discussions.',files:['Product Ideas — Voice Memo']},
+  {id:5,label:'standup',color:'#6366F1',count:1,desc:'Daily standup recordings. Short format, multiple speakers.',files:['Daily Standup 19 Jun']},
 ];
 let SPEAKERS=[
-  {id:0,name:'Alexei Sorokin',color:'#0D9488',count:4,totalMin:'42 min',desc:'Product lead. Discusses roadmap, feature prioritization, and team updates. Measured and deliberate speech pattern.',files:['Quarterly Review Meeting','Daily Standup 19 Jun','Weekly Sync — Design','Product Roadmap Q3']},
-  {id:1,name:'Maria Chen',color:'#7C3AED',count:3,totalMin:'28 min',desc:'Head of Engineering. Covers technical architecture, sprint planning, and code quality. Uses extensive technical terminology.',files:['Quarterly Review Meeting','Interview: Anna K.','Weekly Sync — Design']},
-  {id:2,name:'James Wright',color:'#D97706',count:2,totalMin:'16 min',desc:'Sales & Marketing lead. Focuses on customer acquisition, webinars, and go-to-market strategy.',files:['Quarterly Review Meeting','Webinar — Growth Metrics']},
-];
-let ITEMS=[
-  {id:0,title:'Quarterly Review Meeting',   dur:'14 min',mins:14,date:'22 Jun',status:'done',tags:[{c:'#2563EB',l:'meeting'},{c:'#059669',l:'quarterly'}]},
-  {id:1,title:'Economics Lecture — Part 2', dur:'1h 12min',mins:72,date:'22 Jun',status:'proc',pct:41,tags:[]},
-  {id:2,title:'Interview: Anna K.',          dur:'47 min',mins:47,date:'21 Jun',status:'done',tags:[{c:'#7C3AED',l:'interview'},{c:'#D97706',l:'hiring'}]},
-  {id:3,title:'Podcast Episode #47',         dur:'38 min',mins:38,date:'22 Jun',status:'pend',tags:[]},
-  {id:4,title:'Product Ideas — Voice Memo', dur:'12 min',mins:12,date:'20 Jun',status:'done',tags:[{c:'#0891B2',l:'ideas'}]},
-  {id:5,title:'Daily Standup 19 Jun',        dur:'8 min', mins:8, date:'19 Jun',status:'done',tags:[{c:'#2563EB',l:'meeting'},{c:'#6366F1',l:'standup'}]},
-];
-const TRANSCRIPT_SEGMENTS=[
-  {sp:0,ts:'0:00',txt:'Good morning everyone. Let\'s get started — we have a lot to cover today. The main focus is Q2 revenue and roadmap for Q3.'},
-  {sp:1,ts:'0:34',txt:'Right. So Q2 was solid overall — revenue is up 22% quarter over quarter. Enterprise deals were the main driver.'},
-  {sp:0,ts:'1:12',txt:'Can you break that down a bit more? What specifically drove enterprise growth?'},
-  {sp:1,ts:'1:18',txt:'Sure. We closed three major accounts — two in APAC and one in Europe. The APAC deals alone contributed about $1.4M to the total.'},
-  {sp:2,ts:'2:05',txt:'From a marketing perspective, the webinar series we ran in May definitely helped with pipeline generation. We saw a 40% lift in demo requests.'},
-  {sp:0,ts:'2:44',txt:'That\'s great. And what about the new product line? How is that tracking?'},
-  {sp:1,ts:'2:51',txt:'New product line contributed $2.1M in Q2. It\'s ahead of the initial forecast by about 15%.'},
-];
-const SP_COLORS=['#7C3AED','#0891B2','#D97706'];
-const THREADS_DATA=[
-  {id:0,name:'Q2 Revenue Analysis',files:['Quarterly Review Meeting'],date:'22 Jun',msgCount:5,preview:'What were the main revenue drivers this quarter?',msgs:[{r:'ai',t:"I've analyzed the Quarterly Review Meeting. Ask me anything."},{r:'user',t:'What were the main revenue drivers in Q2?'},{r:'ai',t:'The main drivers were: (1) Enterprise deals up 34% YoY, (2) New product line contributing $2.1M, (3) APAC expansion adding 18% to international revenue.'}]},
-  {id:1,name:'Hiring Pipeline',files:['Interview: Anna K.'],date:'21 Jun',msgCount:3,preview:"Summarize Anna's technical background",msgs:[{r:'ai',t:"I've analyzed the interview with Anna K. What would you like to know?"},{r:'user',t:"Summarize Anna's technical background."},{r:'ai',t:'Anna has 5+ years in distributed systems with strong Kubernetes and Kafka experience. She led infrastructure migrations at her previous role and mentioned hands-on work with multi-region deployments.'}]},
+  {id:0,name:'Alexei Sorokin',color:'#0D9488',count:4,totalMin:'42 min',desc:'Product lead. Discusses roadmap, feature prioritization, and team updates.',files:['Quarterly Review Meeting','Daily Standup 19 Jun','Weekly Sync — Design','Product Roadmap Q3']},
+  {id:1,name:'Maria Chen',color:'#7C3AED',count:3,totalMin:'28 min',desc:'Head of Engineering. Covers architecture, sprints, and code quality.',files:['Quarterly Review Meeting','Interview: Anna K.','Weekly Sync — Design']},
+  {id:2,name:'James Wright',color:'#D97706',count:2,totalMin:'16 min',desc:'Sales & Marketing lead. Focuses on customer acquisition and GTM strategy.',files:['Quarterly Review Meeting','Webinar — Growth Metrics']},
 ];
 let editType=null,editId=null,nextId=20;
-const PAGE_TITLES={list:'Transcriptions',threads:'Threads',tags:'Tags',speakers:'Speakers',settings:'Settings'};
+let detailSpkMap={1:{name:'Alexei Sorokin',color:'#0D9488'},2:{name:'Maria Chen',color:'#7C3AED'},3:{name:'James Wright',color:'#D97706'}};
+let segOverrides={};
+let pickerState={segIdx:null,currentSpkName:''};
+let currentDetailId=null;
+let prevTitleText='';
 
-function navigate(p){
-  document.querySelectorAll('[data-nav]').forEach(i=>i.classList.toggle('active',i.dataset.nav===p));
-  document.querySelectorAll('.vw').forEach(v=>v.classList.remove('active'));
-  document.getElementById('vw-'+p)?.classList.add('active');
-  document.getElementById('topbar-title').textContent=PAGE_TITLES[p]||p;
-  if(p==='list')applySortAndRender();
-  if(p==='threads')renderThreads();
-  if(p==='tags')renderTags();
-  if(p==='speakers')renderSpeakers();
-}
-
-function fc(files,max=2){
-  if(!files||!files.length)return'<span style="font-size:11px;color:var(--text3);font-style:italic">Not used yet</span>';
-  const shown=files.slice(0,max);const rest=files.length-max;
-  return shown.map(f=>`<span class="fc" title="${f}">${f}</span>`).join('')+(rest>0?`<span class="fc-more">+${rest} more</span>`:'');
-}
-
-function renderTags(){
-  const unique=new Set(TAGS.flatMap(t=>t.files||[])).size;
-  document.getElementById('tags-sub').textContent=`${TAGS.length} tag${TAGS.length!==1?'s':''} · used in ${unique} file${unique!==1?'s':''}`;
-  document.getElementById('tags-grid').innerHTML=TAGS.map(t=>`
-    <div class="card">
-      <div class="card-border" style="background:${t.color}"></div>
-      <div class="card-top">
-        <span class="card-name">${t.label}</span>
-        <div class="card-actions">
-          <div class="card-icon-btn" onclick="openItemModal('tag',${t.id})" title="Edit"><span class="icon sm">edit</span></div>
-          <div class="card-icon-btn del" onclick="confirmDel(${t.id},'tag')" title="Delete"><span class="icon sm">delete</span></div>
-        </div>
-      </div>
-      <div class="card-desc">${t.desc||'<span style="font-style:italic">No description yet</span>'}</div>
-      <div class="card-divider"></div>
-      <div class="card-stats-row">
-        <div class="card-stat-block"><div class="card-stat-num">${t.count}</div><div class="card-stat-lbl">Files</div></div>
-      </div>
-      <div class="card-files">${fc(t.files)}</div>
-    </div>`).join('')+`
-    <div class="card add-card" onclick="openItemModal('tag',null)">
-      <div class="add-card-inner"><span class="icon">add_circle</span><span>Add tag</span></div>
-    </div>`;
-}
-
-function renderSpeakers(){
-  const totalMin=SPEAKERS.reduce((s,sp)=>s+parseInt(sp.totalMin)||0,0);
-  document.getElementById('spk-sub').textContent=`${SPEAKERS.length} speaker${SPEAKERS.length!==1?'s':''} · ${totalMin} min total identified`;
-  document.getElementById('spk-grid').innerHTML=SPEAKERS.map(s=>`
-    <div class="card" style="padding-left:16px">
-      <div class="spk-top">
-        <div class="spk-av" style="background:${s.color}">${s.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
-        <div class="spk-info">
-          <div class="spk-name">${s.name}</div>
-          <div class="spk-stats">
-            <span class="spk-stat"><span class="icon">description</span>${s.count} files</span>
-            <span class="spk-stat"><span class="icon">schedule</span>${s.totalMin}</span>
-          </div>
-        </div>
-        <div class="card-actions">
-          <div class="card-icon-btn" onclick="openItemModal('speaker',${s.id})"><span class="icon sm">edit</span></div>
-          <div class="card-icon-btn del" onclick="confirmDel(${s.id},'speaker')"><span class="icon sm">delete</span></div>
-        </div>
-      </div>
-      <div class="card-desc">${s.desc||'<span style="font-style:italic">No description yet</span>'}</div>
-      <div class="card-divider"></div>
-      <div class="card-stats-row">
-        <div class="card-stat-block"><div class="card-stat-num">${s.count}</div><div class="card-stat-lbl">Files</div></div>
-        <div class="card-stat-block"><div class="card-stat-num">${s.totalMin}</div><div class="card-stat-lbl">Total time</div></div>
-      </div>
-      <div class="card-files">${fc(s.files)}</div>
-    </div>`).join('')+`
-    <div class="card add-card" onclick="openItemModal('speaker',null)">
-      <div class="add-card-inner"><span class="icon">add_circle</span><span>Add speaker</span></div>
-    </div>`;
-}
-
+function getEffSpk(i){if(segOverrides[i])return segOverrides[i];const slot=TRANSCRIPT[i].spk;return detailSpkMap[slot]||{name:`Speaker ${slot}`,color:'#888'};}
+function navigate(page){document.querySelectorAll('[data-nav]').forEach(i=>i.classList.toggle('active',i.dataset.nav===page));document.querySelectorAll('.vw').forEach(v=>v.classList.remove('active'));document.getElementById('vw-'+page)?.classList.add('active');document.getElementById('topbar-title').textContent=PAGE_TITLES[page]||'Dictara';if(page==='list')applySortAndRender();if(page==='threads')renderThreads();if(page==='tags')renderTags();if(page==='speakers')renderSpeakers();}
 function getAF(){return{st:[...document.querySelectorAll('.status-check:checked')].map(e=>e.value),tg:[...document.querySelectorAll('.tag-check:checked')].map(e=>e.value),q:(document.getElementById('search-input')?.value||'').toLowerCase()};}
 function applyFilters(items){const{st,tg,q}=getAF();return items.filter(i=>{if(st.length&&!st.includes(i.status))return false;if(tg.length&&!tg.some(t=>i.tags.some(tag=>tag.l===t)))return false;if(q&&!i.title.toLowerCase().includes(q))return false;return true;});}
-function applySortAndRender(){
-  const ICO={done:'check_circle',proc:'autorenew',pend:'schedule'};const LBL={done:'Done',proc:'Processing',pend:'Pending'};
-  const sort=document.querySelector('input[name="sort"]:checked')?.value||'newest';
-  let items=applyFilters([...ITEMS]);
-  if(sort==='oldest')items.sort((a,b)=>a.id-b.id);else if(sort==='longest')items.sort((a,b)=>b.mins-a.mins);else if(sort==='name')items.sort((a,b)=>a.title.localeCompare(b.title));else items.sort((a,b)=>b.id-a.id);
-  const list=document.getElementById('row-list');
-  if(!items.length){list.innerHTML='<div style="text-align:center;padding:56px 20px;color:var(--text3);font-size:14px">No matching transcriptions</div>';return;}
-  list.innerHTML=items.map(i=>`<div class="row" onclick="openTranscript(${i.id})"><div class="row-icon ${i.status}"><span class="icon">${ICO[i.status]}</span></div><div class="row-info"><div class="row-name">${i.title}</div><div class="row-meta"><span><span class="icon">schedule</span>${i.dur}</span><span><span class="icon">calendar_today</span>${i.date}</span></div><div class="row-foot">${i.tags.map(t=>`<span class="mini-tag" style="background:${t.c}">${t.l}</span>`).join('')}</div>${i.status==='proc'?`<div class="prog-wrap"><div class="prog-bar"><div class="prog-fill" style="width:${i.pct}%"></div></div><div class="prog-label">${i.pct}% — transcribing…</div></div>`:''}</div><div class="row-right"><span class="badge ${i.status}">${LBL[i.status]}</span><span class="icon row-chev">chevron_right</span></div></div>`).join('');
-  const n=document.querySelectorAll('.status-check:checked,.tag-check:checked').length;
-  const fb=document.getElementById('filter-btn');fb.classList.toggle('active',n>0);fb.querySelector('.filter-label').textContent=n?`Filter · ${n}`:'Filter';
-  const SLBL={oldest:'Oldest',longest:'Longest',name:'A→Z'};const sb=document.getElementById('sort-btn');sb.classList.toggle('active',sort!=='newest');sb.querySelector('.sort-label').textContent=sort!=='newest'?SLBL[sort]:'Sort';
-}
+function applySortAndRender(){const sort=document.querySelector('input[name="sort"]:checked')?.value||'newest';let items=applyFilters([...ITEMS]);if(sort==='oldest')items.sort((a,b)=>a.id-b.id);else if(sort==='longest')items.sort((a,b)=>b.mins-a.mins);else if(sort==='name')items.sort((a,b)=>a.title.localeCompare(b.title));else items.sort((a,b)=>b.id-a.id);const list=document.getElementById('row-list');if(!items.length){list.innerHTML='<div style="text-align:center;padding:56px 20px;color:var(--text3);font-size:14px">No matching transcriptions</div>';return;}list.innerHTML=items.map(i=>`<div class="row" onclick="openDetail(${i.id})"><div class="row-icon ${i.status}"><span class="icon">${ICO[i.status]}</span></div><div class="row-info"><div class="row-name">${i.title}</div><div class="row-meta"><span><span class="icon">schedule</span>${i.dur}</span><span><span class="icon">calendar_today</span>${i.date}</span></div><div class="row-foot">${i.tags.map(t=>`<span class="mini-tag" style="background:${t.c}">${t.l}</span>`).join('')}${i.speakers>0?`<span class="row-spk"><span class="icon">record_voice_over</span>${i.speakers}</span>`:''}</div>${i.status==='proc'?`<div class="prog-wrap"><div class="prog-bar"><div class="prog-fill" style="width:${i.pct}%"></div></div><div class="prog-label">${i.pct}% — transcribing…</div></div>`:''}</div><div class="row-right"><span class="badge ${i.status}">${LABEL[i.status]}</span>${i.status==='done'?`<button class="r-dl" onclick="event.stopPropagation()"><span class="icon">download</span></button>`:''}<span class="icon row-chev">chevron_right</span></div></div>`).join('');const n=document.querySelectorAll('.status-check:checked,.tag-check:checked').length;const fb=document.getElementById('filter-btn');fb.classList.toggle('active',n>0);fb.querySelector('.filter-label').textContent=n?`Filter · ${n}`:'Filter';const sb=document.getElementById('sort-btn');const SLBL={oldest:'Oldest first',longest:'Longest',name:'A→Z'};sb.classList.toggle('active',sort!=='newest');sb.querySelector('.sort-label').textContent=sort!=='newest'?SLBL[sort]:'Sort';}
 
-function openTranscript(id){
-  const item=ITEMS.find(i=>i.id===id);if(!item||item.status!=='done')return;
-  document.getElementById('ts-title').textContent=item.title;
-  document.getElementById('ts-meta').innerHTML=`<span><span class="icon">schedule</span>${item.dur}</span><span><span class="icon">calendar_today</span>${item.date}</span>`;
-  document.getElementById('ts-tags').innerHTML=item.tags.map(t=>`<span class="mini-tag" style="background:${t.c}">${t.l}</span>`).join('');
-  const SP_NAMES=['Speaker 1','Speaker 2','Speaker 3'];
-  let html='';let lastSp=-1;
-  TRANSCRIPT_SEGMENTS.forEach(s=>{
-    if(s.sp!==lastSp){html+=`<div class="ts-spk-hdr" style="color:${SP_COLORS[s.sp]}">${SP_NAMES[s.sp]}</div>`;lastSp=s.sp;}
-    html+=`<div class="ts-block"><span class="ts-ts">${s.ts}</span><span class="ts-txt">${s.txt}</span></div>`;
-  });
-  document.getElementById('ts-body').innerHTML=html;
-  document.querySelectorAll('[data-nav]').forEach(i=>i.classList.remove('active'));
-  document.querySelectorAll('.vw').forEach(v=>v.classList.remove('active'));
-  document.getElementById('vw-transcript').classList.add('active');
-  document.getElementById('topbar-title').textContent=item.title;
-}
+function openDetail(id){const item=ITEMS[id];if(!item||item.status!=='done')return;currentDetailId=id;segOverrides={};document.getElementById('detail-breadcrumb').textContent=item.title;const titleEl=document.getElementById('detail-title');titleEl.textContent=item.title;titleEl.style.display='';const titleInput=document.getElementById('detail-title-input');if(titleInput)titleInput.style.display='none';prevTitleText=item.title;document.getElementById('detail-meta').innerHTML=`<span class="m-item"><span class="icon">schedule</span>${item.dur}</span><span class="m-item"><span class="icon">calendar_today</span>${item.date}</span><span class="badge done">Done</span>`;renderDetailTags();renderDetailSpkRow(item);renderTranscript();document.querySelectorAll('[data-nav]').forEach(i=>i.classList.remove('active'));document.querySelectorAll('.vw').forEach(v=>v.classList.remove('active'));document.getElementById('vw-detail').classList.add('active');document.getElementById('topbar-title').textContent=item.title;document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.toggle('active',i===0)});document.querySelectorAll('.tab-content').forEach((t,i)=>{t.classList.toggle('active',i===0)});}
+function renderDetailSpkRow(item){const slots=item.speakers>0?Array.from({length:item.speakers},(_,i)=>i+1):[];const row=document.getElementById('detail-spk-row');if(!slots.length){row.innerHTML='';return;}row.innerHTML='<span class="d-spk-label">Speakers:</span>'+slots.map(s=>{const info=detailSpkMap[s]||{name:`Speaker ${s}`,color:'#888'};return`<span class="spk-chip"><span class="spk-dot" style="background:${info.color}"></span>${info.name}</span>`;}).join('');}
+function startTitleEdit(){const title=document.getElementById('detail-title');const input=document.getElementById('detail-title-input');input.value=title.textContent;title.style.display='none';document.querySelector('.d-title-hint').style.display='none';input.style.display='';input.focus();input.select();}
+function titleKeydown(e){if(e.key==='Enter'){e.preventDefault();e.target.blur();}if(e.key==='Escape'){document.getElementById('detail-title-input').value=prevTitleText;e.target.blur();}}
+function saveTitleEdit(){const title=document.getElementById('detail-title');const input=document.getElementById('detail-title-input');const val=input.value.trim()||prevTitleText;title.textContent=val;title.style.display='';input.style.display='none';document.querySelector('.d-title-hint').style.display='';if(currentDetailId!==null&&val!==prevTitleText){ITEMS[currentDetailId].title=val;document.getElementById('detail-breadcrumb').textContent=val;document.getElementById('topbar-title').textContent=val;prevTitleText=val;applySortAndRender();}}
 
-function renderThreads(){
-  document.getElementById('thread-list').innerHTML=THREADS_DATA.map(t=>`
-    <div class="thread-card" onclick="openThread(${t.id})">
-      <div class="thread-top"><span class="thread-name">${t.name}</span><div class="thread-meta"><span class="icon sm">chat_bubble</span>${t.msgCount}<span style="margin-left:4px">${t.date}</span></div></div>
-      <div class="thread-files">${t.files.map(f=>`<span class="thread-file-chip"><span class="icon">description</span>${f}</span>`).join('')}</div>
-      <div class="thread-preview">"${t.preview}"</div>
-    </div>`).join('');
-}
-function openThread(id){
-  const t=THREADS_DATA.find(x=>x.id===id);if(!t)return;
-  document.getElementById('thread-detail-name').textContent=t.name;
-  document.getElementById('thread-ctx-bar').innerHTML=`<span class="ctx-label">Context</span>${t.files.map(f=>`<span class="ctx-chip"><span class="icon">description</span>${f}</span>`).join('')}`;
-  document.getElementById('chat-area').innerHTML=t.msgs.map(m=>`<div class="chat-msg ${m.r}"><div class="chat-role">${m.r==='ai'?'Dictara AI':'You'}</div><div class="chat-bubble">${m.t}</div></div>`).join('');
-  document.querySelectorAll('[data-nav]').forEach(i=>i.classList.remove('active'));
-  document.querySelectorAll('.vw').forEach(v=>v.classList.remove('active'));
-  document.getElementById('vw-thread').classList.add('active');
-  document.getElementById('topbar-title').textContent=t.name;
-}
-function sendChat(){const inp=document.getElementById('chat-input');const txt=inp.value.trim();if(!txt)return;const ca=document.getElementById('chat-area');ca.innerHTML+=`<div class="chat-msg user"><div class="chat-role">You</div><div class="chat-bubble">${txt}</div></div>`;inp.value='';ca.scrollTop=ca.scrollHeight;setTimeout(()=>{ca.innerHTML+=`<div class="chat-msg ai"><div class="chat-role">Dictara AI</div><div class="chat-bubble">Analyzing your question…</div></div>`;ca.scrollTop=ca.scrollHeight;},600);}
+function renderDetailTags(){const item=ITEMS[currentDetailId];if(!item)return;document.getElementById('detail-tags-pills').innerHTML=item.tags.map(t=>`<span class="tag-pill" style="background:${t.c}">${t.l}<i class="tag-x" onclick="removeDetailTag('${t.l}')">×</i></span>`).join('');filterTagDD();}
+function removeDetailTag(label){const item=ITEMS[currentDetailId];if(!item)return;item.tags=item.tags.filter(t=>t.l!==label);renderDetailTags();applySortAndRender();}
+function addDetailTag(tagId){const item=ITEMS[currentDetailId];if(!item)return;const tag=TAGS.find(t=>t.id===tagId);if(!tag)return;if(!item.tags.find(t=>t.l===tag.label))item.tags.push({c:tag.color,l:tag.label});closeTagDD();renderDetailTags();applySortAndRender();}
+function filterTagDD(){const item=ITEMS[currentDetailId];if(!item)return;const q=(document.getElementById('tag-dd-search')?.value||'').toLowerCase().trim();const used=new Set(item.tags.map(t=>t.l));const avail=TAGS.filter(t=>!used.has(t.label)&&(!q||t.label.toLowerCase().includes(q)));const exact=TAGS.some(t=>t.label.toLowerCase()===q);const usedExact=q&&[...used].some(l=>l.toLowerCase()===q);let html=avail.length?avail.map(t=>`<div class="tag-dd-row" onclick="addDetailTag(${t.id})"><span class="mini-tag" style="background:${t.color}">${t.label}</span></div>`).join(''):'';if(!html&&!q)html='<div class="tag-dd-empty">All tags already added</div>';if(q&&!exact&&!usedExact)html+=`<div class="tag-dd-create" onclick="createAndAddTag('${q.replace(/'/g,"\\'")}')"><span class="icon">add</span>Create "${q}"</div>`;document.getElementById('tag-dd-list').innerHTML=html;}
+function createAndAddTag(name){const color=COLORS[TAGS.length%COLORS.length];const id=nextId++;TAGS.push({id,label:name,color,count:1,desc:'',files:[]});addDetailTag(id);renderTags();}
+function tagSearchKey(e){if(e.key==='Enter'){const q=(document.getElementById('tag-dd-search')?.value||'').trim();if(q){const item=ITEMS[currentDetailId];const used=new Set(item?.tags.map(t=>t.l)||[]);const exact=TAGS.find(t=>t.label.toLowerCase()===q.toLowerCase()&&!used.has(t.label));if(exact)addDetailTag(exact.id);else createAndAddTag(q);}}if(e.key==='Escape')closeTagDD();}
+function toggleTagDD(e){e.stopPropagation();const dd=document.getElementById('tag-add-dd');const isOpen=dd.classList.toggle('open');if(isOpen){document.getElementById('tag-dd-search').value='';filterTagDD();setTimeout(()=>document.getElementById('tag-dd-search').focus(),30);}}
+function closeTagDD(){document.getElementById('tag-add-dd').classList.remove('open');}
+
+function renderTranscript(){const runs=[];TRANSCRIPT.forEach((seg,i)=>{const info=getEffSpk(i);const last=runs[runs.length-1];if(last&&last.spkName===info.name){last.segs.push({...seg,idx:i});}else{runs.push({spkName:info.name,color:info.color,firstIdx:i,segs:[{...seg,idx:i}]});}});document.getElementById('transcript-content').innerHTML=runs.map(run=>{const escaped=run.spkName.replace(/\\/g,'\\\\').replace(/'/g,"\\'");return`<div class="spk-run" style="border-left-color:${run.color}"><div class="run-hdr" onclick="openSpkPicker(${run.firstIdx},'${escaped}',this)" title="Change speaker"><span class="run-dot" style="background:${run.color}"></span><span class="run-name" style="color:${run.color}">${run.spkName}</span><span class="icon sm run-edit-ico">edit</span></div><div class="run-segs">${run.segs.map(s=>`<div class="seg-row"><span class="seg-time">${s.time}</span><p class="seg-text">${s.text}</p></div>`).join('')}</div></div>`;}).join('');}
+
+function openSpkPicker(segIdx,spkName,el){pickerState={segIdx,currentSpkName:spkName};const picker=document.getElementById('spk-picker');picker.style.display='block';const rect=el.getBoundingClientRect();const pw=280,ph=320;let top=rect.bottom+6,left=rect.left;if(left+pw>window.innerWidth-8)left=window.innerWidth-pw-8;if(top+ph>window.innerHeight-8)top=rect.top-ph-4;picker.style.top=top+'px';picker.style.left=left+'px';document.getElementById('spk-current-lbl').textContent=spkName;document.querySelector('input[name="spk-scope"][value="one"]').checked=true;document.getElementById('spk-search').value='';filterSpkPicker();setTimeout(()=>document.getElementById('spk-search').focus(),30);}
+function filterSpkPicker(){const q=document.getElementById('spk-search').value.toLowerCase().trim();const filtered=SPEAKERS.filter(s=>!q||s.name.toLowerCase().includes(q));const exact=SPEAKERS.some(s=>s.name.toLowerCase()===q);const inits=n=>n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();let html=filtered.map(s=>`<div class="spk-pick-item" onclick="pickSpeaker('${s.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}','${s.color}')"><div class="spk-pick-av" style="background:${s.color}">${inits(s.name)}</div>${s.name}</div>`).join('');if(!html&&!q)html='<div class="spk-pick-empty">No speakers yet</div>';else if(!html)html='<div class="spk-pick-empty">No match</div>';if(q&&!exact){const qe=q.replace(/\\/g,'\\\\').replace(/'/g,"\\'");html+=`<div class="spk-pick-create" onclick="createAndPickSpeaker('${qe}')"><span class="icon sm">add</span>Create "${q}"</div>`;}document.getElementById('spk-list').innerHTML=html;}
+function spkSearchKey(e){if(e.key==='Escape')closeSpkPicker();}
+function pickSpeaker(name,color){const scope=document.querySelector('input[name="spk-scope"]:checked')?.value||'one';if(scope==='one'){segOverrides[pickerState.segIdx]={name,color};}else{const cur=pickerState.currentSpkName;TRANSCRIPT.forEach((_,i)=>{if(getEffSpk(i).name===cur)segOverrides[i]={name,color};});}closeSpkPicker();renderTranscript();if(currentDetailId!==null)renderDetailSpkRow(ITEMS[currentDetailId]);}
+function createAndPickSpeaker(name){const color=COLORS[SPEAKERS.length%COLORS.length];SPEAKERS.push({id:nextId++,name,color,count:0,totalMin:'0 min',desc:'',files:[]});pickSpeaker(name,color);}
+function closeSpkPicker(){document.getElementById('spk-picker').style.display='none';}
+
+function openThread(id){const t=THREADS_DATA[id];document.getElementById('thread-detail-name').textContent=t.name;document.getElementById('thread-ctx-bar').innerHTML=`<span class="ctx-label">Context</span>${t.files.map(f=>`<span class="ctx-chip"><span class="icon">description</span>${f}</span>`).join('')}<button class="ctx-add">+ Add file</button>`;renderChat();document.querySelectorAll('[data-nav]').forEach(i=>i.classList.remove('active'));document.querySelectorAll('.vw').forEach(v=>v.classList.remove('active'));document.getElementById('vw-thread').classList.add('active');document.getElementById('topbar-title').textContent=t.name;}
+function renderThreads(){document.getElementById('thread-list').innerHTML=THREADS_DATA.map(t=>`<div class="thread-card" onclick="openThread(${t.id})"><div class="thread-top"><span class="thread-name">${t.name}</span><div class="thread-meta"><span class="icon sm">chat_bubble</span>${t.msgCount}<span style="margin-left:4px">${t.date}</span></div></div><div class="thread-files">${t.files.map(f=>`<span class="thread-file-chip"><span class="icon">description</span>${f}</span>`).join('')}</div><div class="thread-preview">"${t.preview}"</div></div>`).join('');}
+function renderChat(){document.getElementById('chat-area').innerHTML=CHAT_MSGS.map(m=>`<div class="chat-msg ${m.role}"><div class="chat-role">${m.role==='ai'?'Dictara AI':'You'}</div><div class="chat-bubble">${m.text}</div></div>`).join('');const ca=document.getElementById('chat-area');ca.scrollTop=ca.scrollHeight;}
+function sendChat(){const inp=document.getElementById('chat-input');const txt=inp.value.trim();if(!txt)return;const ca=document.getElementById('chat-area');ca.innerHTML+=`<div class="chat-msg user"><div class="chat-role">You</div><div class="chat-bubble">${txt}</div></div>`;inp.value='';ca.scrollTop=ca.scrollHeight;setTimeout(()=>{ca.innerHTML+=`<div class="chat-msg ai"><div class="chat-role">Dictara AI</div><div class="chat-bubble">Analyzing…</div></div>`;ca.scrollTop=ca.scrollHeight;},600);}
 function handleChatKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}}
 
-function openItemModal(type,id){
-  editType=type;editId=id;
-  const isTag=type==='tag';
-  const item=id!==null?(isTag?TAGS.find(x=>x.id===id):SPEAKERS.find(x=>x.id===id)):null;
-  document.getElementById('modal-title').textContent=item?(isTag?'Edit tag':'Edit speaker'):(isTag?'New tag':'New speaker');
-  document.getElementById('modal-name-lbl').textContent=isTag?'Tag name':'Full name';
-  document.getElementById('modal-name').placeholder=isTag?'e.g. meeting':'e.g. Alexei Sorokin';
-  document.getElementById('modal-name').value=item?(isTag?item.label:item.name):'';
-  document.getElementById('modal-desc').value=item?item.desc:'';
-  document.getElementById('modal-hint').textContent=isTag?'Descriptions help Dictara auto-tag future transcriptions.':
-    "Describe this speaker's role, speech style, and typical topics. Used for auto-identification.";
-  document.getElementById('item-modal').classList.add('open');
-  setTimeout(()=>document.getElementById('modal-name').focus(),50);
-}
+function fc(files,max=2){if(!files||!files.length)return'<span style="font-size:11px;color:var(--text3);font-style:italic">Not used yet</span>';const shown=files.slice(0,max);const rest=files.length-max;return shown.map(f=>`<span class="fc" title="${f}">${f}</span>`).join('')+(rest>0?`<span class="fc-more">+${rest} more</span>`:'');}
+function renderTags(){const unique=new Set(TAGS.flatMap(t=>t.files||[])).size;document.getElementById('tags-sub').textContent=`${TAGS.length} tag${TAGS.length!==1?'s':''} · used in ${unique} file${unique!==1?'s':''}`;document.getElementById('tags-grid').innerHTML=TAGS.map(t=>`<div class="card"><div class="card-accent" style="background:${t.color}"></div><div class="card-top"><div class="card-dot" style="background:${t.color}"></div><span class="card-name">${t.label}</span><div class="card-actions"><div class="card-icon-btn" onclick="openItemModal('tag',${t.id})"><span class="icon sm">edit</span></div><div class="card-icon-btn del" onclick="confirmDel(${t.id},'tag')"><span class="icon sm">delete</span></div></div></div><div class="card-desc">${t.desc||'<em style="color:var(--text3)">No description yet</em>'}</div><div class="card-divider"></div><div class="card-stat"><span class="icon">description</span>${t.count} file${t.count!==1?'s':''}</div><div class="card-files">${fc(t.files)}</div></div>`).join('')+`<div class="card add-card" onclick="openItemModal('tag',null)"><div class="add-card-inner"><span class="icon">add_circle</span><span>Add tag</span></div></div>`;}
+function renderSpeakers(){document.getElementById('spk-sub').textContent=`${SPEAKERS.length} speaker${SPEAKERS.length!==1?'s':''}`;document.getElementById('spk-grid').innerHTML=SPEAKERS.map(s=>`<div class="card"><div class="spk-top"><div class="spk-av" style="background:${s.color}">${s.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div><div class="spk-info"><div class="spk-name">${s.name}</div><div class="spk-stats"><span class="spk-stat"><span class="icon">description</span>${s.count} files</span><span class="spk-stat"><span class="icon">schedule</span>${s.totalMin}</span></div></div><div class="card-actions"><div class="card-icon-btn" onclick="openItemModal('speaker',${s.id})"><span class="icon sm">edit</span></div><div class="card-icon-btn del" onclick="confirmDel(${s.id},'speaker')"><span class="icon sm">delete</span></div></div></div><div class="card-desc">${s.desc||'<em style="color:var(--text3)">No description yet</em>'}</div><div class="card-divider"></div><div class="card-stat"><span class="icon">description</span>${s.count} transcription${s.count!==1?'s':''}</div><div class="card-files">${fc(s.files)}</div></div>`).join('')+`<div class="card add-card" onclick="openItemModal('speaker',null)"><div class="add-card-inner"><span class="icon">add_circle</span><span>Add speaker</span></div></div>`;}
 
-function saveItem(){
-  const name=document.getElementById('modal-name').value.trim();if(!name)return;
-  const desc=document.getElementById('modal-desc').value.trim();
-  const isTag=editType==='tag';
-  if(editId!==null){
-    const item=isTag?TAGS.find(x=>x.id===editId):SPEAKERS.find(x=>x.id===editId);
-    if(item){if(isTag)item.label=name;else item.name=name;item.desc=desc;}
-  }else{
-    if(isTag)TAGS.push({id:nextId++,label:name,color:COLORS[TAGS.length%COLORS.length],count:0,desc,files:[]});
-    else SPEAKERS.push({id:nextId++,name,color:COLORS[SPEAKERS.length%COLORS.length],count:0,totalMin:'0 min',desc,files:[]});
-  }
-  closeModal('item-modal');
-  if(isTag)renderTags();else renderSpeakers();
-}
+function openItemModal(type,id){editType=type;editId=id;const isTag=type==='tag';const item=id!==null?(isTag?TAGS.find(x=>x.id===id):SPEAKERS.find(x=>x.id===id)):null;document.getElementById('modal-title').textContent=item?(isTag?'Edit tag':'Edit speaker'):(isTag?'New tag':'New speaker');document.getElementById('modal-name-lbl').textContent=isTag?'Tag name':'Full name';document.getElementById('modal-name').placeholder=isTag?'e.g. meeting':'e.g. Alexei Sorokin';document.getElementById('modal-name').value=item?(isTag?item.label:item.name):'';document.getElementById('modal-desc').value=item?item.desc:'';document.getElementById('modal-hint').textContent=isTag?'Descriptions help Dictara auto-tag future transcriptions.':"Describe this speaker's role and topics.";document.getElementById('item-modal').classList.add('open');setTimeout(()=>document.getElementById('modal-name').focus(),50);}
+function saveItem(){const name=document.getElementById('modal-name').value.trim();if(!name)return;const desc=document.getElementById('modal-desc').value.trim();const isTag=editType==='tag';if(editId!==null){const item=isTag?TAGS.find(x=>x.id===editId):SPEAKERS.find(x=>x.id===editId);if(item){if(isTag)item.label=name;else item.name=name;item.desc=desc;}}else{if(isTag)TAGS.push({id:nextId++,label:name,color:COLORS[TAGS.length%COLORS.length],count:0,desc,files:[]});else SPEAKERS.push({id:nextId++,name,color:COLORS[SPEAKERS.length%COLORS.length],count:0,totalMin:'0 min',desc,files:[]});}closeModal('item-modal');if(editType==='tag')renderTags();else renderSpeakers();}
+function confirmDel(id,type){const item=type==='tag'?TAGS.find(t=>t.id===id):SPEAKERS.find(s=>s.id===id);document.getElementById('del-name').textContent=type==='tag'?item.label:item.name;document.getElementById('del-count').textContent=item.count;document.getElementById('del-type-lbl').textContent=type;document.getElementById('del-btn').onclick=()=>{if(type==='tag'){TAGS=TAGS.filter(t=>t.id!==id);renderTags();}else{SPEAKERS=SPEAKERS.filter(s=>s.id!==id);renderSpeakers();}closeModal('del-modal');};document.getElementById('del-modal').classList.add('open');}
 
-function confirmDel(id,type){
-  const item=type==='tag'?TAGS.find(t=>t.id===id):SPEAKERS.find(s=>s.id===id);
-  document.getElementById('del-name').textContent=type==='tag'?item.label:item.name;
-  document.getElementById('del-count').textContent=item.count;
-  document.getElementById('del-type-lbl').textContent=type;
-  document.getElementById('del-btn').onclick=()=>{
-    if(type==='tag'){TAGS=TAGS.filter(t=>t.id!==id);renderTags();}
-    else{SPEAKERS=SPEAKERS.filter(s=>s.id!==id);renderSpeakers();}
-    closeModal('del-modal');
-  };
-  document.getElementById('del-modal').classList.add('open');
-}
-
+function switchTab(name,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));el.classList.add('active');document.getElementById('tab-'+name).classList.add('active');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
-function toggleDD(id){
-  document.querySelectorAll('.dd-panel').forEach(p=>{if(p.id!==id)p.classList.remove('open')});
-  document.querySelectorAll('.dropdown-wrap').forEach(w=>w.classList.remove('open'));
-  const p=document.getElementById(id);p.classList.toggle('open');
-  if(p.classList.contains('open'))p.closest('.dropdown-wrap')?.classList.add('open');
-}
+function toggleDD(id){document.querySelectorAll('.dd-panel').forEach(p=>{if(p.id!==id){p.classList.remove('open');p.closest('.dropdown-wrap')?.classList.remove('open');}});const p=document.getElementById(id);p.classList.toggle('open');p.closest('.dropdown-wrap')?.classList.toggle('open',p.classList.contains('open'));}
+
 document.addEventListener('click',e=>{
   if(!e.target.closest('.dropdown-wrap')){document.querySelectorAll('.dd-panel').forEach(p=>p.classList.remove('open'));document.querySelectorAll('.dropdown-wrap').forEach(w=>w.classList.remove('open'));}
+  if(!e.target.closest('#tag-add-wrap'))closeTagDD();
+  if(!e.target.closest('#spk-picker')&&!e.target.closest('.run-hdr'))closeSpkPicker();
   ['item-modal','del-modal','upload-modal'].forEach(id=>{if(e.target===document.getElementById(id))closeModal(id);});
 });
 document.querySelectorAll('#filter-dd input,#sort-dd input').forEach(el=>el.addEventListener('change',applySortAndRender));
-renderTags();applySortAndRender();renderThreads();
+applySortAndRender();renderThreads();renderTags();renderSpeakers();
 </script>
 </body>
 </html>
