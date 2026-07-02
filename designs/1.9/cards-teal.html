@@ -128,7 +128,7 @@ select,input,textarea{font-family:inherit}
 .breadcrumb .icon{font-size:16px}
 .d-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
 /* Title + rename */
-.d-title-wrap{display:flex;align-items:center;gap:6px;margin-bottom:5px;min-width:0}
+.d-title-wrap{display:flex;align-items:center;gap:6px;margin-bottom:8px;min-width:0}
 .d-title{font-size:20px;font-weight:700;letter-spacing:-.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .d-rename-btn{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border:none;background:none;cursor:pointer;color:var(--text3);border-radius:6px;opacity:0;transition:opacity .15s,background .12s,color .12s;flex-shrink:0}
 .d-title-wrap:hover .d-rename-btn{opacity:1}
@@ -141,17 +141,56 @@ select,input,textarea{font-family:inherit}
 .d-save-btn:hover{background:var(--ad);border-color:var(--ad)}
 .d-cancel-btn{background:none;border-color:var(--border);color:var(--text3)}
 .d-cancel-btn:hover{background:var(--bg);color:var(--text2)}
-.d-meta{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text2);margin-bottom:8px;flex-wrap:wrap;padding:0 6px}
+.d-meta{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text2);margin-bottom:10px;flex-wrap:wrap;padding:0 6px}
 .d-meta .m-item{display:flex;align-items:center;gap:4px}
 .d-meta .icon{font-size:14px;color:var(--text3)}
 /* Tags row */
-.d-tags-row{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-bottom:7px;padding:0 6px}
+.d-tags-row{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-bottom:10px;padding:0 6px}
 .tag-pill{display:inline-flex;align-items:center;gap:2px;font-size:12px;font-weight:600;color:#fff;padding:2px 3px 2px 10px;border-radius:100px}
 .tag-pill-rm{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;cursor:pointer;opacity:0;transition:opacity .15s,background .15s;font-size:14px;flex-shrink:0}
 .tag-pill:hover .tag-pill-rm{opacity:.8}
 .tag-pill-rm:hover{opacity:1!important;background:rgba(255,255,255,.22)}
 .tag-dd-row.added{background:var(--al)}
 .tag-dd-row .tag-check{color:var(--accent);font-size:14px;margin-left:auto;flex-shrink:0}
+/* ── AI suggestions banner — single row ── */
+.sugg-banner{display:none;align-items:center;gap:6px;background:var(--al);border:1px solid color-mix(in srgb,var(--accent) 18%,transparent);border-radius:10px;padding:5px 6px 5px 10px;margin-bottom:10px;width:fit-content;max-width:100%}
+.sugg-banner.visible{display:flex}
+.sugg-banner-star{color:var(--accent);font-size:14px;flex-shrink:0}
+.sugg-banner-rename-lbl{font-size:12px;color:var(--text3);flex-shrink:0;white-space:nowrap}
+.sugg-banner-rename-val{font-size:12px;color:var(--text2);flex-shrink:0;white-space:nowrap}
+.sugg-banner-sep{font-size:12px;color:var(--text3);flex-shrink:0}
+.sugg-banner-meta{font-size:12px;color:var(--text2);flex-shrink:0;white-space:nowrap}
+.sugg-banner-accept{font-size:12px;font-weight:600;color:var(--accent);background:transparent;border:none;padding:2px 8px;cursor:pointer;border-radius:100px;flex-shrink:0;transition:background .12s}
+.sugg-banner-accept:hover{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.sugg-banner-dismiss{display:flex;align-items:center;background:transparent;border:none;cursor:pointer;color:var(--text3);padding:2px 4px;transition:color .12s;flex-shrink:0}
+.sugg-banner-dismiss:hover{color:var(--text)}
+.sugg-banner-dismiss .icon{font-size:15px}
+/* ── Filename tooltip ── */
+.det-chip-file{position:relative}
+#filename-global-tt{display:none;position:fixed;z-index:9999;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.1);user-select:text;cursor:text;pointer-events:auto;opacity:0;transition:opacity .15s ease}
+/* ── Ghost inline suggestions ── */
+/* Ghost action icons — text-style, no filled background */
+.ghost-ok{cursor:pointer;color:var(--accent);font-size:16px;flex-shrink:0;opacity:.8;transition:opacity .12s}
+.ghost-ok:hover{opacity:1}
+.ghost-x{cursor:pointer;color:var(--text3);font-size:16px;flex-shrink:0;transition:color .12s}
+.ghost-x:hover{color:var(--text)}
+/* "Suggested:" prefix row */
+.d-sugg-row{display:flex;align-items:center;flex-wrap:wrap;gap:5px;padding:2px 6px 6px}
+/* Loading spinner */
+@keyframes spin{to{transform:rotate(360deg)}}
+.btn-spinner{width:11px;height:11px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;display:inline-block;animation:spin .55s linear infinite;opacity:.55;vertical-align:middle}
+/* Ghost tag pills */
+.ghost-pill{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:600;padding:2px 4px 2px 8px;border-radius:100px;border:1.5px dashed var(--border);background:transparent}
+.ghost-pill-icon{font-size:13px;color:var(--accent)}
+.ghost-pill-acts{display:inline-flex;align-items:center;gap:0px;margin-left:1px}
+/* Ghost speaker chips */
+.ghost-spk-chip{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;color:var(--text2);background:transparent;border:1.5px dashed var(--border);border-radius:100px;padding:2px 4px 2px 7px}
+.ghost-spk-ai{font-size:13px;color:var(--accent);cursor:default}
+.ghost-spk-raw{color:var(--text3)}
+.ghost-spk-arrow{font-size:13px;color:var(--text3)}
+.ghost-spk-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.ghost-spk-name{color:var(--text);font-weight:600}
+.ghost-spk-x:hover{color:var(--text)}
 .add-tag-btn{font-size:12px;font-weight:500;color:var(--text3);border:1px dashed var(--border);border-radius:100px;padding:2px 10px;background:none;cursor:pointer;white-space:nowrap}
 .add-tag-btn:hover{color:var(--accent);border-color:var(--accent);border-style:solid;background:var(--al)}
 /* Tag add dropdown */
@@ -167,7 +206,7 @@ select,input,textarea{font-family:inherit}
 .tag-dd-create:hover{background:var(--al)}
 .tag-dd-create .icon{font-size:14px}
 .tag-dd-empty{padding:8px 10px;font-size:12px;color:var(--text3);font-style:italic;text-align:center}
-.d-spk-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:0 6px}
+.d-spk-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:0 6px;margin-bottom:6px}
 .d-spk-label{font-size:12px;color:var(--text3);font-weight:500}
 .spk-chip{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:500;color:var(--text2);background:var(--bg);border:1px solid var(--border);border-radius:100px;padding:2px 9px}
 .spk-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
@@ -227,9 +266,14 @@ select,input,textarea{font-family:inherit}
 .det-panel{position:sticky;top:20px}
 .det-title{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:10px}
 .det-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.det-chip{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 10px;display:flex;flex-direction:column;gap:2px}
+.det-chip{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 10px;display:flex;flex-direction:column;gap:2px;min-width:0;overflow:hidden}
+.det-chip-wide{grid-column:1/-1;flex-direction:row;align-items:center;gap:10px;padding:10px 12px}
+.det-chip-wide .det-chip-icon{font-size:20px;margin-bottom:0;flex-shrink:0}
+.det-chip-wide .det-chip-val{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.det-chip-wide .det-chip-lbl{font-size:9px;margin-top:0;flex-shrink:0}
 .det-chip-icon{font-size:18px;color:var(--accent);margin-bottom:4px;display:block}
 .det-chip-val{font-size:14px;font-weight:700;color:var(--text);line-height:1.2}
+.det-chip-sub{font-size:11px;font-weight:500;color:var(--text2);line-height:1.3}
 .det-chip-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-top:2px}
 
 /* THREADS */
@@ -459,6 +503,16 @@ select,input,textarea{font-family:inherit}
             <button class="d-save-btn" onclick="saveTitleEdit()"><span class="icon sm">check</span></button>
             <button class="d-cancel-btn" onclick="cancelTitleEdit()"><span class="icon sm">close</span></button>
           </div>
+          <!-- AI suggestions banner -->
+          <div class="sugg-banner" id="sugg-banner">
+            <span class="icon sugg-banner-star">auto_awesome</span>
+            <span class="sugg-banner-rename-lbl" id="sugg-banner-rename-lbl">Rename to:</span>
+            <span class="sugg-banner-rename-val" id="sugg-banner-rename-val">—</span>
+            <span class="sugg-banner-sep" id="sugg-banner-sep">·</span>
+            <span class="sugg-banner-meta" id="sugg-banner-meta"></span>
+            <button class="sugg-banner-accept" onclick="acceptAllSugg(this)">Accept all</button>
+            <button class="sugg-banner-dismiss" onclick="dismissAllSugg(this)" title="Dismiss all"><span class="icon">close</span></button>
+          </div>
           <div class="d-meta" id="detail-meta"></div>
           <!-- Tags row with add dropdown -->
           <div class="d-tags-row" id="detail-tags-row">
@@ -471,8 +525,18 @@ select,input,textarea{font-family:inherit}
               </div>
             </div>
           </div>
+          <!-- Tag suggestions row -->
+          <div class="d-sugg-row" id="detail-tags-sugg-row" style="display:none">
+            <span class="sugg-prefix">Suggested:</span>
+            <div id="detail-tags-sugg-pills" style="display:contents"></div>
+          </div>
           <!-- Speakers row -->
           <div class="d-spk-row" id="detail-spk-row"></div>
+          <!-- Speaker suggestions row -->
+          <div class="d-sugg-row" id="detail-spk-sugg-row" style="display:none">
+            <span class="sugg-prefix">Suggested:</span>
+            <div id="detail-spk-sugg-chips" style="display:contents"></div>
+          </div>
         </div>
         <div class="d-actions">
           <button class="d-btn"><span class="icon">download</span> .txt</button>
@@ -495,12 +559,13 @@ select,input,textarea{font-family:inherit}
         <div class="det-panel">
           <div class="det-title">Details</div>
           <div class="det-grid">
+            <div class="det-chip det-chip-file"><span class="icon det-chip-icon">draft</span><div class="det-chip-val" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px">product_sync_2025_06_23.mp4</div><div class="det-chip-lbl">Original file</div></div>
             <div class="det-chip"><span class="icon det-chip-icon">schedule</span><div class="det-chip-val">14:22</div><div class="det-chip-lbl">Duration</div></div>
             <div class="det-chip"><span class="icon det-chip-icon">record_voice_over</span><div class="det-chip-val">3</div><div class="det-chip-lbl">Speakers</div></div>
             <div class="det-chip"><span class="icon det-chip-icon">translate</span><div class="det-chip-val">EN</div><div class="det-chip-lbl">Language</div></div>
             <div class="det-chip"><span class="icon det-chip-icon">text_fields</span><div class="det-chip-val">~1,840</div><div class="det-chip-lbl">Words</div></div>
             <div class="det-chip"><span class="icon det-chip-icon">storage</span><div class="det-chip-val">22.4 MB</div><div class="det-chip-lbl">File size</div></div>
-            <div class="det-chip"><span class="icon det-chip-icon">calendar_today</span><div class="det-chip-val">22 Jun</div><div class="det-chip-lbl">Uploaded</div></div>
+            <div class="det-chip"><span class="icon det-chip-icon">calendar_today</span><div class="det-chip-val" style="font-size:12px">22 Jun · 14:41</div><div class="det-chip-lbl">Uploaded</div></div>
           </div>
         </div>
       </div>
@@ -631,6 +696,7 @@ let ITEMS=[
   {id:3,title:'Podcast Episode #47',         dur:'38 min', mins:38,date:'22 Jun',status:'pend',tags:[],speakers:0},
   {id:4,title:'Product Ideas — Voice Memo', dur:'12 min', mins:12,date:'20 Jun',status:'done',tags:[{c:'#0891B2',l:'ideas'}],speakers:0},
   {id:5,title:'Daily Standup 19 Jun',        dur:'8 min',  mins:8, date:'19 Jun',status:'done',tags:[{c:'#2563EB',l:'meeting'},{c:'#6366F1',l:'standup'}],speakers:3},
+  {id:6,title:'product_sync_2025_06_23.mp4', dur:'34 min', mins:34,date:'23 Jun',status:'done',tags:[],speakers:3},
 ];
 const THREADS_DATA=[
   {id:0,name:'Q2 Planning',files:['Quarterly Review Meeting','Interview: Anna K.'],date:'22 Jun',msgCount:5,preview:'How many speakers were involved across both files?'},
@@ -674,6 +740,23 @@ let SPEAKERS=[
 ];
 let editType=null,editId=null,nextId=20;
 
+const AI_SUGGESTIONS={
+  6:{
+    title:'Product Sync — Q3 Roadmap',
+    tags:[
+      {label:'meeting',  color:'#2563EB'},
+      {label:'product',  color:'#0891B2'},
+      {label:'roadmap',  color:'#059669'},
+    ],
+    speakers:{
+      1:{name:'Alexei Sorokin', color:'#0D9488'},
+      2:{name:'Maria Chen',     color:'#7C3AED'},
+      3:{name:'James Wright',   color:'#D97706'},
+    }
+  }
+};
+let pendingSugg=null;
+
 // ─── SPEAKER MAP (transcript slot → speaker info) ────────────────────────────
 // Maps slot numbers used in TRANSCRIPT[i].spk to actual speaker display info
 let detailSpkMap={
@@ -689,7 +772,9 @@ let prevTitleText='';
 function getEffSpk(i){
   if(segOverrides[i])return segOverrides[i];
   const slot=TRANSCRIPT[i].spk;
-  return detailSpkMap[slot]||{name:`Speaker ${slot}`,color:'#888'};
+  if(detailSpkMap[slot])return detailSpkMap[slot];
+  const aiSpk=currentDetailId!==null&&AI_SUGGESTIONS[currentDetailId]?.speakers[slot];
+  return {name:`Speaker ${slot}`,color:aiSpk?aiSpk.color:'#aaa'};
 }
 
 // ─── NAVIGATION ──────────────────────────────────────────────────────────────
@@ -724,11 +809,20 @@ function openDetail(id){
   const item=ITEMS[id];if(!item||item.status!=='done')return;
   currentDetailId=id;
   segOverrides={};
+  // Init suggestions state
+  if(AI_SUGGESTIONS[id]){
+    const s=AI_SUGGESTIONS[id];
+    pendingSugg={titlePending:true,tags:new Set(s.tags.map(t=>t.label)),speakers:new Set(Object.keys(s.speakers).map(Number))};
+    detailSpkMap={};
+  } else {
+    pendingSugg=null;
+    detailSpkMap={1:{name:'Alexei Sorokin',color:'#0D9488'},2:{name:'Maria Chen',color:'#7C3AED'},3:{name:'James Wright',color:'#D97706'}};
+  }
   document.getElementById('detail-breadcrumb').textContent=item.title;
   document.getElementById('detail-title').textContent=item.title;
-  document.getElementById('d-title-wrap').style.display='';
   document.getElementById('d-title-edit').style.display='none';
   prevTitleText=item.title;
+  renderSuggBanner();
   document.getElementById('detail-meta').innerHTML=`<span class="m-item"><span class="icon">schedule</span>${item.dur}</span><span class="m-item"><span class="icon">calendar_today</span>${item.date}</span><span class="badge done">Done</span>`;
   renderDetailTags();
   renderDetailSpkRow(item);
@@ -740,14 +834,125 @@ function openDetail(id){
   document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.toggle('active',i===0)});
   document.querySelectorAll('.tab-content').forEach((t,i)=>{t.classList.toggle('active',i===0)});
 }
+
+function renderSuggBanner(){
+  const sugg=currentDetailId!==null?AI_SUGGESTIONS[currentDetailId]:null;
+  const tp=sugg&&pendingSugg&&pendingSugg.titlePending;
+  const hasPending=sugg&&pendingSugg&&(tp||pendingSugg.tags.size>0||pendingSugg.speakers.size>0);
+  document.getElementById('sugg-banner').classList.toggle('visible',!!hasPending);
+  if(!hasPending)return;
+  const hasTagsOrSpk=pendingSugg.tags.size>0||pendingSugg.speakers.size>0;
+  document.getElementById('sugg-banner-rename-lbl').style.display=tp?'':'none';
+  document.getElementById('sugg-banner-rename-val').style.display=tp?'':'none';
+  document.getElementById('sugg-banner-sep').style.display=(tp&&hasTagsOrSpk)?'':'none';
+  if(tp)document.getElementById('sugg-banner-rename-val').textContent=sugg.title;
+  const parts=[];
+  if(pendingSugg.tags.size>0)parts.push(`${pendingSugg.tags.size} tag${pendingSugg.tags.size>1?'s':''}`);
+  if(pendingSugg.speakers.size>0)parts.push(`${pendingSugg.speakers.size} speaker${pendingSugg.speakers.size>1?'s':''}`);
+  const metaEl=document.getElementById('sugg-banner-meta');
+  metaEl.textContent=parts.length?'+ '+parts.join(' · '):'';
+  metaEl.style.display=hasTagsOrSpk?'':'none';
+}
+function fakeDelay(){return new Promise(r=>setTimeout(r,Math.random()*1000));}
+async function withLoading(btn,fn){
+  const orig=btn.innerHTML;
+  btn.disabled=true;
+  btn.innerHTML='<span class="btn-spinner"></span>';
+  await fakeDelay();
+  fn();
+  if(btn.isConnected){btn.innerHTML=orig;btn.disabled=false;}
+}
+function acceptAllSugg(btn){
+  withLoading(btn,()=>{
+    if(!pendingSugg||currentDetailId===null)return;
+    const sugg=AI_SUGGESTIONS[currentDetailId];
+    if(pendingSugg.titlePending){
+      const val=sugg.title;
+      ITEMS[currentDetailId].title=val;prevTitleText=val;
+      document.getElementById('detail-title').textContent=val;
+      document.getElementById('detail-breadcrumb').textContent=val;
+      document.getElementById('topbar-title').textContent=val;
+      pendingSugg.titlePending=false;
+    }
+    pendingSugg.tags.forEach(label=>{
+      const ts=sugg.tags.find(t=>t.label===label);if(!ts)return;
+      let tag=TAGS.find(t=>t.label===label);
+      if(!tag){tag={id:nextId++,label:ts.label,color:ts.color,count:0,desc:'',files:[]};TAGS.push(tag);}
+      const item=ITEMS[currentDetailId];
+      if(!item.tags.find(t=>t.l===label))item.tags.push({c:ts.color,l:label});
+    });
+    pendingSugg.tags.clear();
+    pendingSugg.speakers.forEach(slot=>{
+      const s=sugg.speakers[slot];if(!s)return;
+      detailSpkMap[slot]={name:s.name,color:s.color};
+      if(!SPEAKERS.find(sp=>sp.name===s.name))
+        SPEAKERS.push({id:nextId++,name:s.name,color:s.color,count:0,totalMin:'0 min',desc:'',files:[]});
+    });
+    pendingSugg.speakers.clear();
+    renderSuggBanner();renderDetailTags();renderDetailSpkRow(ITEMS[currentDetailId]);renderTranscript();applySortAndRender();
+  });
+}
+function dismissAllSugg(btn){
+  withLoading(btn,()=>{
+    if(!pendingSugg)return;
+    pendingSugg.titlePending=false;pendingSugg.tags.clear();pendingSugg.speakers.clear();
+    renderSuggBanner();renderDetailTags();renderDetailSpkRow(ITEMS[currentDetailId]);
+  });
+}
+function acceptTagSugg(btn,label){
+  withLoading(btn,()=>{
+    if(!pendingSugg)return;
+    const s=AI_SUGGESTIONS[currentDetailId];
+    const ts=s.tags.find(t=>t.label===label);if(!ts)return;
+    let tag=TAGS.find(t=>t.label===label);
+    if(!tag){tag={id:nextId++,label:ts.label,color:ts.color,count:0,desc:'',files:[]};TAGS.push(tag);}
+    const item=ITEMS[currentDetailId];
+    if(!item.tags.find(t=>t.l===label))item.tags.push({c:ts.color,l:label});
+    pendingSugg.tags.delete(label);
+    renderSuggBanner();renderDetailTags();applySortAndRender();
+  });
+}
+function rejectTagSugg(btn,label){
+  withLoading(btn,()=>{
+    if(!pendingSugg)return;
+    pendingSugg.tags.delete(label);
+    renderSuggBanner();renderDetailTags();
+  });
+}
+function acceptSpkSugg(btn,slot){
+  withLoading(btn,()=>{
+    if(!pendingSugg)return;
+    const s=AI_SUGGESTIONS[currentDetailId].speakers[slot];if(!s)return;
+    detailSpkMap[slot]={name:s.name,color:s.color};
+    if(!SPEAKERS.find(sp=>sp.name===s.name))
+      SPEAKERS.push({id:nextId++,name:s.name,color:s.color,count:0,totalMin:'0 min',desc:'',files:[]});
+    pendingSugg.speakers.delete(slot);
+    renderSuggBanner();renderDetailSpkRow(ITEMS[currentDetailId]);renderTranscript();
+  });
+}
+function rejectSpkSugg(btn,slot){
+  withLoading(btn,()=>{
+    if(!pendingSugg)return;
+    pendingSugg.speakers.delete(slot);
+    renderSuggBanner();renderDetailSpkRow(ITEMS[currentDetailId]);
+  });
+}
 function renderDetailSpkRow(item){
   const slots=item.speakers>0?Array.from({length:item.speakers},(_,i)=>i+1):[];
   const row=document.getElementById('detail-spk-row');
+  document.getElementById('detail-spk-sugg-row').style.display='none';
   if(!slots.length){row.innerHTML='';return;}
-  row.innerHTML='<span class="d-spk-label">Speakers:</span>'+slots.map(s=>{
+  const sugg=currentDetailId!==null?AI_SUGGESTIONS[currentDetailId]:null;
+  let html='<span class="d-spk-label">Speakers:</span>';
+  html+=slots.map(s=>{
+    if(pendingSugg&&pendingSugg.speakers.has(s)&&sugg){
+      const sp=sugg.speakers[s];
+      return `<span class="ghost-spk-chip"><span class="icon ghost-spk-ai" title="AI suggestion">auto_awesome</span><span class="ghost-spk-raw">Speaker ${s}</span><span class="icon ghost-spk-arrow">arrow_forward</span><span class="ghost-spk-dot" style="background:${sp.color}"></span><span class="ghost-spk-name">${sp.name}</span><span class="icon ghost-ok" onclick="acceptSpkSugg(this,${s})" title="Accept">check_circle</span><span class="icon ghost-x" onclick="rejectSpkSugg(this,${s})" title="Dismiss">close</span></span>`;
+    }
     const info=detailSpkMap[s]||{name:`Speaker ${s}`,color:'#888'};
     return `<span class="spk-chip"><span class="spk-dot" style="background:${info.color}"></span>${info.name}</span>`;
   }).join('');
+  row.innerHTML=html;
 }
 
 // ─── EDITABLE TITLE ──────────────────────────────────────────────────────────
@@ -782,9 +987,19 @@ function cancelTitleEdit(){
 // ─── DETAIL TAGS ─────────────────────────────────────────────────────────────
 function renderDetailTags(){
   const item=ITEMS[currentDetailId];if(!item)return;
-  document.getElementById('detail-tags-pills').innerHTML=item.tags.map(t=>
+  const sugg=currentDetailId!==null?AI_SUGGESTIONS[currentDetailId]:null;
+  document.getElementById('detail-tags-sugg-row').style.display='none';
+  let html=item.tags.map(t=>
     `<span class="tag-pill" style="background:${t.c}">${t.l}<span class="tag-pill-rm icon" onclick="toggleDetailTag('${t.l.replace(/'/g,"\\'")}')">close</span></span>`
   ).join('');
+  if(pendingSugg&&sugg){
+    pendingSugg.tags.forEach(label=>{
+      const ts=sugg.tags.find(t=>t.label===label);if(!ts)return;
+      const lbl=label.replace(/'/g,"\\'");
+      html+=`<span class="ghost-pill"><span class="icon ghost-pill-icon" title="AI suggestion">auto_awesome</span><span style="color:${ts.color}">${label}</span><span class="ghost-pill-acts"><span class="icon ghost-ok" onclick="acceptTagSugg(this,'${lbl}')" title="Accept">check_circle</span><span class="icon ghost-x" onclick="rejectTagSugg(this,'${lbl}')" title="Dismiss">close</span></span></span>`;
+    });
+  }
+  document.getElementById('detail-tags-pills').innerHTML=html;
   filterTagDD();
 }
 function filterTagDD(){
@@ -1032,6 +1247,26 @@ document.querySelectorAll('#filter-dd input,#sort-dd input').forEach(el=>el.addE
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 applySortAndRender();renderThreads();renderTags();renderSpeakers();
+(function(){
+  const chip=document.querySelector('.det-chip-file');
+  if(!chip)return;
+  const tt=document.createElement('div');
+  tt.id='filename-global-tt';
+  tt.textContent=chip.querySelector('.det-chip-val').textContent;
+  document.body.appendChild(tt);
+  let onTt=false,showing=false;
+  chip.addEventListener('mouseenter',(e)=>{
+    if(showing)return;
+    showing=true;
+    tt.style.left=(e.clientX+14)+'px';
+    tt.style.top=(e.clientY+14)+'px';
+    tt.style.display='block';
+    requestAnimationFrame(()=>tt.style.opacity='1');
+  });
+  chip.addEventListener('mouseleave',()=>setTimeout(()=>{if(!onTt){tt.style.opacity='0';setTimeout(()=>{if(!onTt){tt.style.display='none';showing=false;}},150);}},80));
+  tt.addEventListener('mouseenter',()=>{onTt=true;});
+  tt.addEventListener('mouseleave',()=>{onTt=false;tt.style.opacity='0';setTimeout(()=>{tt.style.display='none';showing=false;},150);});
+})();
 </script>
 </body>
 </html>
