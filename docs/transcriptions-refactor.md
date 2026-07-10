@@ -1,4 +1,4 @@
-# Рефакторинг: `transcriptions` как центральная сущность
+# Рефакторинг: `transcripts` как центральная доменная сущность
 
 ## Проблема
 
@@ -18,18 +18,16 @@
 
 Два чётко разделённых понятия:
 
-**`transcriptions`** — то, что видит и трогает пользователь:
-- название (`title`)
-- теги
-- спикеры
-- ссылка на исходный файл
-- ссылка на submission, который это произвёл
+**`transcripts`** — то, что видит и трогает пользователь (уже существует):
+- текст, сегменты, длительность
+- + название (`title`)
+- + теги
+- + спикеры
 
 **`submissions`** — внутренний технический job:
 - параметры обработки (модель, язык, диаризация)
 - статус и прогресс
 - попытки (`stage_attempts`)
-- сырой результат (`transcripts`, `summaries`)
 
 ---
 
@@ -45,8 +43,8 @@ submissions (id=abc)
   language = "auto"
   diarize = true
   status = "done"
-  ← теги вешаются сюда (submission_tags)
-  ← спикеры вешаются сюда (submission_speakers)
+  ← теги вешаются сюда (submission_tags)     ← неверно
+  ← спикеры вешаются сюда (submission_speakers) ← неверно
 
 transcripts (submission_id=abc)
   segments = [{speaker: "SPEAKER_00", text: "Добрый день..."}]
@@ -57,122 +55,103 @@ transcripts (submission_id=abc)
 ### Как должно быть
 
 ```
-transcriptions (id=trn_1)
+submissions (id=abc)
   user_id = user_1
   audio_id = file_xyz
-  title = "Встреча по продукту Q3"     ← название транскрипта
-  source = "web"
-  created_at = ...
-  ← теги вешаются сюда (transcription_tags)
-  ← спикеры вешаются сюда (transcription_speakers)
-
-submissions (id=sub_abc)
-  transcription_id = trn_1             ← принадлежит транскрипции
   model = "turbo"
   language = "auto"
   diarize = true
-  num_speakers = 2
-  summary_mode = "short"
-  status = "done"
+  status = "done"               ← только технические поля
 
-transcripts (submission_id=sub_abc)    ← результат конкретного submission
-  segments = [...]
+transcripts (submission_id=abc)
+  title = "Встреча по продукту Q3"    ← название транскрипта ✓
+  segments = [{speaker: "SPEAKER_00", text: "Добрый день..."}]
   formatted_text = "..."
   audio_duration_s = 864.5
+  ← теги вешаются сюда (transcript_tags)      ✓
+  ← спикеры вешаются сюда (transcript_speakers) ✓
 ```
 
 ---
 
 ## Что нужно сделать
 
-### 1. Новая таблица `transcriptions`
+### 1. Добавить `title` в `transcripts`
 
 ```sql
-CREATE TABLE transcriptions (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     UUID NOT NULL REFERENCES users(id),
-    audio_id    UUID NOT NULL REFERENCES audio_meta(id),
-    title       TEXT,
-    source      VARCHAR(20) NOT NULL DEFAULT 'web',
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+ALTER TABLE transcripts ADD COLUMN title TEXT;
+```
+
+При отдаче API: если `title IS NULL` — фоллбэк на `audio_meta.original_name`.
+
+### 2. Перенести теги
+
+```sql
+CREATE TABLE transcript_tags (
+    transcript_id UUID NOT NULL REFERENCES transcripts(id) ON DELETE CASCADE,
+    tag_id        UUID NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+    PRIMARY KEY (transcript_id, tag_id)
 );
+
+-- Перенести данные из submission_tags через join
+INSERT INTO transcript_tags (transcript_id, tag_id)
+SELECT t.id, st.tag_id
+FROM submission_tags st
+JOIN transcripts t ON t.submission_id = st.submission_id;
+
+DROP TABLE submission_tags;
 ```
 
-### 2. Добавить FK в `submissions`
+### 3. Перенести спикеров
 
 ```sql
-ALTER TABLE submissions
-    ADD COLUMN transcription_id UUID REFERENCES transcriptions(id);
+CREATE TABLE transcript_speakers (
+    transcript_id UUID NOT NULL REFERENCES transcripts(id) ON DELETE CASCADE,
+    speaker_id    UUID NOT NULL REFERENCES speakers(id) ON DELETE CASCADE,
+    PRIMARY KEY (transcript_id, speaker_id)
+);
+
+INSERT INTO transcript_speakers (transcript_id, speaker_id)
+SELECT t.id, ss.speaker_id
+FROM submission_speakers ss
+JOIN transcripts t ON t.submission_id = ss.submission_id;
+
+DROP TABLE submission_speakers;
 ```
 
-Перенести в `transcriptions`: `user_id`, `audio_id`, `source` из `submissions`.  
-Из `submissions` эти колонки можно убрать (остаются только технические параметры).
+### 4. Обновить Kotlin-код
 
-### 3. Перенести теги
+- `SubmissionTagRepository` / `SubmissionTagEntity` → `TranscriptTagRepository` / `TranscriptTagEntity`
+- `SubmissionSpeakerRepository` / `SubmissionSpeakerEntity` → `TranscriptSpeakerRepository` / `TranscriptSpeakerEntity`
+- `SubmissionService.addTag` / `removeTag` — джойнить через `transcripts` чтобы получить `transcript_id`
+- `TranscriptEntity` — добавить поле `title: String?`
+- Список (`GET /transcriptions`): джойн `submissions → transcripts → transcript_tags → tags` вместо `submissions → submission_tags → tags`
+- Детали (`GET /jobs/{id}`): аналогично
+- `title` в ответах: `transcript?.title ?: audioMeta.originalName`
 
-```
-submission_tags  →  transcription_tags
-  submission_id      transcription_id
-  tag_id             tag_id
-```
+### 5. Обновить dedup-логику
 
-### 4. Перенести спикеров
-
-```
-submission_speakers  →  transcription_speakers
-  submission_id          transcription_id
-  speaker_id             speaker_id
-```
-
-### 5. Перевести `telegram_deliveries`
-
-```sql
--- было: job_id FK → submissions
--- стало: transcription_id FK → transcriptions
-ALTER TABLE telegram_deliveries
-    RENAME COLUMN job_id TO transcription_id;
-```
-
-Телеграм-бот доставляет результат пользователю — это доменное событие, относится к транскрипции.
-
-### 6. Обновить dedup-логику
-
-Сейчас `findDuplicate()` ищет существующий `submission` с тем же `(user_id, content_hash, model, language, diarize, ...)` и возвращает `submission_id`.
-
-После рефакторинга: при дубликате возвращаем `transcription_id` — пользователь уже получил этот транскрипт, новый submission не нужен.
-
-### 7. Переписать Kotlin-код
-
-- Новый entity `TranscriptionEntity` + `TranscriptionRepository`
-- `SubmissionEntity` получает поле `transcriptionId`
-- `SubmissionService`, `OrchestratorService`, `SubmissionStateService` — обновить flow создания: сначала INSERT `transcriptions`, потом INSERT `submissions` с `transcription_id`
-- Все контроллеры: `/transcriptions` и `/jobs/{id}` отдают `transcription_id` как основной ID
-- `submission_tags`/`submission_speakers` → `transcription_tags`/`transcription_speakers`
-
-### 8. Статус транскрипции
-
-Статус для пользователя берётся из `submissions.status` (единственного submission, 1:1 на данный момент).  
-В будущем — если появятся ретраи, статус = статус последнего submission.
+Без изменений — dedup работает на уровне `submissions` (по `content_hash` + параметрам), это технический уровень и так и должно быть.
 
 ---
 
-## Что остаётся без изменений
+## Что не меняется
 
-- `transcripts` — сырые данные транскрипта, ссылаются на `submission_id` (это правильно: они результат конкретного job'а)
-- `summaries` — аналогично, ссылаются на `submission_id`
-- `stage_attempts` — ссылаются на `submission_id` (технические попытки этапов)
-- `audio_meta` — без изменений
-- `plans`, `users`, `auth_identities` — без изменений
+- `submissions` — структура таблицы не трогается
+- `transcripts` — все существующие колонки остаются, только добавляем `title`
+- `summaries` — ссылается на `submission_id`, остаётся как есть (результат конкретного job'а)
+- `stage_attempts` — аналогично
+- `telegram_deliveries` — ссылается на `submissions.id`, не трогаем (доставка привязана к конкретному processing job'у)
+- `audio_meta`, `plans`, `users`, `auth_identities` — без изменений
 
 ---
 
 ## Порядок выполнения
 
-1. Flyway-миграция: создать `transcriptions`, добавить `transcription_id` в `submissions`, перенести `submission_tags` → `transcription_tags`, `submission_speakers` → `transcription_speakers`, обновить `telegram_deliveries`
-2. Kotlin: entity + repository для `transcriptions`
-3. Kotlin: обновить submission flow (создание пары transcription + submission)
-4. Kotlin: обновить сервисы и контроллеры — везде где раньше был `submissionId` как внешний ID, теперь `transcriptionId`
-5. Kotlin: обновить dedup-логику
-6. Тесты
+1. Flyway-миграция: `ALTER TABLE transcripts ADD COLUMN title TEXT`, создать `transcript_tags` + `transcript_speakers`, перенести данные, удалить `submission_tags` + `submission_speakers`
+2. Kotlin: переименовать entity/repository для тегов и спикеров
+3. Kotlin: добавить `title` в `TranscriptEntity`
+4. Kotlin: обновить `SubmissionService` (tag/speaker методы джойнят через `transcripts`)
+5. Kotlin: обновить контроллер и response DTO — добавить `title`, поменять джойны для тегов/спикеров
 
 Миграцию данных делать не нужно — это новое развёртывание, данных в проде ещё нет.
