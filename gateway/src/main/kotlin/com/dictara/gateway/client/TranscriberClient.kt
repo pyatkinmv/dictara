@@ -31,6 +31,7 @@ data class TranscriberJobSnapshot(
     val progress: ProgressInfo?,
     val segments: List<Segment>?,
     val audioDurationS: Double?,
+    val detectedLanguage: String?,
     val durationS: Double?,
     val elapsedS: Double?,
     val error: String?,
@@ -142,11 +143,12 @@ class TranscriberClient(private val props: DictaraProperties) {
         } else null
 
         val audioDurationS = root["result"]?.get("audio_duration_s")?.takeIf { !it.isNull }?.asDouble()
+        val detectedLanguage = root["result"]?.get("language")?.takeIf { !it.isNull }?.asText()
         val durationS = root["duration_s"]?.takeIf { !it.isNull }?.asDouble()
         val elapsedS = root["elapsed_s"]?.takeIf { !it.isNull }?.asDouble()
         val error = root["error"]?.takeIf { !it.isNull }?.asText()
         val retryable = root["retryable"]?.takeIf { !it.isNull }?.asBoolean() ?: true
 
-        return TranscriberJobSnapshot(status, progress, segments, audioDurationS, durationS, elapsedS, error, retryable)
+        return TranscriberJobSnapshot(status, progress, segments, audioDurationS, detectedLanguage, durationS, elapsedS, error, retryable)
     }
 }

@@ -57,7 +57,7 @@ class SubmissionService(
         sizeBytes: Long,
         uploadResult: UploadResult,
         model: String,
-        language: String,
+        languageHint: String,
         diarize: Boolean,
         numSpeakers: Int?,
         summaryMode: String,
@@ -67,7 +67,7 @@ class SubmissionService(
     ): CreateResult {
         val contentHash = uploadResult.contentHash
         if (contentHash.isNotEmpty()) {
-            val duplicate = submissionRepo.findDuplicate(userId, contentHash, model, language, diarize, numSpeakers, summaryMode)
+            val duplicate = submissionRepo.findDuplicate(userId, contentHash, model, languageHint, diarize, numSpeakers, summaryMode)
             if (duplicate != null) return CreateResult(duplicate.id!!, dedup = true)
         }
 
@@ -79,7 +79,7 @@ class SubmissionService(
             storageUri = uploadResult.ref.uri, contentHash = contentHash,
         ).apply { _isNew = true })
         val submission = submissionRepo.save(SubmissionEntity(
-            userId = userId, audioId = audio.id, model = model, language = language,
+            userId = userId, audioId = audio.id, model = model, languageHint = languageHint,
             diarize = diarize, numSpeakers = numSpeakers, summaryMode = summaryMode, source = source,
         ))
         if (telegramChatId != null) {

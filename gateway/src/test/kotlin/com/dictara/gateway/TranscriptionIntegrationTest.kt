@@ -40,6 +40,7 @@ class TranscriptionIntegrationTest : AbstractSharedContextIntegrationTest() {
     data class ResultResponse(
         val formattedText: String?,
         val audioDurationS: Double?,
+        val detectedLanguage: String?,
         val segments: List<Segment>?,
         val summary: String?,
     )
@@ -73,7 +74,7 @@ class TranscriptionIntegrationTest : AbstractSharedContextIntegrationTest() {
                 .inScenario("job-1").whenScenarioStateIs("done")
                 .willReturn(okJson("""
                     {"status":"done","duration_s":2.1,
-                     "result":{"formatted_text":"Hello world.","audio_duration_s":5.0,
+                     "result":{"formatted_text":"Hello world.","audio_duration_s":5.0,"language":"en",
                                "segments":[{"start":0.0,"end":2.0,"text":"Hello world."}]}}
                 """))
         )
@@ -82,7 +83,8 @@ class TranscriptionIntegrationTest : AbstractSharedContextIntegrationTest() {
         val result = pollUntilDone(jobId)
 
         assert(result.formattedText?.isNotEmpty() == true) { "formattedText should not be empty" }
-        assert(result.audioDurationS != null) { "audioDurationS should be present" }
+        assert(result.audioDurationS == 5.0) { "audioDurationS should be 5.0 from transcriber result" }
+        assert(result.detectedLanguage == "en") { "detectedLanguage should be 'en'" }
         assert(result.segments?.isNotEmpty() == true) { "segments should not be empty" }
     }
 

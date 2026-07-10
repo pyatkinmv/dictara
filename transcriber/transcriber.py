@@ -41,12 +41,11 @@ class Transcriber:
         self.model = WhisperModel(model_size, device=device, compute_type=compute_type)
         print("Model ready.")
 
-    def transcribe(self, audio_path: str, language: str | None = None, progress_callback=None) -> list[dict]:
+    def transcribe(self, audio_path: str, language: str | None = None, progress_callback=None) -> dict:
         """
         Transcribe an audio/video file.
 
-        Returns a list of segments:
-            [{"start": 0.0, "end": 2.4, "text": "Hello world"}, ...]
+        Returns {"segments": [...], "language": "en", "duration_s": 42.0}
 
         progress_callback(processed_s: float, total_s: float) is called after each segment.
         """
@@ -60,16 +59,16 @@ class Transcriber:
         detected = info.language if language is None else language
         print(f"Language: {detected} (confidence: {info.language_probability:.0%}), duration: {info.duration:.1f}s")
 
-        result = []
+        result_segments = []
         for segment in segments:
-            result.append({
+            result_segments.append({
                 "start": segment.start,
                 "end": segment.end,
                 "text": segment.text.strip(),
             })
             if progress_callback:
                 progress_callback(segment.end, info.duration)
-        return result
+        return {"segments": result_segments, "language": detected, "duration_s": info.duration}
 
 
 class Diarizer:

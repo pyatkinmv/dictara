@@ -35,7 +35,7 @@ interface SubmissionRepository : CrudRepository<SubmissionEntity, UUID> {
         WHERE a.user_id = :userId
           AND a.content_hash = :contentHash
           AND s.model = :model
-          AND s.language = :language
+          AND s.language_hint = :languageHint
           AND s.diarize = :diarize
           AND COALESCE(s.num_speakers, 0) = COALESCE(:numSpeakers, 0)
           AND s.summary_mode = :summaryMode
@@ -47,7 +47,7 @@ interface SubmissionRepository : CrudRepository<SubmissionEntity, UUID> {
         userId: UUID,
         contentHash: String,
         model: String,
-        language: String,
+        languageHint: String,
         diarize: Boolean,
         numSpeakers: Int?,
         summaryMode: String,

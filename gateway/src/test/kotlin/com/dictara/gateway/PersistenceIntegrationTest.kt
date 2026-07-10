@@ -1,5 +1,6 @@
 package com.dictara.gateway
 
+import com.dictara.gateway.repository.AudioMetaRepository
 import com.dictara.gateway.repository.StageAttemptRepository
 import com.dictara.gateway.repository.SubmissionRepository
 import com.dictara.gateway.repository.TranscriptRepository
@@ -29,6 +30,7 @@ class PersistenceIntegrationTest : AbstractSharedContextIntegrationTest() {
 
     @Autowired lateinit var rest: TestRestTemplate
     @Autowired lateinit var submissionRepo: SubmissionRepository
+    @Autowired lateinit var audioMetaRepo: AudioMetaRepository
     @Autowired lateinit var transcriptRepo: TranscriptRepository
     @Autowired lateinit var stageAttemptRepo: StageAttemptRepository
     @MockBean lateinit var audioStorage: AudioStorage
@@ -45,7 +47,7 @@ class PersistenceIntegrationTest : AbstractSharedContextIntegrationTest() {
         wireMock.stubFor(get(urlEqualTo("/jobs/persist-1"))
             .willReturn(okJson("""
                 {"status":"done","duration_s":1.5,
-                 "result":{"formatted_text":"Hello world.","audio_duration_s":5.0,
+                 "result":{"formatted_text":"Hello world.","audio_duration_s":5.0,"language":"en",
                            "segments":[{"start":0.0,"end":2.0,"text":"Hello world."}]}}
             """)))
         val fakeAudio = object : ByteArrayResource(ByteArray(8)) {
@@ -101,6 +103,10 @@ class PersistenceIntegrationTest : AbstractSharedContextIntegrationTest() {
         val transcript = transcriptRepo.findBySubmissionId(jobId)
         assertThat(transcript).isNotNull
         assertThat(transcript!!.segments).isNotNull
+        assertThat(transcript.detectedLanguage).isEqualTo("en")
+
+        val audioMeta = audioMetaRepo.findById(submission.audioId).orElse(null)
+        assertThat(audioMeta?.durationS).isEqualTo(5.0)
 
         val attempts = stageAttemptRepo.findBySubmissionIdAndStageOrderByAttemptNumDesc(jobId, "transcription")
         assertThat(attempts).hasSize(1)

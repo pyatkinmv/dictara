@@ -61,11 +61,11 @@ class JobStore:
         with self._lock:
             self._jobs[job_id].diarize_progress = completed / total
 
-    def set_done(self, job_id: str, segments: list[dict]) -> None:
+    def set_done(self, job_id: str, segments: list[dict], language: str | None, audio_duration_s: float | None) -> None:
         with self._lock:
             job = self._jobs[job_id]
             job.status = "done"
-            job.result = {"segments": segments}
+            job.result = {"segments": segments, "language": language, "audio_duration_s": audio_duration_s}
             job.finished_at = time.time()
 
     def set_failed(self, job_id: str, error: str, retryable: bool = True) -> None:

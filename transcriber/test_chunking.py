@@ -9,19 +9,21 @@ from jobs import JobStore
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
-def _make_transcriber(segments_per_call):
+def _make_transcriber(segments_per_call, language="en"):
     """Return a mock Transcriber whose transcribe() returns the next item from
-    segments_per_call on each successive call, also invoking the progress_callback."""
+    segments_per_call on each successive call, also invoking the progress_callback.
+    Returns a dict {"segments": [...], "language": ..., "duration_s": ...} matching
+    the real Transcriber.transcribe() contract."""
     mock = MagicMock()
     call_index = [0]
 
-    def fake_transcribe(path, language=None, progress_callback=None):
+    def fake_transcribe(path, language=language, progress_callback=None):
         segs = segments_per_call[call_index[0]]
         call_index[0] += 1
+        duration = segs[-1]["end"] if segs else 0.0
         if progress_callback and segs:
-            last_end = segs[-1]["end"]
-            progress_callback(last_end, last_end)
-        return segs
+            progress_callback(duration, duration)
+        return {"segments": segs, "language": language, "duration_s": duration}
 
     mock.transcribe.side_effect = fake_transcribe
     return mock
@@ -66,8 +68,8 @@ def test_short_audio_not_chunked():
         result = transcriber.transcribe("/tmp/fake.wav", language=None, progress_callback=on_segment)
 
     assert transcriber.transcribe.call_count == 1
-    assert result == segs
-    assert result[0]["start"] == 0.0   # no offset applied
+    assert result["segments"] == segs
+    assert result["segments"][0]["start"] == 0.0   # no offset applied
 
 
 # ── test 2: long audio — correct chunk count ──────────────────────────────────
@@ -88,7 +90,7 @@ def test_long_audio_chunk_count():
     result = _run(job_id, "/tmp/fake.wav", None, 3600.0, transcriber, store)
 
     assert transcriber.transcribe.call_count == 3
-    assert len(result) == 3
+    assert len(result["segments"]) == 3
 
 
 # ── test 3: segment timestamps are offset correctly ───────────────────────────
@@ -105,12 +107,13 @@ def test_segment_offsets():
 
     result = _run(job_id, "/tmp/fake.wav", None, 3000.0, transcriber, store)
 
-    assert result[0]["start"] == 0.0
-    assert result[0]["end"]   == 10.0
-    assert result[1]["start"] == 1200.0
-    assert result[1]["end"]   == 1210.0
-    assert result[2]["start"] == 2400.0
-    assert result[2]["end"]   == 2410.0
+    segs = result["segments"]
+    assert segs[0]["start"] == 0.0
+    assert segs[0]["end"]   == 10.0
+    assert segs[1]["start"] == 1200.0
+    assert segs[1]["end"]   == 1210.0
+    assert segs[2]["start"] == 2400.0
+    assert segs[2]["end"]   == 2410.0
 
 
 # ── test 4: progress callbacks report cumulative position ─────────────────────
@@ -164,7 +167,7 @@ def test_empty_chunk_segments():
 
     result = _run(job_id, "/tmp/fake.wav", None, 3600.0, transcriber, store)
 
-    assert result == []
+    assert result["segments"] == []
     assert transcriber.transcribe.call_count == 3
 
 
@@ -185,6 +188,25 @@ def test_mixed_chunks():
 
     result = _run(job_id, "/tmp/fake.wav", None, 3600.0, transcriber, store)
 
-    assert len(result) == 1
-    assert result[0]["start"] == 1205.0   # 1200 + 5
-    assert result[0]["end"]   == 1215.0   # 1200 + 15
+    segs = result["segments"]
+    assert len(segs) == 1
+    assert segs[0]["start"] == 1205.0   # 1200 + 5
+    assert segs[0]["end"]   == 1215.0   # 1200 + 15
+
+
+# ── test 8: return dict includes language and duration_s ─────────────────────
+
+def test_return_dict_has_language_and_duration():
+    """_transcribe_chunked must return language from first chunk and total_s as duration_s."""
+    store = JobStore()
+    job_id = store.create("/tmp/fake.wav")
+    store.set_processing(job_id)
+
+    segs = [{"start": 0.0, "end": 10.0, "text": "hello"}]
+    transcriber = _make_transcriber([segs, segs], language="ru")
+
+    result = _run(job_id, "/tmp/fake.wav", None, 2500.0, transcriber, store)
+
+    assert result["language"] == "ru"
+    assert result["duration_s"] == 2500.0   # equals the total_s passed in
+    assert len(result["segments"]) == 2

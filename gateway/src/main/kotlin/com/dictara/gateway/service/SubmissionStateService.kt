@@ -14,6 +14,7 @@ class SubmissionStateService(
     private val stageAttemptRepo: StageAttemptRepository,
     private val transcriptRepo: TranscriptRepository,
     private val summaryRepo: SummaryRepository,
+    private val audioMetaRepo: AudioMetaRepository,
 ) {
     /** Claims the next pending submission (oldest by createdAt), marks it processing, and returns it.
      *  Returns null if no pending submissions exist or another job is already processing.
@@ -58,19 +59,22 @@ class SubmissionStateService(
         stageAttemptRepo.save(attempt)
     }
 
-    /** Marks an attempt done and saves the transcript. */
+    /** Marks an attempt done and saves the transcript; updates audio_meta.duration_s. */
     @Transactional
     fun saveTranscriptAndCompleteAttempt(
         submissionId: UUID,
+        audioId: UUID,
         attemptId: UUID,
         segments: JsonNode,
         audioDurationS: Double?,
+        detectedLanguage: String?,
     ) {
         transcriptRepo.save(TranscriptEntity(
             submissionId = submissionId,
             segments = segments,
-            audioDurationS = audioDurationS,
+            detectedLanguage = detectedLanguage,
         ))
+        audioMetaRepo.updateDurationS(audioId, audioDurationS)
         val attempt = stageAttemptRepo.findById(attemptId).orElseThrow()
         attempt.status = "done"
         attempt.finishedAt = Instant.now()

@@ -27,6 +27,7 @@ class TranscribeController(
     private val userService: UserService,
     private val userRepo: UserRepository,
     private val submissionRepo: SubmissionRepository,
+    private val audioMetaRepo: AudioMetaRepository,
     private val transcriptRepo: TranscriptRepository,
     private val summaryRepo: SummaryRepository,
     private val stageAttemptRepo: StageAttemptRepository,
@@ -69,7 +70,7 @@ class TranscribeController(
 
     data class SegmentResponse(val start: Double, val end: Double, val text: String, val speaker: String?)
 
-    data class ResultResponse(val segments: List<SegmentResponse>?, val formattedText: String?, val audioDurationS: Double?, val summary: String?)
+    data class ResultResponse(val segments: List<SegmentResponse>?, val formattedText: String?, val audioDurationS: Double?, val detectedLanguage: String?, val summary: String?)
 
     data class JobResponse(
         val jobId: String,
@@ -136,7 +137,7 @@ class TranscribeController(
         val result = submissionService.createSubmission(
             userId = user.id!!, audioId = audioId, originalName = originalName,
             contentType = contentType, sizeBytes = file.size, uploadResult = uploadResult,
-            model = resolvedModel, language = language, diarize = diarize,
+            model = resolvedModel, languageHint = language, diarize = diarize,
             numSpeakers = numSpeakers, summaryMode = summaryMode, source = source,
             telegramChatId = telegramChatId, telegramMessageId = telegramMessageId,
         )
@@ -159,6 +160,7 @@ class TranscribeController(
         }
 
         val transcript = transcriptRepo.findBySubmissionId(id)
+        val audioMeta = audioMetaRepo.findById(submission.audioId).orElse(null)
         val summary = summaryRepo.findBySubmissionId(id)
         val liveProgress = orchestrator.getLiveProgress(id)
 
@@ -199,7 +201,8 @@ class TranscribeController(
             result = if (transcript != null) ResultResponse(
                 segments = segments,
                 formattedText = formattedText,
-                audioDurationS = transcript.audioDurationS,
+                audioDurationS = audioMeta?.durationS,
+                detectedLanguage = transcript.detectedLanguage,
                 summary = summary?.text,
             ) else null,
             durationS = durationS,

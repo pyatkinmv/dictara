@@ -39,7 +39,7 @@ class RepositorySmokeTest {
         ).apply { _isNew = true })
         val submission = submissionRepo.save(SubmissionEntity(
             userId = user.id!!, audioId = audio.id, model = "fast",
-            language = "auto", summaryMode = "off",
+            languageHint = "auto", summaryMode = "off",
         ))
 
         val found = submissionRepo.findById(submission.id!!).orElse(null)

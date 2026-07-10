@@ -100,10 +100,11 @@ def _transcribe_chunked(
     transcriber,
     language: str | None,
     total_s: float,
-) -> list[dict]:
+) -> dict:
     """Split wav_path into _CHUNK_SIZE_S-second chunks, transcribe each,
-    return segments with timestamps offset to absolute positions."""
+    return {"segments": [...], "language": "...", "duration_s": total_s}."""
     all_segments = []
+    detected_language = language
     starts = list(range(0, int(total_s), _CHUNK_SIZE_S))
 
     for i, chunk_start in enumerate(starts):
@@ -127,7 +128,7 @@ def _transcribe_chunked(
 
         t0 = time.time()
         try:
-            chunk_segs = transcriber.transcribe(
+            chunk_result = transcriber.transcribe(
                 chunk_path, language=language, progress_callback=on_segment
             )
         finally:
@@ -135,6 +136,10 @@ def _transcribe_chunked(
                 os.unlink(chunk_path)
             except OSError:
                 pass
+
+        if i == 0:
+            detected_language = chunk_result["language"]
+        chunk_segs = chunk_result["segments"]
 
         logger.info(
             "Chunk %d/%d: done in %.1fs — %d segments",
@@ -147,7 +152,7 @@ def _transcribe_chunked(
                 "end":   seg["end"]   + chunk_offset,
             })
 
-    return all_segments
+    return {"segments": all_segments, "language": detected_language, "duration_s": total_s}
 
 
 # ── worker ────────────────────────────────────────────────────────────────────
@@ -179,19 +184,22 @@ def _run_transcription(job_id: str, tmp_path: str, language: str | None, diarize
                 "Long audio detected: %.0fs (%.1f min) — splitting into %d chunks of %ds",
                 total_s, total_s / 60, n_chunks, _CHUNK_SIZE_S,
             )
-            segments = _transcribe_chunked(job_id, wav_path, transcriber, language, total_s)
-            logger.info("Chunked transcription complete: %d segments total", len(segments))
+            result = _transcribe_chunked(job_id, wav_path, transcriber, language, total_s)
+            logger.info("Chunked transcription complete: %d segments total", len(result["segments"]))
         else:
             def on_segment(processed_s: float, ts: float):
                 job_store.set_progress(job_id, processed_s, ts)
-            segments = transcriber.transcribe(wav_path, language=language, progress_callback=on_segment)
+            result = transcriber.transcribe(wav_path, language=language, progress_callback=on_segment)
+        segments = result["segments"]
+        detected_language = result["language"]
+        audio_duration_s = result["duration_s"]
         if diarize and app.state.diarizer is not None:
             job_store.set_diarizing(job_id)
             def on_diarize(completed: int, total: int):
                 job_store.set_diarize_progress(job_id, completed, total)
             diarization = app.state.diarizer.diarize(wav_path, num_speakers=num_speakers, progress_callback=on_diarize)
             segments = merge_diarization(segments, diarization)
-        job_store.set_done(job_id, segments)
+        job_store.set_done(job_id, segments, detected_language, audio_duration_s)
     except Exception as exc:
         logger.exception("Transcription failed for job %s", job_id)
         job_store.set_failed(job_id, str(exc))

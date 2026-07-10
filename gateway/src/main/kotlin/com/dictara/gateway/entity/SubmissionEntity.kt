@@ -11,7 +11,7 @@ class SubmissionEntity(
     val userId: UUID,
     val audioId: UUID,
     val model: String = "fast",
-    val language: String = "auto",
+    val languageHint: String = "auto",
     val diarize: Boolean = false,
     val numSpeakers: Int? = null,
     val summaryMode: String = "off",

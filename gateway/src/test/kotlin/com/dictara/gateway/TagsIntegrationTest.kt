@@ -35,7 +35,7 @@ class TagsIntegrationTest : AbstractSharedContextIntegrationTest() {
             audioId, userId, "hash-$userId",
         )
         jdbcTemplate.update(
-            "INSERT INTO submissions(id, user_id, audio_id, model, language, diarize, summary_mode, source, status) VALUES (?, ?, ?, 'fast', 'auto', false, 'off', 'web', 'done')",
+            "INSERT INTO submissions(id, user_id, audio_id, model, language_hint, diarize, summary_mode, source, status) VALUES (?, ?, ?, 'fast', 'auto', false, 'off', 'web', 'done')",
             submissionId, userId, audioId,
         )
     }
@@ -62,7 +62,7 @@ class TagsIntegrationTest : AbstractSharedContextIntegrationTest() {
             otherAudioId, otherUserId, "hash-$otherUserId",
         )
         jdbcTemplate.update(
-            "INSERT INTO submissions(id, user_id, audio_id, model, language, diarize, summary_mode, source, status) VALUES (?, ?, ?, 'fast', 'auto', false, 'off', 'web', 'done')",
+            "INSERT INTO submissions(id, user_id, audio_id, model, language_hint, diarize, summary_mode, source, status) VALUES (?, ?, ?, 'fast', 'auto', false, 'off', 'web', 'done')",
             otherSubmissionId, otherUserId, otherAudioId,
         )
 
