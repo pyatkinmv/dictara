@@ -71,3 +71,4 @@ dictara:
   storage:
     gcs:
       bucket: ${GCS_UPLOADS_BUCKET:}
+
