@@ -64,13 +64,11 @@ class SubmissionStateService(
         submissionId: UUID,
         attemptId: UUID,
         segments: JsonNode,
-        formattedText: String,
         audioDurationS: Double?,
     ) {
         transcriptRepo.save(TranscriptEntity(
             submissionId = submissionId,
             segments = segments,
-            formattedText = formattedText,
             audioDurationS = audioDurationS,
         ))
         val attempt = stageAttemptRepo.findById(attemptId).orElseThrow()

@@ -6,6 +6,7 @@ import com.dictara.gateway.storage.AudioStorage
 import com.dictara.gateway.service.OrchestratorService
 import com.dictara.gateway.service.SubmissionService
 import com.dictara.gateway.service.UserService
+import com.dictara.gateway.util.TranscriptFormatter
 import jakarta.servlet.http.HttpServletRequest
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
@@ -162,7 +163,7 @@ class TranscribeController(
         val liveProgress = orchestrator.getLiveProgress(id)
 
         val segmentsNode = transcript?.segments
-        val formattedText = transcript?.formattedText
+        val formattedText = TranscriptFormatter.format(segmentsNode)
 
         val transcriptionAttempts = stageAttemptRepo.findBySubmissionIdAndStageOrderByAttemptNumDesc(id, "transcription")
         val latestFailedAttempt = transcriptionAttempts.firstOrNull { it.status == "failed" }
@@ -222,7 +223,9 @@ class TranscribeController(
 
     @GetMapping("/transcript")
     fun downloadTranscript(@RequestParam jobId: UUID): ResponseEntity<ByteArray> {
-        val text = transcriptRepo.findBySubmissionId(jobId)?.formattedText
+        val text = transcriptRepo.findBySubmissionId(jobId)
+            ?.let { TranscriptFormatter.format(it.segments) }
+            ?.takeIf { it.isNotEmpty() }
             ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"transcript_$jobId.txt\"")

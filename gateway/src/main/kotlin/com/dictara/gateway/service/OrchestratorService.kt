@@ -9,6 +9,7 @@ import com.dictara.gateway.model.SummaryMode
 import com.dictara.gateway.port.SummarizerPort
 import com.dictara.gateway.repository.AudioMetaRepository
 import com.dictara.gateway.repository.TranscriptRepository
+import com.dictara.gateway.util.TranscriptFormatter
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
@@ -111,10 +112,10 @@ class OrchestratorService(
 
             val snapshot = pollTranscriber(submissionId, transcriberJobId)
             val segmentsNode = mapper.valueToTree<JsonNode>(snapshot.segments ?: emptyList<Any>())
-            val formattedText = formatSegments(snapshot.segments ?: emptyList())
+            val formattedText = TranscriptFormatter.format(snapshot.segments ?: emptyList())
 
             stateService.saveTranscriptAndCompleteAttempt(
-                submissionId, attempt.id, segmentsNode, formattedText, snapshot.audioDurationS,
+                submissionId, attempt.id, segmentsNode, snapshot.audioDurationS,
             )
             liveProgress.remove(submissionId)
             log.info("Transcription complete for submission $submissionId (duration=${snapshot.audioDurationS?.let { "%.1fs".format(it) } ?: "unknown"}, segments=${snapshot.segments?.size ?: 0})")
@@ -148,10 +149,10 @@ class OrchestratorService(
         try {
             val snapshot = pollTranscriber(submissionId, attempt.externalJobId!!)
             val segmentsNode = mapper.valueToTree<JsonNode>(snapshot.segments ?: emptyList<Any>())
-            val formattedText = formatSegments(snapshot.segments ?: emptyList())
+            val formattedText = TranscriptFormatter.format(snapshot.segments ?: emptyList())
 
             stateService.saveTranscriptAndCompleteAttempt(
-                submissionId, attempt.id!!, segmentsNode, formattedText, snapshot.audioDurationS,
+                submissionId, attempt.id!!, segmentsNode, snapshot.audioDurationS,
             )
             liveProgress.remove(submissionId)
             log.info("Resumed transcription complete for submission $submissionId (duration=${snapshot.audioDurationS?.let { "%.1fs".format(it) } ?: "unknown"}, segments=${snapshot.segments?.size ?: 0})")
@@ -248,19 +249,6 @@ class OrchestratorService(
         throw RuntimeException("Timeout: transcription did not complete within ${props.transcriber.timeoutHours} hours")
     }
 
-    private fun formatTimestamp(seconds: Double): String {
-        val h = (seconds / 3600).toInt()
-        val m = ((seconds % 3600) / 60).toInt()
-        val s = (seconds % 60).toInt()
-        val ms = ((seconds % 1) * 1000).toInt()
-        return "%02d:%02d:%02d.%03d".format(h, m, s, ms)
-    }
-
-    private fun formatSegments(segments: List<com.dictara.gateway.model.Segment>): String =
-        segments.joinToString("\n") { seg ->
-            val ts = "[${formatTimestamp(seg.start)} --> ${formatTimestamp(seg.end)}]"
-            if (seg.speaker != null) "$ts [${seg.speaker}] ${seg.text}" else "$ts ${seg.text}"
-        }
 }
 
 /** Thrown when the transcriber reports a non-retryable failure (e.g. bad file format). */

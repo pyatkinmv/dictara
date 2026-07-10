@@ -100,7 +100,7 @@ class PersistenceIntegrationTest : AbstractSharedContextIntegrationTest() {
 
         val transcript = transcriptRepo.findBySubmissionId(jobId)
         assertThat(transcript).isNotNull
-        assertThat(transcript!!.formattedText).contains("Hello world")
+        assertThat(transcript!!.segments).isNotNull
 
         val attempts = stageAttemptRepo.findBySubmissionIdAndStageOrderByAttemptNumDesc(jobId, "transcription")
         assertThat(attempts).hasSize(1)

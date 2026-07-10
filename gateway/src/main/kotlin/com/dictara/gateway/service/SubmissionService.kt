@@ -4,6 +4,7 @@ import com.dictara.gateway.entity.AudioMetaEntity
 import com.dictara.gateway.entity.SubmissionEntity
 import com.dictara.gateway.entity.TagEntity
 import com.dictara.gateway.entity.TelegramDeliveryEntity
+import com.dictara.gateway.util.TranscriptFormatter
 import com.dictara.gateway.plan.PlanService
 import com.dictara.gateway.repository.*
 import com.dictara.gateway.storage.UploadResult
@@ -126,7 +127,8 @@ class SubmissionService(
             ExportData(
                 submissionId = id,
                 createdAt = s.createdAt,
-                transcriptText = transcriptRepo.findBySubmissionId(id)?.formattedText,
+                transcriptText = transcriptRepo.findBySubmissionId(id)
+                    ?.let { TranscriptFormatter.format(it.segments) },
                 summaryText = summaryRepo.findBySubmissionId(id)?.text,
                 originalName = audio?.originalName,
                 storageUri = audio?.storageUri,
