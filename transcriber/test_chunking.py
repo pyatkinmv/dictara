@@ -13,17 +13,20 @@ def _make_transcriber(segments_per_call, language="en"):
     """Return a mock Transcriber whose transcribe() returns the next item from
     segments_per_call on each successive call, also invoking the progress_callback.
     Returns a dict {"segments": [...], "language": ..., "duration_s": ...} matching
-    the real Transcriber.transcribe() contract."""
+    the real Transcriber.transcribe() contract.
+    `language` is always returned as the detected language regardless of the hint
+    passed to transcribe() — simulating Whisper's auto-detection behaviour."""
     mock = MagicMock()
     call_index = [0]
+    detected_language = language  # capture now; inner param must not shadow this
 
-    def fake_transcribe(path, language=language, progress_callback=None):
+    def fake_transcribe(path, language=None, progress_callback=None):
         segs = segments_per_call[call_index[0]]
         call_index[0] += 1
         duration = segs[-1]["end"] if segs else 0.0
         if progress_callback and segs:
             progress_callback(duration, duration)
-        return {"segments": segs, "language": language, "duration_s": duration}
+        return {"segments": segs, "language": detected_language, "duration_s": duration}
 
     mock.transcribe.side_effect = fake_transcribe
     return mock
