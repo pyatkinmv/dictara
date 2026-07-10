@@ -137,6 +137,7 @@ jobs:
           command_timeout: 45m
           envs: GATEWAY_CHANGED,BOT_CHANGED,APP_CHANGED,MONITORING_CHANGED
           script: |
+            set -e
             cd ~/dictara
             git pull
             bash scripts/set-limits.sh
