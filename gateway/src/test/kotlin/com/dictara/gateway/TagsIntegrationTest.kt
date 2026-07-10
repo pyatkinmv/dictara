@@ -1,6 +1,6 @@
 package com.dictara.gateway
 
-import com.dictara.gateway.repository.SubmissionTagRepository
+import com.dictara.gateway.repository.TranscriptTagRepository
 import com.dictara.gateway.repository.TagRepository
 import com.dictara.gateway.service.SubmissionService
 import com.dictara.gateway.storage.AudioStorage
@@ -18,17 +18,19 @@ class TagsIntegrationTest : AbstractSharedContextIntegrationTest() {
 
     @Autowired lateinit var submissionService: SubmissionService
     @Autowired lateinit var tagRepository: TagRepository
-    @Autowired lateinit var submissionTagRepo: SubmissionTagRepository
+    @Autowired lateinit var transcriptTagRepo: TranscriptTagRepository
     @MockBean lateinit var audioStorage: AudioStorage
 
     private lateinit var userId: UUID
     private lateinit var submissionId: UUID
+    private lateinit var transcriptId: UUID
 
     @BeforeEach
     fun setupUserAndSubmission() {
         userId = UUID.randomUUID()
         val audioId = UUID.randomUUID()
         submissionId = UUID.randomUUID()
+        transcriptId = UUID.randomUUID()
         jdbcTemplate.update("INSERT INTO users(id) VALUES (?)", userId)
         jdbcTemplate.update(
             "INSERT INTO audio_meta(id, user_id, original_name, content_type, size_bytes, storage_uri, content_hash) VALUES (?, ?, 'test.m4a', 'audio/mp4', 1000, 'gs://test/test.m4a', ?)",
@@ -37,6 +39,10 @@ class TagsIntegrationTest : AbstractSharedContextIntegrationTest() {
         jdbcTemplate.update(
             "INSERT INTO submissions(id, user_id, audio_id, model, language_hint, diarize, summary_mode, source, status) VALUES (?, ?, ?, 'fast', 'auto', false, 'off', 'web', 'done')",
             submissionId, userId, audioId,
+        )
+        jdbcTemplate.update(
+            "INSERT INTO transcripts(id, submission_id) VALUES (?, ?)",
+            transcriptId, submissionId,
         )
     }
 
@@ -56,6 +62,7 @@ class TagsIntegrationTest : AbstractSharedContextIntegrationTest() {
         val otherUserId = UUID.randomUUID()
         val otherAudioId = UUID.randomUUID()
         val otherSubmissionId = UUID.randomUUID()
+        val otherTranscriptId = UUID.randomUUID()
         jdbcTemplate.update("INSERT INTO users(id) VALUES (?)", otherUserId)
         jdbcTemplate.update(
             "INSERT INTO audio_meta(id, user_id, original_name, content_type, size_bytes, storage_uri, content_hash) VALUES (?, ?, 'other.m4a', 'audio/mp4', 1000, 'gs://test/other.m4a', ?)",
@@ -64,6 +71,10 @@ class TagsIntegrationTest : AbstractSharedContextIntegrationTest() {
         jdbcTemplate.update(
             "INSERT INTO submissions(id, user_id, audio_id, model, language_hint, diarize, summary_mode, source, status) VALUES (?, ?, ?, 'fast', 'auto', false, 'off', 'web', 'done')",
             otherSubmissionId, otherUserId, otherAudioId,
+        )
+        jdbcTemplate.update(
+            "INSERT INTO transcripts(id, submission_id) VALUES (?, ?)",
+            otherTranscriptId, otherSubmissionId,
         )
 
         submissionService.addTag(submissionId, userId, "meeting")
@@ -86,8 +97,8 @@ class TagsIntegrationTest : AbstractSharedContextIntegrationTest() {
             Long::class.java, userId,
         )
         val junctionCount = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM submission_tags st JOIN tags t ON t.id = st.tag_id WHERE st.submission_id = ? AND t.name = 'meeting'",
-            Long::class.java, submissionId,
+            "SELECT COUNT(*) FROM transcript_tags tt JOIN tags t ON t.id = tt.tag_id WHERE tt.transcript_id = ? AND t.name = 'meeting'",
+            Long::class.java, transcriptId,
         )
         assertThat(tagCount).isEqualTo(1L)
         assertThat(junctionCount).isEqualTo(1L)
@@ -103,8 +114,8 @@ class TagsIntegrationTest : AbstractSharedContextIntegrationTest() {
             Long::class.java, userId,
         )
         val junctionCount = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM submission_tags st JOIN tags t ON t.id = st.tag_id WHERE st.submission_id = ? AND t.name = 'meeting'",
-            Long::class.java, submissionId,
+            "SELECT COUNT(*) FROM transcript_tags tt JOIN tags t ON t.id = tt.tag_id WHERE tt.transcript_id = ? AND t.name = 'meeting'",
+            Long::class.java, transcriptId,
         )
         assertThat(tagCount).isEqualTo(1L)
         assertThat(junctionCount).isEqualTo(0L)

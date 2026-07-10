@@ -12,5 +12,6 @@ class TranscriptEntity(
     val submissionId: UUID,
     var segments: JsonNode? = null,
     var detectedLanguage: String? = null,
+    var title: String? = null,
     val createdAt: Instant = Instant.now(),
 )

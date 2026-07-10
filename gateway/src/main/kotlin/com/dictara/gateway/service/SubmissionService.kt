@@ -21,7 +21,7 @@ import java.util.UUID
 class SubmissionService(
     private val submissionRepo: SubmissionRepository,
     private val audioMetaRepo: AudioMetaRepository,
-    private val submissionTagRepo: SubmissionTagRepository,
+    private val transcriptTagRepo: TranscriptTagRepository,
     private val tagRepository: TagRepository,
     private val telegramDeliveryRepo: TelegramDeliveryRepository,
     private val transcriptRepo: TranscriptRepository,
@@ -34,6 +34,7 @@ class SubmissionService(
     data class SubmissionSummary(
         val jobId: UUID,
         val fileName: String,
+        val title: String,
         val createdAt: String,
         val status: String,
         val tags: List<String>,
@@ -99,20 +100,29 @@ class SubmissionService(
         val submissions = submissionRepo.findByUserIdOrderByCreatedAtDesc(userId)
         val audioById = audioMetaRepo.findAllById(submissions.map { it.audioId }).associateBy { it.id }
         val submissionIds = submissions.mapNotNull { it.id }
-        val tagsBySubmission: Map<UUID, List<String>> = if (submissionIds.isEmpty()) {
+        if (submissionIds.isEmpty()) return emptyList()
+
+        val transcriptBySubmissionId = transcriptRepo.findBySubmissionIdIn(submissionIds).associateBy { it.submissionId }
+        val transcriptIds = transcriptBySubmissionId.values.mapNotNull { it.id }
+
+        val tagsByTranscriptId: Map<UUID, List<String>> = if (transcriptIds.isEmpty()) {
             emptyMap()
         } else {
-            val submissionTags = submissionTagRepo.findBySubmissionIdIn(submissionIds)
-            val tagsById = tagRepository.findAllById(submissionTags.map { it.tagId }).associateBy { it.id }
-            submissionTags.groupBy({ it.submissionId }, { tagsById[it.tagId]?.name ?: "" })
+            val transcriptTags = transcriptTagRepo.findByTranscriptIdIn(transcriptIds)
+            val tagsById = tagRepository.findAllById(transcriptTags.map { it.tagId }).associateBy { it.id }
+            transcriptTags.groupBy({ it.transcriptId }, { tagsById[it.tagId]?.name ?: "" })
         }
+
         return submissions.map { s ->
+            val fileName = audioById[s.audioId]?.originalName ?: "unknown"
+            val transcript = transcriptBySubmissionId[s.id]
             SubmissionSummary(
                 jobId = s.id!!,
-                fileName = audioById[s.audioId]?.originalName ?: "unknown",
+                fileName = fileName,
+                title = transcript?.title ?: fileName,
                 createdAt = s.createdAt.toString(),
                 status = s.status,
-                tags = (tagsBySubmission[s.id] ?: emptyList()).sorted(),
+                tags = (tagsByTranscriptId[transcript?.id] ?: emptyList()).sorted(),
             )
         }
     }
@@ -141,12 +151,14 @@ class SubmissionService(
         val submission = submissionRepo.findById(submissionId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found") }
         if (submission.userId != userId) throw ResponseStatusException(HttpStatus.FORBIDDEN)
+        val transcript = transcriptRepo.findBySubmissionId(submissionId)
+            ?: throw ResponseStatusException(HttpStatus.CONFLICT, "Transcript not ready")
         val tag = tagRepository.findByUserIdAndName(userId, tagName)
             ?: tagRepository.save(TagEntity(userId = userId, name = tagName))
-        if (!submissionTagRepo.existsBySubmissionIdAndTagId(submissionId, tag.id!!)) {
-            submissionTagRepo.insert(submissionId, tag.id)
+        if (!transcriptTagRepo.existsByTranscriptIdAndTagId(transcript.id!!, tag.id!!)) {
+            transcriptTagRepo.insert(transcript.id, tag.id)
         }
-        return tagRepository.findBySubmissionId(submissionId).map { it.name }
+        return tagRepository.findByTranscriptId(transcript.id).map { it.name }
     }
 
     @Transactional
@@ -154,10 +166,22 @@ class SubmissionService(
         val submission = submissionRepo.findById(submissionId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found") }
         if (submission.userId != userId) throw ResponseStatusException(HttpStatus.FORBIDDEN)
+        val transcript = transcriptRepo.findBySubmissionId(submissionId)
+            ?: throw ResponseStatusException(HttpStatus.CONFLICT, "Transcript not ready")
         tagRepository.findByUserIdAndName(userId, tagName)?.let { tag ->
-            submissionTagRepo.deleteBySubmissionIdAndTagId(submissionId, tag.id!!)
+            transcriptTagRepo.deleteByTranscriptIdAndTagId(transcript.id!!, tag.id!!)
         }
-        return tagRepository.findBySubmissionId(submissionId).map { it.name }
+        return tagRepository.findByTranscriptId(transcript.id!!).map { it.name }
+    }
+
+    @Transactional
+    fun updateTitle(submissionId: UUID, userId: UUID, title: String?) {
+        val submission = submissionRepo.findById(submissionId)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found") }
+        if (submission.userId != userId) throw ResponseStatusException(HttpStatus.FORBIDDEN)
+        val transcript = transcriptRepo.findBySubmissionId(submissionId)
+            ?: throw ResponseStatusException(HttpStatus.CONFLICT, "Transcript not ready")
+        transcriptRepo.updateTitle(transcript.id!!, title?.takeIf { it.isNotBlank() })
     }
 
     @Transactional

@@ -75,6 +75,7 @@ class TranscribeController(
     data class JobResponse(
         val jobId: String,
         val status: String,
+        val title: String?,
         val progress: ProgressResponse?,
         val result: ResultResponse?,
         val durationS: Double?,
@@ -188,7 +189,7 @@ class TranscribeController(
             )
         }
 
-        val tags = tagRepo.findBySubmissionId(id).map { it.name }
+        val tags = transcript?.let { tagRepo.findByTranscriptId(it.id!!) }?.map { it.name } ?: emptyList()
 
         val queuePosition = if (submission.status == "pending") {
             submissionRepo.countPendingSubmissionsBefore(submission.createdAt).toInt() + 1
@@ -197,6 +198,7 @@ class TranscribeController(
         return JobResponse(
             jobId = jobId,
             status = submission.status,
+            title = transcript?.title ?: audioMeta?.originalName,
             progress = liveProgress?.let { ProgressResponse(it.phase, it.processedS, it.totalS, it.diarizeProgress) },
             result = if (transcript != null) ResultResponse(
                 segments = segments,
@@ -213,14 +215,14 @@ class TranscribeController(
         )
     }
 
-    data class TranscriptionSummary(val jobId: String, val fileName: String, val createdAt: String, val status: String, val tags: List<String>)
+    data class TranscriptionSummary(val jobId: String, val fileName: String, val title: String, val createdAt: String, val status: String, val tags: List<String>)
 
     @GetMapping("/transcriptions")
     fun listTranscriptions(servletRequest: HttpServletRequest): List<TranscriptionSummary> {
         val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
             ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
         return submissionService.listForUser(userId).map {
-            TranscriptionSummary(it.jobId.toString(), it.fileName, it.createdAt, it.status, it.tags)
+            TranscriptionSummary(it.jobId.toString(), it.fileName, it.title, it.createdAt, it.status, it.tags)
         }
     }
 
@@ -260,6 +262,18 @@ class TranscribeController(
         val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
             ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
         return mapOf("tags" to submissionService.removeTag(id, userId, tag))
+    }
+
+    @PatchMapping("/jobs/{jobId}/title")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun updateTitle(@PathVariable jobId: String, @RequestBody body: Map<String, String?>, servletRequest: HttpServletRequest) {
+        val id = runCatching { UUID.fromString(jobId) }.getOrElse {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid job ID")
+        }
+        val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
+            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
+        val title = body["title"]
+        submissionService.updateTitle(id, userId, title)
     }
 
     @GetMapping("/formats")

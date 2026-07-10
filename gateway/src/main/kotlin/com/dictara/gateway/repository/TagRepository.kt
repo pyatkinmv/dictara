@@ -8,6 +8,6 @@ import java.util.UUID
 interface TagRepository : CrudRepository<TagEntity, UUID> {
     fun findByUserIdAndName(userId: UUID, name: String): TagEntity?
 
-    @Query("SELECT t.* FROM tags t JOIN submission_tags st ON st.tag_id = t.id WHERE st.submission_id = :submissionId ORDER BY t.name")
-    fun findBySubmissionId(submissionId: UUID): List<TagEntity>
+    @Query("SELECT t.* FROM tags t JOIN transcript_tags tt ON tt.tag_id = t.id WHERE tt.transcript_id = :transcriptId ORDER BY t.name")
+    fun findByTranscriptId(transcriptId: UUID): List<TagEntity>
 }
