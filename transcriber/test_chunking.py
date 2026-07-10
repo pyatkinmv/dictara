@@ -203,10 +203,10 @@ def test_return_dict_has_language_and_duration():
     store.set_processing(job_id)
 
     segs = [{"start": 0.0, "end": 10.0, "text": "hello"}]
-    transcriber = _make_transcriber([segs, segs], language="ru")
+    transcriber = _make_transcriber([segs, segs, segs], language="ru")
 
     result = _run(job_id, "/tmp/fake.wav", None, 2500.0, transcriber, store)
 
     assert result["language"] == "ru"
     assert result["duration_s"] == 2500.0   # equals the total_s passed in
-    assert len(result["segments"]) == 2
+    assert len(result["segments"]) == 3
