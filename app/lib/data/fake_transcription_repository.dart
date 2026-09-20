@@ -87,6 +87,23 @@ const _transcript = <Segment>[
   ),
 ];
 
+const _summary = Summary(
+  text: 'Q2 closed strong: revenue up 18% QoQ, 12 features shipped vs. 9 planned. Heading into Q3, '
+      'the team will hire 4 engineers, reserve 20% of capacity for a payments refactor, and pivot '
+      'marketing to content-driven channels with a monthly webinar series launching in August.',
+  keyPoints: [
+    'Revenue up 18% QoQ — enterprise growth and May integrations as primary drivers',
+    '12 features shipped vs. 9 planned; technical debt in payments module flagged for Q3',
+    '4 engineers to be hired by September for parallel development tracks',
+    'Marketing pivoting to SEO content, case studies, and monthly webinars from August',
+  ],
+  actionItems: [
+    'Reserve 20% engineering capacity in July for payments refactor',
+    'Begin recruitment for 4 engineering roles — target: September',
+    'Sales team to co-present webinar series starting August',
+  ],
+);
+
 /// Slots 1-3 mapped to people, for every item except the one that carries AI
 /// suggestions in the design (id 6); its slots stay "Speaker N" until the
 /// suggestions are accepted (iteration 7).
@@ -97,7 +114,7 @@ List<Transcription> _seedItems() => [
       Transcription(
         id: 0,
         title: 'Quarterly Review Meeting',
-        duration: const Duration(minutes: 14),
+        duration: const Duration(minutes: 14, seconds: 22),
         uploadedAt: DateTime(2025, 6, 22, 14, 41),
         status: TranscriptionStatus.done,
         tags: const [_meeting, _quarterly],
@@ -190,6 +207,12 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
       item: _items[index],
       segments: _transcript,
       speakers: id == _itemWithSuggestions ? const {} : _confirmedSpeakers,
+      // The design shows the same summary and file details for every item.
+      summary: _summary,
+      originalFilename: 'product_sync_2025_06_23.mp4',
+      fileSizeBytes: 23488102, // 22.4 MB
+      language: 'EN',
+      wordCount: 1840,
     );
   }
 

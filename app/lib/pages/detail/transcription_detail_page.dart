@@ -3,8 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../../state/transcription_detail_controller.dart';
 import '../../theme/app_palette.dart';
-import '../placeholder_page.dart';
 import 'detail_header.dart';
+import 'overview_view.dart';
 import 'transcript_view.dart';
 
 enum DetailTab { transcript, overview }
@@ -70,8 +70,7 @@ class _TranscriptionDetailPageState extends State<TranscriptionDetailPage> {
         Expanded(
           child: switch (_tab) {
             DetailTab.transcript => TranscriptView(detail: detail),
-            // The Overview tab is built in iteration 4.
-            DetailTab.overview => const PlaceholderPage(label: 'Overview'),
+            DetailTab.overview => OverviewView(detail: detail),
           },
         ),
       ],

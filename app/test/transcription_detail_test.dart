@@ -21,15 +21,24 @@ const _bob = Speaker('Bob', Color(0xFF222222));
 
 Segment _seg(int slot, String text) => Segment(start: Duration.zero, speakerSlot: slot, text: text);
 
+TranscriptionDetail _detail(List<Segment> segments, {Map<int, Speaker> speakers = const {}}) {
+  return TranscriptionDetail(
+    item: _item(),
+    segments: segments,
+    speakers: speakers,
+    originalFilename: 'a.mp3',
+    fileSizeBytes: 1024,
+  );
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(loadInter);
 
   group('TranscriptionDetail.runs', () {
     test('consecutive segments by one speaker form one block', () {
-      final detail = TranscriptionDetail(
-        item: _item(),
-        segments: [_seg(1, 'a'), _seg(1, 'b'), _seg(2, 'c'), _seg(1, 'd')],
+      final detail = _detail(
+        [_seg(1, 'a'), _seg(1, 'b'), _seg(2, 'c'), _seg(1, 'd')],
         speakers: const {1: _ann, 2: _bob},
       );
       final runs = detail.runs;
@@ -38,16 +47,12 @@ void main() {
     });
 
     test('two slots mapped to the same person merge into one block', () {
-      final detail = TranscriptionDetail(
-        item: _item(),
-        segments: [_seg(1, 'a'), _seg(2, 'b')],
-        speakers: const {1: _ann, 2: _ann},
-      );
+      final detail = _detail([_seg(1, 'a'), _seg(2, 'b')], speakers: const {1: _ann, 2: _ann});
       expect(detail.runs.length, 1);
     });
 
     test('an unmapped slot is shown as "Speaker N"', () {
-      final detail = TranscriptionDetail(item: _item(), segments: [_seg(3, 'a')]);
+      final detail = _detail([_seg(3, 'a')]);
       expect(detail.runs.single.speaker.name, 'Speaker 3');
     });
   });
@@ -92,7 +97,7 @@ void main() {
 
       await tester.tap(find.text('Overview'));
       await settle(tester);
-      expect(find.text('Overview — coming soon'), findsOneWidget);
+      expect(find.text('SUMMARY'), findsOneWidget);
       expect(find.textContaining('Good morning everyone'), findsNothing);
 
       await tester.tap(find.text('Transcript'));

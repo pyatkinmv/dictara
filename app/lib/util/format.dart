@@ -1,17 +1,47 @@
-/// "14 min", "1h 12min" — the duration style used in the design.
+/// "14 min", "1h 12min" — the duration style used in the list and header.
 String formatDuration(Duration d) {
   final minutes = d.inMinutes;
   if (minutes < 60) return '$minutes min';
   return '${minutes ~/ 60}h ${minutes % 60}min';
 }
 
-/// "0:34", "12:05" — a transcript timestamp.
+/// "0:34", "14:22", "1:02:03" — a transcript timestamp or a clock-style length.
 String formatTimestamp(Duration d) {
+  String two(int n) => n.toString().padLeft(2, '0');
   final seconds = d.inSeconds % 60;
-  return '${d.inMinutes}:${seconds.toString().padLeft(2, '0')}';
+  if (d.inHours > 0) return '${d.inHours}:${two(d.inMinutes % 60)}:${two(seconds)}';
+  return '${d.inMinutes}:${two(seconds)}';
 }
 
 const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /// "22 Jun".
 String formatDay(DateTime d) => '${d.day} ${_months[d.month - 1]}';
+
+/// "22 Jun · 14:41".
+String formatDayTime(DateTime d) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${formatDay(d)} · ${two(d.hour)}:${two(d.minute)}';
+}
+
+/// "1,840".
+String formatCount(int n) {
+  final digits = n.abs().toString();
+  final buffer = StringBuffer(n < 0 ? '-' : '');
+  for (var i = 0; i < digits.length; i++) {
+    if (i > 0 && (digits.length - i) % 3 == 0) buffer.write(',');
+    buffer.write(digits[i]);
+  }
+  return buffer.toString();
+}
+
+/// "22.4 MB" (binary units, one decimal).
+String formatFileSize(int bytes) {
+  const kb = 1024;
+  const mb = kb * 1024;
+  const gb = mb * 1024;
+  if (bytes >= gb) return '${(bytes / gb).toStringAsFixed(1)} GB';
+  if (bytes >= mb) return '${(bytes / mb).toStringAsFixed(1)} MB';
+  if (bytes >= kb) return '${(bytes / kb).toStringAsFixed(1)} KB';
+  return '$bytes B';
+}
