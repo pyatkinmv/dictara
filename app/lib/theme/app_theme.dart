@@ -32,11 +32,47 @@ ThemeData buildAppTheme(AppPalette p) {
   );
 
   return base.copyWith(
-    textTheme: base.textTheme.apply(
-      fontFamily: appFontFamily,
-      bodyColor: p.text,
-      displayColor: p.text,
-    ),
+    textTheme: _cssTextTheme(base.textTheme, p),
     extensions: <ThemeExtension<dynamic>>[p],
+  );
+}
+
+/// Line height of Inter with CSS `line-height: normal`: (ascender 1984 +
+/// descender 494) / 2048 units per em.
+const _interNormalLineHeight = 1.21;
+
+/// Material 3 gives every text a tall line height (1.43 for body) and extra
+/// letter spacing. The design is plain CSS: `line-height: normal` and no
+/// tracking. Keep the M3 sizes and weights, but set height and spacing
+/// explicitly so text measures like it does in the HTML. (They must be
+/// non-null: `MaterialApp` fills every null field from its own text geometry.)
+TextTheme _cssTextTheme(TextTheme t, AppPalette p) {
+  TextStyle? plain(TextStyle? s) => s == null
+      ? null
+      : TextStyle(
+          fontFamily: appFontFamily,
+          fontSize: s.fontSize,
+          fontWeight: s.fontWeight,
+          color: p.text,
+          height: _interNormalLineHeight,
+          letterSpacing: 0,
+        );
+
+  return TextTheme(
+    displayLarge: plain(t.displayLarge),
+    displayMedium: plain(t.displayMedium),
+    displaySmall: plain(t.displaySmall),
+    headlineLarge: plain(t.headlineLarge),
+    headlineMedium: plain(t.headlineMedium),
+    headlineSmall: plain(t.headlineSmall),
+    titleLarge: plain(t.titleLarge),
+    titleMedium: plain(t.titleMedium),
+    titleSmall: plain(t.titleSmall),
+    bodyLarge: plain(t.bodyLarge),
+    bodyMedium: plain(t.bodyMedium),
+    bodySmall: plain(t.bodySmall),
+    labelLarge: plain(t.labelLarge),
+    labelMedium: plain(t.labelMedium),
+    labelSmall: plain(t.labelSmall),
   );
 }
