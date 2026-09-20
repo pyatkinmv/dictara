@@ -8,11 +8,7 @@ import '../models/transcription.dart';
 /// and the result. Lives above the router so filters survive navigation.
 class TranscriptionListController extends ChangeNotifier {
   TranscriptionListController(this._repository) {
-    _repository.tags().then((tags) {
-      if (_disposed) return;
-      _tags = tags;
-      notifyListeners();
-    });
+    _loadTags();
     _load();
   }
 
@@ -34,8 +30,18 @@ class TranscriptionListController extends ChangeNotifier {
   /// True until the first result arrives.
   bool get loading => _loading;
 
-  /// Re-runs the current query, e.g. after something changed a transcription.
-  Future<void> reload() => _load();
+  /// Re-runs the current query and refreshes the tag library, e.g. after
+  /// something changed a transcription or created a tag.
+  Future<void> reload() async {
+    await Future.wait([_loadTags(), _load()]);
+  }
+
+  Future<void> _loadTags() async {
+    final tags = await _repository.tags();
+    if (_disposed) return;
+    _tags = tags;
+    notifyListeners();
+  }
 
   void setSearch(String value) => _apply(_query.copyWith(search: value));
 

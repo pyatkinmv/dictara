@@ -14,7 +14,7 @@ const _hiring = Tag('hiring', Color(0xFFD97706));
 const _ideas = Tag('ideas', Color(0xFF0891B2));
 const _standup = Tag('standup', Color(0xFF6366F1));
 
-const _tags = <Tag>[_meeting, _quarterly, _interview, _hiring, _ideas, _standup];
+const _seedTags = <Tag>[_meeting, _quarterly, _interview, _hiring, _ideas, _standup];
 
 const _alexei = Speaker('Alexei Sorokin', Color(0xFF0D9488));
 const _maria = Speaker('Maria Chen', Color(0xFF7C3AED));
@@ -176,6 +176,9 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   /// renaming shows up everywhere, like a real backend.
   final List<Transcription> _items = _seedItems();
 
+  /// The tag library, in creation order. Mutable: tags can be created from a transcription.
+  final List<Tag> _library = List.of(_seedTags);
+
   @override
   Future<List<Transcription>> list(TranscriptionQuery query) async {
     final q = query.search.trim().toLowerCase();
@@ -223,5 +226,30 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   }
 
   @override
-  Future<List<Tag>> tags() async => _tags;
+  Future<List<Tag>> tags() async => List.unmodifiable(_library);
+
+  @override
+  Future<Tag> addTag(int id, String label) async {
+    final wanted = label.trim().toLowerCase();
+    var tag = _library.where((t) => t.label == wanted).firstOrNull;
+    if (tag == null) {
+      tag = Tag(wanted, tagPalette[_library.length % tagPalette.length]);
+      _library.add(tag);
+    }
+    final index = _items.indexWhere((i) => i.id == id);
+    if (index >= 0 && !_items[index].tags.contains(tag)) {
+      _items[index] = _items[index].copyWith(tags: [..._items[index].tags, tag]);
+    }
+    return tag;
+  }
+
+  @override
+  Future<void> removeTag(int id, String label) async {
+    final index = _items.indexWhere((i) => i.id == id);
+    if (index < 0) return;
+    _items[index] = _items[index].copyWith(tags: [
+      for (final t in _items[index].tags)
+        if (t.label != label) t,
+    ]);
+  }
 }

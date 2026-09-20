@@ -26,7 +26,7 @@ class Transcription {
   final List<Tag> tags;
   final int speakerCount;
 
-  Transcription copyWith({String? title}) {
+  Transcription copyWith({String? title, List<Tag>? tags}) {
     return Transcription(
       id: id,
       title: title ?? this.title,
@@ -34,7 +34,7 @@ class Transcription {
       uploadedAt: uploadedAt,
       status: status,
       processingPct: processingPct,
-      tags: tags,
+      tags: tags ?? this.tags,
       speakerCount: speakerCount,
     );
   }

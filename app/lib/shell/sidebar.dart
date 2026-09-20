@@ -38,21 +38,24 @@ class Sidebar extends StatelessWidget {
         children: [
           const _Brand(),
           const SizedBox(height: 20),
+          // Scrolls when the window is too short for the whole sidebar, instead of overflowing.
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var i = 0; i < navDestinations.length; i++) ...[
-                  // `.sb-nav` is a flex column with gap 2; the separator is one of its items.
-                  if (i > 0) const SizedBox(height: 2),
-                  if (i == last) ...const [_Separator(), SizedBox(height: 2)],
-                  _NavItem(
-                    destination: navDestinations[i],
-                    active: navDestinations[i] == active,
-                    onTap: () => context.go(navDestinations[i].path),
-                  ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < navDestinations.length; i++) ...[
+                    // `.sb-nav` is a flex column with gap 2; the separator is one of its items.
+                    if (i > 0) const SizedBox(height: 2),
+                    if (i == last) ...const [_Separator(), SizedBox(height: 2)],
+                    _NavItem(
+                      destination: navDestinations[i],
+                      active: navDestinations[i] == active,
+                      onTap: () => context.go(navDestinations[i].path),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
           const _UsageBlock(),

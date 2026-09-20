@@ -12,6 +12,7 @@ class Popover extends StatefulWidget {
     required this.panelBuilder,
     this.above = false,
     this.alignEnd = false,
+    this.gap = 6,
     this.matchTargetWidth = false,
     this.minWidth = 0,
   });
@@ -28,6 +29,9 @@ class Popover extends StatefulWidget {
   /// Line the panel's right edge up with the target's instead of the left one,
   /// for targets near the right edge of the window.
   final bool alignEnd;
+
+  /// Distance between the target and the panel.
+  final double gap;
 
   /// Make the panel exactly as wide as the target; otherwise it is as wide as
   /// its content, but at least [minWidth].
@@ -64,7 +68,7 @@ class _PopoverState extends State<Popover> {
                 link: _link,
                 targetAnchor: Alignment(widget.alignEnd ? 1 : -1, widget.above ? -1 : 1),
                 followerAnchor: Alignment(widget.alignEnd ? 1 : -1, widget.above ? 1 : -1),
-                offset: Offset(0, widget.above ? -6 : 6),
+                offset: Offset(0, widget.above ? -widget.gap : widget.gap),
                 child: TapRegion(
                   groupId: _tapGroup,
                   child: widget.matchTargetWidth
@@ -94,9 +98,13 @@ class _PopoverState extends State<Popover> {
 /// the overlay, which has no Material ancestor for `InkWell`, and the hover
 /// fills of its rows must paint above the white.
 class PopoverPanel extends StatelessWidget {
-  const PopoverPanel({super.key, required this.child});
+  const PopoverPanel({super.key, required this.child, this.padding = const EdgeInsets.all(8)});
 
   final Widget child;
+
+  /// Space between the card edge and the content; zero lets content (a search
+  /// field, a rule) reach the edge.
+  final EdgeInsets padding;
 
   @override
   Widget build(BuildContext context) {
@@ -110,14 +118,23 @@ class PopoverPanel extends StatelessWidget {
           BoxShadow(color: p.accent.withValues(alpha: .12), blurRadius: 20, offset: const Offset(0, 4)),
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [child],
+      // Clip to the card's rounded corners, so content that reaches the edge
+      // (a search field, a hover fill) does not poke out of them.
+      // The border takes 1 px of space, as in CSS (`border` + `padding`).
+      child: Padding(
+        padding: const EdgeInsets.all(1),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(appRadius - 1),
+          child: Material(
+            color: Colors.transparent,
+            child: Padding(
+              padding: padding,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [child],
+              ),
+            ),
           ),
         ),
       ),

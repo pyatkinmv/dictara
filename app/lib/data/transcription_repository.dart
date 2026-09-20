@@ -52,6 +52,15 @@ abstract class TranscriptionRepository {
   /// Renames a transcription (`PATCH /jobs/{id}/title`).
   Future<void> rename(int id, String title);
 
+  /// Puts the tag with this label on a transcription and returns it. If the
+  /// library has no such tag yet it is created first (`POST /jobs/{id}/tags`
+  /// with either a `tag_id` or a `label`, api-gaps §2.3).
+  Future<Tag> addTag(int id, String label);
+
+  /// Takes a tag off one transcription; it stays in the library
+  /// (`DELETE /jobs/{id}/tags/{tagId}`).
+  Future<void> removeTag(int id, String label);
+
   /// The tag library, in display order.
   Future<List<Tag>> tags();
 }

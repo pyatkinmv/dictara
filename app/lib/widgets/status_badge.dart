@@ -39,6 +39,8 @@ class StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return Container(
+      // Chrome rounds this line box up to 18 px; Flutter keeps 17.3.
+      constraints: const BoxConstraints(minHeight: 18),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(color: status.background(p), borderRadius: BorderRadius.circular(100)),
       child: Text(

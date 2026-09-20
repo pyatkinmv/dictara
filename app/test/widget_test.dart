@@ -1,3 +1,5 @@
+import 'dart:ui' show Size;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dictara_web/app.dart';
 
@@ -30,6 +32,18 @@ void main() {
 
     expect(find.text('Tags'), findsNWidgets(2));
     expect(find.text('Transcriptions'), findsOneWidget);
+  });
+
+  testWidgets('a short window does not overflow the sidebar', (tester) async {
+    tester.view.physicalSize = const Size(1280, 300);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const DictaraApp());
+    await settle(tester);
+
+    // A RenderFlex overflow is reported as an exception and would fail the test.
+    expect(tester.takeException(), isNull);
+    expect(find.text('Settings'), findsOneWidget);
   });
 
   testWidgets('profile menu opens and closes', (tester) async {
