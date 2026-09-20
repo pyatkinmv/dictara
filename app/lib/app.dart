@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'data/fake_transcription_repository.dart';
 import 'data/transcription_repository.dart';
 import 'router.dart';
+import 'state/tag_library_controller.dart';
 import 'state/transcription_detail_controller.dart';
 import 'state/transcription_list_controller.dart';
 import 'theme/app_palette.dart';
@@ -45,6 +46,13 @@ class _DictaraAppState extends State<DictaraApp> {
         Provider<TranscriptionRepository>.value(value: _repository),
         ChangeNotifierProvider(
           create: (context) => TranscriptionListController(context.read<TranscriptionRepository>()),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => TagLibraryController(
+            context.read<TranscriptionRepository>(),
+            // The list filter offers the library, so it must follow changes.
+            onChanged: context.read<TranscriptionListController>().reload,
+          ),
         ),
         ChangeNotifierProvider(
           create: (context) => TranscriptionDetailController(

@@ -30,7 +30,8 @@ void main() {
     await tester.tap(find.text('Tags'));
     await settle(tester);
 
-    expect(find.text('Tags'), findsNWidgets(2));
+    // Sidebar item, topbar title and the page's own heading.
+    expect(find.text('Tags'), findsNWidgets(3));
     expect(find.text('Transcriptions'), findsOneWidget);
   });
 

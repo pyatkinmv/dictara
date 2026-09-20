@@ -33,7 +33,13 @@ class TranscriptionListController extends ChangeNotifier {
   /// Re-runs the current query and refreshes the tag library, e.g. after
   /// something changed a transcription or created a tag.
   Future<void> reload() async {
-    await Future.wait([_loadTags(), _load()]);
+    await _loadTags();
+    // A tag that was deleted or renamed must not keep filtering the list.
+    final known = {for (final t in _tags) t.label};
+    if (_query.tags.any((label) => !known.contains(label))) {
+      _query = _query.copyWith(tags: {for (final label in _query.tags) if (known.contains(label)) label});
+    }
+    await _load();
   }
 
   Future<void> _loadTags() async {

@@ -1,5 +1,6 @@
 import '../models/speaker.dart';
 import '../models/tag.dart';
+import '../models/tag_entry.dart';
 import '../models/transcription.dart';
 import '../models/transcription_detail.dart';
 
@@ -64,6 +65,21 @@ abstract class TranscriptionRepository {
 
   /// The tag library, in display order.
   Future<List<Tag>> tags();
+
+  /// The tag library with descriptions and usage, for the Tags page
+  /// (`GET /tags`, `docs/api-gaps.md` §2.1).
+  Future<List<TagEntry>> tagLibrary();
+
+  /// Creates a tag in the library (`POST /tags`); it gets the next palette color.
+  Future<Tag> createTag(String label, String description);
+
+  /// Renames and/or re-describes the tag called [label] (`PUT /tags/{id}`).
+  /// Transcriptions that carry it follow the new name.
+  Future<void> updateTag(String label, {required String newLabel, required String description});
+
+  /// Deletes the tag from the library and from every transcription
+  /// (`DELETE /tags/{id}`); returns how many transcriptions it was removed from.
+  Future<int> deleteTag(String label);
 
   /// The speaker library, in creation order.
   Future<List<Speaker>> speakers();

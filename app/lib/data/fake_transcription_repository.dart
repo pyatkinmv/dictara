@@ -3,6 +3,7 @@ import 'dart:ui' show Color;
 import '../models/speaker.dart';
 import '../models/suggestions.dart';
 import '../models/tag.dart';
+import '../models/tag_entry.dart';
 import '../models/transcription.dart';
 import '../models/transcription_detail.dart';
 import 'transcription_repository.dart';
@@ -202,6 +203,16 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   /// The tag library, in creation order. Mutable: tags can be created from a transcription.
   final List<Tag> _library = List.of(_seedTags);
 
+  /// What each tag is for, by label (from the design's Tags page).
+  final Map<String, String> _tagDescriptions = {
+    'meeting': 'Regular team meetings, standups, and group discussions.',
+    'quarterly': 'End-of-quarter review sessions covering performance and roadmap.',
+    'interview': 'Candidate interviews for open positions.',
+    'hiring': 'Recruitment-related recordings including screens and debriefs.',
+    'ideas': 'Brainstorming sessions and exploratory discussions.',
+    'standup': 'Daily standup recordings. Short format, multiple speakers.',
+  };
+
   /// The speaker library, in creation order. Mutable like the tag library.
   final List<Speaker> _speakerLibrary = [_alexei, _maria, _james];
 
@@ -267,6 +278,65 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
 
   @override
   Future<List<Tag>> tags() async => List.unmodifiable(_library);
+
+  @override
+  Future<List<TagEntry>> tagLibrary() async => [
+        for (final tag in _library)
+          TagEntry(
+            tag: tag,
+            description: _tagDescriptions[tag.label] ?? '',
+            // Items are kept oldest first, so this reads oldest first too.
+            transcriptions: [
+              for (final item in _items)
+                if (item.tags.contains(tag)) item.title,
+            ],
+          ),
+      ];
+
+  @override
+  Future<Tag> createTag(String label, String description) async {
+    final wanted = label.trim().toLowerCase();
+    final tag = _libraryTag(wanted) ??
+        _createTag(Tag(wanted, libraryPalette[_library.length % libraryPalette.length]));
+    _tagDescriptions[wanted] = description.trim();
+    return tag;
+  }
+
+  @override
+  Future<void> updateTag(String label, {required String newLabel, required String description}) async {
+    final index = _library.indexWhere((t) => t.label == label);
+    if (index < 0) return;
+    final wanted = newLabel.trim().toLowerCase();
+    final old = _library[index];
+    final renamed = Tag(wanted, old.color);
+
+    _library[index] = renamed;
+    _tagDescriptions
+      ..remove(label)
+      ..[wanted] = description.trim();
+    // Transcriptions follow the rename.
+    for (var i = 0; i < _items.length; i++) {
+      if (_items[i].tags.contains(old)) {
+        _items[i] = _items[i].copyWith(tags: [for (final t in _items[i].tags) t == old ? renamed : t]);
+      }
+    }
+  }
+
+  @override
+  Future<int> deleteTag(String label) async {
+    final tag = _libraryTag(label);
+    if (tag == null) return 0;
+    var affected = 0;
+    for (var i = 0; i < _items.length; i++) {
+      if (_items[i].tags.contains(tag)) {
+        affected++;
+        _items[i] = _items[i].copyWith(tags: [for (final t in _items[i].tags) if (t != tag) t]);
+      }
+    }
+    _library.remove(tag);
+    _tagDescriptions.remove(label);
+    return affected;
+  }
 
   @override
   Future<List<Speaker>> speakers() async => List.unmodifiable(_speakerLibrary);
