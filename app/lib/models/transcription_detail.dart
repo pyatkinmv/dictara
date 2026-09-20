@@ -1,4 +1,5 @@
 import 'speaker.dart';
+import 'suggestions.dart';
 import 'transcription.dart';
 
 /// One row of the transcript.
@@ -44,6 +45,7 @@ class TranscriptionDetail {
     required this.fileSizeBytes,
     this.speakers = const {},
     this.segmentSpeakers = const {},
+    this.suggestions,
     this.summary,
     this.language,
     this.wordCount,
@@ -62,6 +64,9 @@ class TranscriptionDetail {
   /// How the gateway stores this is still open (`docs/api-gaps.md` §1.3).
   final Map<int, Speaker> segmentSpeakers;
 
+  /// AI proposals still waiting for the user; null when there are none.
+  final Suggestions? suggestions;
+
   /// Null until the summary has been generated (or when summarizing is off).
   final Summary? summary;
 
@@ -75,8 +80,15 @@ class TranscriptionDetail {
   /// Approximate; not stored by the gateway yet (`docs/api-gaps.md` §1.4).
   final int? wordCount;
 
-  /// The speaker of a diarizer slot (the confirmed mapping, else "Speaker N").
-  Speaker speakerFor(int slot) => speakers[slot] ?? Speaker.unassigned(slot);
+  /// The speaker of a diarizer slot: the confirmed mapping, else "Speaker N" -
+  /// tinted with the color of a pending AI suggestion for that slot, else grey.
+  Speaker speakerFor(int slot) {
+    final confirmed = speakers[slot];
+    if (confirmed != null) return confirmed;
+    final unassigned = Speaker.unassigned(slot);
+    final suggested = suggestions?.speakers[slot];
+    return suggested == null ? unassigned : Speaker(unassigned.name, suggested.color);
+  }
 
   /// Who speaks segment [index]: a manual assignment, else its slot's speaker.
   Speaker speakerOfSegment(int index) => segmentSpeakers[index] ?? speakerFor(segments[index].speakerSlot);
@@ -108,6 +120,7 @@ class TranscriptionDetail {
       segments: segments,
       speakers: speakers,
       segmentSpeakers: segmentSpeakers ?? this.segmentSpeakers,
+      suggestions: suggestions,
       summary: summary,
       originalFilename: originalFilename,
       fileSizeBytes: fileSizeBytes,

@@ -5,6 +5,16 @@ import '../models/speaker.dart';
 import '../models/tag.dart';
 import '../models/transcription_detail.dart';
 
+/// Keys of the suggestion actions, for [TranscriptionDetailController.isBusy].
+abstract final class SuggestionAction {
+  static const acceptAll = 'accept-all';
+  static const dismissAll = 'dismiss-all';
+  static String acceptTag(String label) => 'accept-tag:$label';
+  static String rejectTag(String label) => 'reject-tag:$label';
+  static String acceptSpeaker(int slot) => 'accept-speaker:$slot';
+  static String rejectSpeaker(int slot) => 'reject-speaker:$slot';
+}
+
 /// The transcription that is open on the detail page. Lives above the router
 /// so the topbar can show its title.
 class TranscriptionDetailController extends ChangeNotifier {
@@ -98,6 +108,58 @@ class TranscriptionDetailController extends ChangeNotifier {
     notifyListeners();
     await _repository.removeTag(current.item.id, label);
     if (_disposed) return;
+    _onChanged?.call();
+  }
+
+  // ── AI suggestions ─────────────────────────────────────────────────────────
+
+  final Set<String> _busy = {};
+
+  /// Whether the action behind [key] (see [SuggestionAction]) is in progress;
+  /// its button shows a spinner and ignores clicks meanwhile.
+  bool isBusy(String key) => _busy.contains(key);
+
+  Future<void> acceptAllSuggestions() => _resolve(SuggestionAction.acceptAll, _repository.acceptAllSuggestions);
+
+  Future<void> dismissAllSuggestions() => _resolve(SuggestionAction.dismissAll, _repository.dismissAllSuggestions);
+
+  Future<void> acceptTagSuggestion(String label) =>
+      _resolve(SuggestionAction.acceptTag(label), (id) => _repository.acceptTagSuggestion(id, label));
+
+  Future<void> rejectTagSuggestion(String label) =>
+      _resolve(SuggestionAction.rejectTag(label), (id) => _repository.rejectTagSuggestion(id, label));
+
+  Future<void> acceptSpeakerSuggestion(int slot) =>
+      _resolve(SuggestionAction.acceptSpeaker(slot), (id) => _repository.acceptSpeakerSuggestion(id, slot));
+
+  Future<void> rejectSpeakerSuggestion(int slot) =>
+      _resolve(SuggestionAction.rejectSpeaker(slot), (id) => _repository.rejectSpeakerSuggestion(id, slot));
+
+  /// Runs one suggestion action, then re-reads the transcription (an accepted
+  /// suggestion changes its title, tags and speakers) and the libraries.
+  Future<void> _resolve(String key, Future<void> Function(int id) action) async {
+    final current = _current;
+    if (current == null || _busy.contains(key)) return;
+    final id = current.item.id;
+
+    _busy.add(key);
+    notifyListeners();
+    try {
+      await action(id);
+      final detail = await _repository.get(id);
+      final library = await _repository.tags();
+      final speakers = await _repository.speakers();
+      // The user moved on to another transcription meanwhile.
+      if (!_disposed && _current?.item.id == id) {
+        _current = detail;
+        _library = library;
+        _speakers = speakers;
+      }
+    } finally {
+      _busy.remove(key);
+    }
+    if (_disposed) return;
+    notifyListeners();
     _onChanged?.call();
   }
 

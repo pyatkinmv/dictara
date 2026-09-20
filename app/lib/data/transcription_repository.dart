@@ -77,4 +77,25 @@ abstract class TranscriptionRepository {
   /// segment, and §1.3 leaves the storage open. This mock works per segment,
   /// as the design does.
   Future<Speaker> assignSpeaker(int id, Set<int> segmentIndexes, String name);
+
+  // AI suggestions (`docs/api-gaps.md` §2.4, still marked TBD there). Each call
+  // resolves part of the suggestions of a transcription; the record disappears
+  // once nothing is left. Read the outcome back with [get].
+
+  /// Accepts everything that is left: the new title, every tag, every speaker.
+  Future<void> acceptAllSuggestions(int id);
+
+  /// Rejects everything that is left.
+  Future<void> dismissAllSuggestions(int id);
+
+  /// Adds the suggested tag to the transcription (and to the library if new).
+  Future<void> acceptTagSuggestion(int id, String label);
+
+  Future<void> rejectTagSuggestion(int id, String label);
+
+  /// Confirms the suggested speaker for a diarizer slot (adding them to the
+  /// library if new).
+  Future<void> acceptSpeakerSuggestion(int id, int slot);
+
+  Future<void> rejectSpeakerSuggestion(int id, int slot);
 }

@@ -9,6 +9,7 @@ import '../../theme/app_palette.dart';
 import '../../util/format.dart';
 import '../../widgets/status_badge.dart';
 import 'speakers_row.dart';
+import 'suggestions_banner.dart';
 import 'tags_row.dart';
 
 /// Sticky top part of the detail page: breadcrumb, editable title, meta row
@@ -41,6 +42,7 @@ class DetailHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _TitleEditor(title: item.title),
+                    const SuggestionsBanner(),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(6, 0, 6, 10),
                       child: _MetaRow(detail: detail),

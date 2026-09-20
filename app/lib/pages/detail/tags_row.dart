@@ -8,6 +8,7 @@ import '../../theme/app_palette.dart';
 import '../../widgets/dashed_border.dart';
 import '../../widgets/mini_tag.dart';
 import '../../widgets/popover.dart';
+import 'ghost_actions.dart';
 
 /// The tags of the open transcription with a remove button on each, followed
 /// by the "Add tag" dropdown (`.d-tags-row`).
@@ -18,12 +19,21 @@ class DetailTagsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = context.watch<TranscriptionDetailController>();
     final tags = controller.current?.item.tags ?? const <Tag>[];
+    final pending = controller.current?.suggestions?.tags ?? const <Tag>[];
     return Wrap(
       spacing: 5,
       runSpacing: 5,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         for (final tag in tags) _TagPill(tag: tag, onRemove: () => controller.removeTag(tag.label)),
+        for (final tag in pending)
+          _GhostTagPill(
+            tag: tag,
+            acceptBusy: controller.isBusy(SuggestionAction.acceptTag(tag.label)),
+            rejectBusy: controller.isBusy(SuggestionAction.rejectTag(tag.label)),
+            onAccept: () => controller.acceptTagSuggestion(tag.label),
+            onReject: () => controller.rejectTagSuggestion(tag.label),
+          ),
         _AddTag(
           library: controller.library,
           used: tags,
@@ -87,6 +97,52 @@ class _TagPillState extends State<_TagPill> {
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A tag the AI suggests: a dashed outline with ✨, the label in the tag's own
+/// color and ✓ / ✗ (`.ghost-pill`).
+class _GhostTagPill extends StatelessWidget {
+  const _GhostTagPill({
+    required this.tag,
+    required this.acceptBusy,
+    required this.rejectBusy,
+    required this.onAccept,
+    required this.onReject,
+  });
+
+  final Tag tag;
+  final bool acceptBusy;
+  final bool rejectBusy;
+  final VoidCallback onAccept;
+  final VoidCallback onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return DashedBorder(
+      color: p.border,
+      width: 1.5,
+      dash: 4.5,
+      gap: 3,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Tooltip(
+              message: 'AI suggestion',
+              child: Icon(Icons.auto_awesome_rounded, size: 13, color: p.accent),
+            ),
+            const SizedBox(width: 3),
+            Text(tag.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: tag.color)),
+            const SizedBox(width: 4), // 3 px gap + 1 px margin of `.ghost-pill-acts`
+            GhostAction.accept(busy: acceptBusy, onTap: onAccept),
+            GhostAction.reject(busy: rejectBusy, onTap: onReject),
           ],
         ),
       ),

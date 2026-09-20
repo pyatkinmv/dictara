@@ -26,10 +26,15 @@ class DashedBorder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Browsers round a border down to whole device pixels: `1.5px` is 1 px on a
+    // 1x screen (and 1.5 px on a 2x one). Do the same, so the box is the size
+    // the design has.
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final effective = (width * dpr).floor().clamp(1, 1 << 30) / dpr;
     return CustomPaint(
-      foregroundPainter: _DashedBorderPainter(color: color, width: width, radius: radius, dash: dash, gap: gap),
+      foregroundPainter: _DashedBorderPainter(color: color, width: effective, radius: radius, dash: dash, gap: gap),
       // The border takes space, as a CSS border does.
-      child: Padding(padding: EdgeInsets.all(width), child: child),
+      child: Padding(padding: EdgeInsets.all(effective), child: child),
     );
   }
 }

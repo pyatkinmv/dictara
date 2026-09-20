@@ -75,9 +75,10 @@ void main() {
       expect(find.text('+ Add tag'), findsOneWidget);
     });
 
-    testWidgets('a transcription without tags has just the add button', (tester) async {
+    testWidgets('a transcription without tags has no tag pills, only the add button', (tester) async {
       await openDetail(tester, '6');
-      expect(find.text('meeting'), findsNothing);
+      // No confirmed tags (its AI suggestions are ghost pills without a remove button).
+      expect(find.byKey(const ValueKey('remove-tag-meeting')), findsNothing);
       expect(find.text('+ Add tag'), findsOneWidget);
     });
 

@@ -1,6 +1,7 @@
 import 'dart:ui' show Color;
 
 import '../models/speaker.dart';
+import '../models/suggestions.dart';
 import '../models/tag.dart';
 import '../models/transcription.dart';
 import '../models/transcription_detail.dart';
@@ -110,6 +111,17 @@ const _summary = Summary(
 const _confirmedSpeakers = <int, Speaker>{1: _alexei, 2: _maria, 3: _james};
 const _itemWithSuggestions = 6;
 
+/// What the design's AI proposes for the item that has suggestions.
+const _seedSuggestions = Suggestions(
+  title: 'Product Sync — Q3 Roadmap',
+  tags: [
+    Tag('meeting', Color(0xFF2563EB)),
+    Tag('product', Color(0xFF0891B2)),
+    Tag('roadmap', Color(0xFF059669)),
+  ],
+  speakers: {1: _alexei, 2: _maria, 3: _james},
+);
+
 List<Transcription> _seedItems() => [
       Transcription(
         id: 0,
@@ -172,6 +184,17 @@ List<Transcription> _seedItems() => [
     ];
 
 class FakeTranscriptionRepository implements TranscriptionRepository {
+  /// [latency] makes the suggestion actions take a while, like a server would;
+  /// the app uses it so the spinners of the design can be seen, tests do not.
+  FakeTranscriptionRepository({this.latency});
+
+  final Duration Function()? latency;
+
+  Future<void> _wait() async {
+    final delay = latency?.call();
+    if (delay != null) await Future<void>.delayed(delay);
+  }
+
   /// In creation order: a higher id was created later. Mutable so that
   /// renaming shows up everywhere, like a real backend.
   final List<Transcription> _items = _seedItems();
@@ -184,6 +207,15 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
 
   /// Speakers assigned by hand, per transcription id, then per segment index.
   final Map<int, Map<int, Speaker>> _segmentSpeakers = {};
+
+  /// Confirmed slot → speaker mapping per transcription id.
+  final Map<int, Map<int, Speaker>> _slotSpeakers = {};
+
+  Map<int, Speaker> _slotsOf(int id) =>
+      _slotSpeakers.putIfAbsent(id, () => id == _itemWithSuggestions ? {} : {..._confirmedSpeakers});
+
+  /// Suggestions still waiting for the user, per transcription id.
+  final Map<int, Suggestions> _suggestions = {_itemWithSuggestions: _seedSuggestions};
 
   @override
   Future<List<Transcription>> list(TranscriptionQuery query) async {
@@ -215,8 +247,9 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
     return TranscriptionDetail(
       item: _items[index],
       segments: _transcript,
-      speakers: id == _itemWithSuggestions ? const {} : _confirmedSpeakers,
+      speakers: Map.unmodifiable(_slotsOf(id)),
       segmentSpeakers: Map.unmodifiable(_segmentSpeakers[id] ?? const {}),
+      suggestions: _suggestions[id],
       // The design shows the same summary and file details for every item.
       summary: _summary,
       originalFilename: 'product_sync_2025_06_23.mp4',
@@ -257,17 +290,45 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   @override
   Future<Tag> addTag(int id, String label) async {
     final wanted = label.trim().toLowerCase();
-    var tag = _library.where((t) => t.label == wanted).firstOrNull;
-    if (tag == null) {
-      tag = Tag(wanted, libraryPalette[_library.length % libraryPalette.length]);
-      _library.add(tag);
-    }
+    final tag = _libraryTag(wanted) ?? _createTag(Tag(wanted, libraryPalette[_library.length % libraryPalette.length]));
+    _link(id, tag);
+    return tag;
+  }
+
+  Tag? _libraryTag(String label) => _library.where((t) => t.label == label).firstOrNull;
+
+  Tag _createTag(Tag tag) {
+    _library.add(tag);
+    return tag;
+  }
+
+  /// Puts [tag] on a transcription unless it is already there.
+  void _link(int id, Tag tag) {
     final index = _items.indexWhere((i) => i.id == id);
     if (index >= 0 && !_items[index].tags.contains(tag)) {
       _items[index] = _items[index].copyWith(tags: [..._items[index].tags, tag]);
     }
-    return tag;
   }
+
+  Speaker _librarySpeaker(Speaker suggested) {
+    final existing = _speakerLibrary.where((s) => s.name == suggested.name).firstOrNull;
+    if (existing != null) return existing;
+    _speakerLibrary.add(suggested);
+    return suggested;
+  }
+
+  /// Stores what is left of the suggestions, dropping the record when nothing is.
+  void _keep(int id, Suggestions left) {
+    if (left.isEmpty) {
+      _suggestions.remove(id);
+    } else {
+      _suggestions[id] = left;
+    }
+  }
+
+  void _acceptTag(int id, Tag suggested) => _link(id, _libraryTag(suggested.label) ?? _createTag(suggested));
+
+  void _acceptSpeaker(int id, int slot, Speaker suggested) => _slotsOf(id)[slot] = _librarySpeaker(suggested);
 
   @override
   Future<void> removeTag(int id, String label) async {
@@ -277,5 +338,63 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
       for (final t in _items[index].tags)
         if (t.label != label) t,
     ]);
+  }
+
+  @override
+  Future<void> acceptAllSuggestions(int id) async {
+    await _wait();
+    final s = _suggestions[id];
+    if (s == null) return;
+    final title = s.title;
+    if (title != null) await rename(id, title);
+    for (final tag in s.tags) {
+      _acceptTag(id, tag);
+    }
+    for (final entry in s.speakers.entries) {
+      _acceptSpeaker(id, entry.key, entry.value);
+    }
+    _suggestions.remove(id);
+  }
+
+  @override
+  Future<void> dismissAllSuggestions(int id) async {
+    await _wait();
+    _suggestions.remove(id);
+  }
+
+  @override
+  Future<void> acceptTagSuggestion(int id, String label) async {
+    await _wait();
+    final s = _suggestions[id];
+    final tag = s?.tags.where((t) => t.label == label).firstOrNull;
+    if (s == null || tag == null) return;
+    _acceptTag(id, tag);
+    _keep(id, s.copyWith(tags: [for (final t in s.tags) if (t.label != label) t]));
+  }
+
+  @override
+  Future<void> rejectTagSuggestion(int id, String label) async {
+    await _wait();
+    final s = _suggestions[id];
+    if (s == null) return;
+    _keep(id, s.copyWith(tags: [for (final t in s.tags) if (t.label != label) t]));
+  }
+
+  @override
+  Future<void> acceptSpeakerSuggestion(int id, int slot) async {
+    await _wait();
+    final s = _suggestions[id];
+    final speaker = s?.speakers[slot];
+    if (s == null || speaker == null) return;
+    _acceptSpeaker(id, slot, speaker);
+    _keep(id, s.copyWith(speakers: {...s.speakers}..remove(slot)));
+  }
+
+  @override
+  Future<void> rejectSpeakerSuggestion(int id, int slot) async {
+    await _wait();
+    final s = _suggestions[id];
+    if (s == null) return;
+    _keep(id, s.copyWith(speakers: {...s.speakers}..remove(slot)));
   }
 }
