@@ -227,9 +227,17 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
     return ((body as Map<String, dynamic>)['affected_transcriptions'] as num?)?.toInt() ?? 0;
   }
 
+  /// `PUT /transcriptions/{id}/speakers`: the picker's choice. The gateway settles the voice or marks the
+  /// phrases (see the repository interface), creating the speaker in the library when the name is new.
   @override
-  Future<Speaker> assignSpeaker(String id, Set<int> segmentIndexes, String name) =>
-      _notYet('Assigning a speaker', 6);
+  Future<Speaker> assignSpeaker(String id, Set<int> segmentIndexes, String name, {bool allBySpeaker = false}) async {
+    final body = await _client.putJson('/transcriptions/${Uri.encodeComponent(id)}/speakers', {
+      'scope': allBySpeaker ? 'all' : 'segment',
+      'segment_indexes': segmentIndexes.toList()..sort(),
+      'name': name,
+    });
+    return _speakerFromJson(body as Map<String, dynamic>);
+  }
 
   @override
   Future<void> acceptAllSuggestions(String id) => _notYet('AI suggestions', 8);
@@ -298,6 +306,16 @@ TranscriptionDetail _detailFromJson(Map<String, dynamic> json) {
       ],
     ),
     segments: segments,
+    // Voices the user has named (the row of chips), and single phrases set to somebody by hand.
+    speakers: {
+      for (final v in (json['voices'] as List<dynamic>? ?? const []))
+        ?_slotFromLabel((v as Map<String, dynamic>)['voice'] as String?): _speakerFromJson(v['speaker'] as Map<String, dynamic>),
+    },
+    segmentSpeakers: {
+      for (final (i, s) in (json['segments'] as List<dynamic>? ?? const []).indexed)
+        if ((s as Map<String, dynamic>)['assigned_speaker'] case final own?)
+          i: _speakerFromJson(own as Map<String, dynamic>),
+    },
     summary: json['summary'] as String?,
     originalFilename: fileName,
     fileSizeBytes: (json['file_size_bytes'] as num?)?.toInt() ?? 0,

@@ -170,19 +170,22 @@ class TranscriptionDetailController extends ChangeNotifier {
   }
 
   /// Attributes the given segments of the open transcription to the speaker
-  /// called [name], creating the speaker in the library if it is new.
-  Future<void> assignSpeaker(Set<int> segmentIndexes, String name) async {
+  /// called [name], creating the speaker in the library if it is new. With
+  /// [allBySpeaker] the speaker's voice is settled for the whole transcription.
+  ///
+  /// What changed (a voice named, marks on segments dropped, a new speaker) is decided by the repository, so the
+  /// transcription is read again instead of guessing the outcome here.
+  Future<void> assignSpeaker(Set<int> segmentIndexes, String name, bool allBySpeaker) async {
     final current = _current;
     if (current == null || segmentIndexes.isEmpty || name.trim().isEmpty) return;
 
-    final speaker = await _repository.assignSpeaker(current.item.id, segmentIndexes, name);
+    await _repository.assignSpeaker(current.item.id, segmentIndexes, name, allBySpeaker: allBySpeaker);
+    final detail = await _repository.get(current.item.id);
     final speakers = await _repository.speakers();
     // The user moved on to another transcription meanwhile.
     if (_disposed || _current?.item.id != current.item.id) return;
     _speakers = speakers;
-    _current = _current!.copyWith(
-      segmentSpeakers: {..._current!.segmentSpeakers, for (final i in segmentIndexes) i: speaker},
-    );
+    if (detail != null) _current = detail;
     notifyListeners();
   }
 

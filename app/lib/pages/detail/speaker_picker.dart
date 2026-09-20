@@ -29,8 +29,9 @@ class SpeakerPicker extends StatefulWidget {
   final SpeakerRun run;
   final List<Speaker> library;
 
-  /// Called with the segments to reassign and the chosen (or new) speaker name.
-  final void Function(Set<int> segmentIndexes, String name) onPick;
+  /// Called with the segments to reassign, the chosen (or new) speaker name and whether the choice is for
+  /// everything the current speaker says (settles their voice for good) rather than for one segment.
+  final void Function(Set<int> segmentIndexes, String name, bool allBySpeaker) onPick;
   final VoidCallback onClose;
 
   @override
@@ -64,7 +65,7 @@ class _SpeakerPickerState extends State<SpeakerPicker> {
       PickerScope.segment => {widget.run.firstIndex},
       PickerScope.allBySpeaker => widget.detail.segmentsBySpeaker(widget.run.speaker!.name),
     };
-    widget.onPick(segments, name);
+    widget.onPick(segments, name, _scope == PickerScope.allBySpeaker);
     widget.onClose();
   }
 

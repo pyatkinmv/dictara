@@ -523,6 +523,93 @@ void main() {
     });
   });
 
+  group('speaker assignment', () {
+    test('a choice for one segment is sent as scope "segment" with the phrase numbers', () async {
+      late http.Request seen;
+      final repo = _repo(MockClient((request) async {
+        seen = request;
+        return _json({'id': 'x', 'name': 'Maria Chen', 'color': '#8F13AE'});
+      }));
+
+      final speaker = await repo.assignSpeaker('t1', {4, 1}, 'Maria Chen');
+
+      expect(seen.method, 'PUT');
+      expect(seen.url.path, '/api/transcriptions/t1/speakers');
+      expect(jsonDecode(seen.body), {'scope': 'segment', 'segment_indexes': [1, 4], 'name': 'Maria Chen'});
+      expect(speaker.name, 'Maria Chen');
+      expect(speaker.color, const Color(0xFF8F13AE));
+    });
+
+    test('"all segments by" is sent as scope "all"', () async {
+      late http.Request seen;
+      final repo = _repo(MockClient((request) async {
+        seen = request;
+        return _json({'id': 'x', 'name': 'Maria', 'color': '#2563EB'});
+      }));
+
+      await repo.assignSpeaker('t1', {0, 3}, 'Maria', allBySpeaker: true);
+
+      expect(jsonDecode(seen.body)['scope'], 'all');
+    });
+
+    test('a refusal says why', () async {
+      final repo = _repo(MockClient((_) async => _json({'message': 'This transcript has no phrase 9'}, status: 400)));
+
+      await expectLater(
+        repo.assignSpeaker('t1', {9}, 'Maria'),
+        throwsA(isA<GatewayException>().having((e) => e.message, 'message', contains('no phrase 9'))),
+      );
+    });
+
+    test('the detail carries the named voices and the phrases set by hand', () async {
+      final json = <String, dynamic>{
+        'job_id': 't1',
+        'file_name': 'a.mp3',
+        'created_at': '2026-09-20T16:36:21Z',
+        'status': 'done',
+        'file_size_bytes': 1,
+        'segments': [
+          {'start': 0.0, 'end': 1.0, 'text': 'a', 'speaker': 'SPEAKER_00'},
+          {'start': 1.0, 'end': 2.0, 'text': 'b', 'speaker': 'SPEAKER_01', 'assigned_speaker': {'id': 'j', 'name': 'James', 'color': '#2563EB'}},
+          {'start': 2.0, 'end': 3.0, 'text': 'c', 'speaker': 'SPEAKER_01'},
+        ],
+        'voices': [
+          {
+            'voice': 'SPEAKER_00',
+            'speaker': {'id': 'm', 'name': 'Maria', 'color': '#8F13AE'},
+          },
+        ],
+      };
+
+      final detail = (await _repo(MockClient((_) async => _json(json))).get('t1'))!;
+
+      expect(detail.speakers.keys, [1]); // voice SPEAKER_00 is slot 1
+      expect(detail.speakers[1]!.name, 'Maria');
+      expect(detail.segmentSpeakers.keys, [1]); // the second phrase
+      expect(detail.segmentSpeakers[1]!.name, 'James');
+      expect([for (var i = 0; i < 3; i++) detail.speakerOfSegment(i)!.name], ['Maria', 'James', 'Speaker 2']);
+    });
+
+    test('without voices or marks nobody is named', () async {
+      final json = <String, dynamic>{
+        'job_id': 't1',
+        'file_name': 'a.mp3',
+        'created_at': '2026-09-20T16:36:21Z',
+        'status': 'done',
+        'file_size_bytes': 1,
+        'segments': [
+          {'start': 0.0, 'end': 1.0, 'text': 'a', 'speaker': 'SPEAKER_00'},
+        ],
+      };
+
+      final detail = (await _repo(MockClient((_) async => _json(json))).get('t1'))!;
+
+      expect(detail.speakers, isEmpty);
+      expect(detail.segmentSpeakers, isEmpty);
+      expect(detail.speakerOfSegment(0)!.name, 'Speaker 1');
+    });
+  });
+
   group('detail', () {
     const detailJson = <String, dynamic>{
       'job_id': '3f1c2f0e-0000-4000-8000-000000000003',

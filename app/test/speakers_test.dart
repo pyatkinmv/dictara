@@ -104,6 +104,64 @@ void main() {
       await repo.assignSpeaker('0', {0}, 'James Wright');
       expect((await repo.get('2'))!.segmentSpeakers, isEmpty);
     });
+    test('"all by" settles a whole voice for the transcription and keeps no marks for it', () async {
+      final repo = FakeTranscriptionRepository();
+      await repo.assignSpeaker('0', {1}, 'James Wright'); // an old mark on a phrase of voice 2
+      await repo.assignSpeaker('0', {1, 4, 6, 9}, 'Maria Chen', allBySpeaker: true); // voice 2 is Maria's whole
+
+      final detail = (await repo.get('0'))!;
+      expect(detail.speakers[2]!.name, 'Maria Chen');
+      expect(detail.segmentSpeakers, isEmpty); // the mark on phrase 1 went with it
+      expect([for (var i = 0; i < detail.segments.length; i++) detail.speakerOfSegment(i)!.name].sublist(0, 3),
+          ['Alexei Sorokin', 'Maria Chen', 'James Wright']);
+    });
+
+    test('"all by" with only some phrases of a voice marks those phrases and leaves the voice', () async {
+      final repo = FakeTranscriptionRepository();
+
+      await repo.assignSpeaker('0', {0, 3}, 'James Wright', allBySpeaker: true); // voice 1 also has phrase 7
+
+      final detail = (await repo.get('0'))!;
+      expect(detail.speakers[1]!.name, 'Alexei Sorokin');
+      expect(detail.segmentSpeakers.keys, {0, 3});
+    });
+
+    test('"all by" made of a whole voice and a lone phrase settles the voice and marks the phrase', () async {
+      final repo = FakeTranscriptionRepository();
+      await repo.assignSpeaker('0', {2}, 'Alexei Sorokin'); // a phrase of voice 3 is Alexei's
+      // Everything under "Alexei Sorokin": voice 1 (0, 3, 7) and phrase 2.
+      await repo.assignSpeaker('0', {0, 2, 3, 7}, 'Maria Chen', allBySpeaker: true);
+
+      final detail = (await repo.get('0'))!;
+      expect(detail.speakers[1]!.name, 'Maria Chen');
+      expect(detail.segmentSpeakers.keys, {2});
+      expect(detail.segmentSpeakers[2]!.name, 'Maria Chen');
+    });
+
+    test('marking every phrase of a voice one by one names the voice', () async {
+      final repo = FakeTranscriptionRepository();
+
+      await repo.assignSpeaker('0', {1}, 'James Wright'); // voice 2 has phrases 1, 4, 6 and 9
+      await repo.assignSpeaker('0', {4, 6}, 'James Wright');
+      expect((await repo.get('0'))!.speakers[2]!.name, 'Maria Chen'); // three of four: not yet
+
+      await repo.assignSpeaker('0', {9}, 'James Wright');
+
+      final detail = (await repo.get('0'))!;
+      expect(detail.speakers[2]!.name, 'James Wright');
+      expect(detail.segmentSpeakers, isEmpty);
+    });
+
+    test('a mark that only repeats what the voice already says is not kept', () async {
+      final repo = FakeTranscriptionRepository();
+      await repo.assignSpeaker('0', {0}, 'James Wright');
+      expect((await repo.get('0'))!.segmentSpeakers.keys, {0});
+
+      await repo.assignSpeaker('0', {0}, 'Alexei Sorokin'); // voice 1 is Alexei's anyway
+
+      expect((await repo.get('0'))!.segmentSpeakers, isEmpty);
+    });
+
   });
 
   group('Speakers row', () {
@@ -195,6 +253,21 @@ void main() {
       expect(find.text('ALEXEI SOROKIN'), findsNothing);
       // Segment 0 now merges with segment 1 (Maria too): 10 blocks → fewer.
       expect(find.text('MARIA CHEN'), findsWidgets);
+    });
+
+    testWidgets('"All segments by" a voice names it in the row of chips too', (tester) async {
+      await openDetail(tester);
+      expect(find.text('Alexei Sorokin'), findsOneWidget); // the chip
+
+      await openPicker(tester, 'ALEXEI SOROKIN');
+      await tester.tap(inPicker(find.textContaining('All segments by')));
+      await settle(tester);
+      await tester.tap(inPicker(find.text('James Wright')));
+      await settle(tester);
+
+      expect(find.text('ALEXEI SOROKIN'), findsNothing); // no block
+      expect(find.text('Alexei Sorokin'), findsNothing); // and no chip: the voice is James now
+      expect(find.text('James Wright'), findsNWidgets(2)); // the chips of voice 1 and voice 3
     });
 
     testWidgets('typing filters the library and offers to create a speaker', (tester) async {

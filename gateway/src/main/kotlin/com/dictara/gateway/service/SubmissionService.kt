@@ -31,6 +31,7 @@ class SubmissionService(
     private val transcriptListQueries: TranscriptListQueries,
     private val submissionListQuery: SubmissionListQuery,
     private val segmentQueries: TranscriptSegmentQueries,
+    private val speakerQueries: TranscriptSpeakerQueries,
 ) {
     data class CreateResult(val submissionId: UUID, val dedup: Boolean)
 
@@ -54,7 +55,11 @@ class SubmissionService(
     /** A page of [SubmissionSummary]; [hasNext] tells whether another page follows. */
     data class SubmissionPage(val items: List<SubmissionSummary>, val hasNext: Boolean)
 
-    data class DetailSegment(val start: Double, val end: Double, val text: String, val speaker: String?)
+    /** [speaker] is the diarizer's label; [assignedSpeaker] the library speaker set on this phrase alone, if any. */
+    data class DetailSegment(val start: Double, val end: Double, val text: String, val speaker: String?, val assignedSpeaker: SpeakerRef? = null)
+
+    /** In this transcript the diarizer voice [voice] is the library speaker [speaker]. */
+    data class VoiceAssignment(val voice: String, val speaker: SpeakerRef)
 
     /** Everything the detail page of one transcription shows (`GET /transcriptions/{id}`). */
     data class TranscriptionDetail(
@@ -72,6 +77,8 @@ class SubmissionService(
         val summary: String?,
         /** Empty until the transcript exists; a segment's speaker is null when the audio was not diarized. */
         val segments: List<DetailSegment>,
+        /** Which speaker each named voice is; a voice not listed is still "Speaker N". */
+        val voices: List<VoiceAssignment>,
     )
 
     data class ExportData(
@@ -192,9 +199,14 @@ class SubmissionService(
         val submission = submissionRepo.findById(submissionId).orElse(null)?.takeIf { it.userId == userId } ?: return null
         val audio = audioMetaRepo.findById(submission.audioId).orElse(null)
         val transcript = transcriptRepo.findBySubmissionId(submissionId)
-        val segments = transcript?.id?.let { segmentQueries.findByTranscriptId(it) }
-            ?.map { DetailSegment(start = it.start, end = it.end, text = it.text, speaker = it.speaker) }
-            ?: emptyList()
+        val segments = transcript?.id?.let { speakerQueries.detailPhrases(it) }?.map {
+            DetailSegment(
+                start = it.start, end = it.end, text = it.text, speaker = it.voice,
+                assignedSpeaker = it.own?.let { own -> SpeakerRef(own.id, own.name) },
+            )
+        } ?: emptyList()
+        val voices = transcript?.id?.let { speakerQueries.voices(it) }
+            ?.map { VoiceAssignment(it.voice, SpeakerRef(it.speaker.id, it.speaker.name)) } ?: emptyList()
         val fileName = audio?.originalName ?: "unknown"
         return TranscriptionDetail(
             jobId = submissionId,
@@ -209,6 +221,7 @@ class SubmissionService(
             tags = transcript?.id?.let { tagRepository.findByTranscriptId(it).map { tag -> TagRef(tag.id!!, tag.name) } } ?: emptyList(),
             summary = summaryRepo.findBySubmissionId(submissionId)?.text?.takeIf { it.isNotBlank() },
             segments = segments,
+            voices = voices,
         )
     }
 

@@ -84,6 +84,24 @@ class SpeakerService(
         return SpeakerRef(saved.id!!, saved.name)
     }
 
+    /** The user's speaker called [rawName] (whatever the case), created without a description when there is none. */
+    @Transactional
+    fun findOrCreate(userId: UUID, rawName: String?): SpeakerRef {
+        val name = normalizeName(rawName)
+        val existing = speakerRepository.findByUserIdAndNameIgnoringCase(userId, name)
+        if (existing != null) return SpeakerRef(existing.id!!, existing.name)
+        val saved = speakerRepository.save(SpeakerEntity(userId = userId, name = name))
+        return SpeakerRef(saved.id!!, saved.name)
+    }
+
+    /** The speaker with this id if it is the user's. */
+    @Transactional(readOnly = true)
+    fun own(userId: UUID, speakerId: UUID): SpeakerRef {
+        val speaker = ownSpeaker(userId, speakerId)
+        return SpeakerRef(speaker.id!!, speaker.name)
+    }
+
+
     /** Changes the name and/or description; what is not given stays. A description of "" clears it. */
     @Transactional
     fun update(userId: UUID, speakerId: UUID, rawName: String?, rawDescription: String?, descriptionGiven: Boolean): SpeakerRef {

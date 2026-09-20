@@ -19,7 +19,7 @@ class TranscriptView extends StatelessWidget {
   final List<Speaker> library;
 
   /// Reassigns segments to the speaker with this name (created if new).
-  final void Function(Set<int> segmentIndexes, String name) onAssign;
+  final void Function(Set<int> segmentIndexes, String name, bool allBySpeaker) onAssign;
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +42,7 @@ class _RunBlock extends StatefulWidget {
   final TranscriptionDetail detail;
   final SpeakerRun run;
   final List<Speaker> library;
-  final void Function(Set<int> segmentIndexes, String name) onAssign;
+  final void Function(Set<int> segmentIndexes, String name, bool allBySpeaker) onAssign;
 
   @override
   State<_RunBlock> createState() => _RunBlockState();

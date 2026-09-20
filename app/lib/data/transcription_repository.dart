@@ -123,13 +123,13 @@ abstract class TranscriptionRepository {
 
   /// Attributes the given segments of a transcription to the speaker called
   /// [name] and returns that speaker. A name that is not in the library yet is
-  /// created first.
+  /// created first (`PUT /transcriptions/{id}/speakers`).
   ///
-  /// The gateway has nothing for this yet: `docs/api-gaps.md` §2.5 sketches
-  /// `PUT /jobs/{id}/speakers/{slot}` with a scope of a whole slot or one
-  /// segment, and §1.3 leaves the storage open. This mock works per segment,
-  /// as the design does.
-  Future<Speaker> assignSpeaker(String id, Set<int> segmentIndexes, String name);
+  /// With [allBySpeaker] the segments are everything the user sees under one name and are all to become
+  /// [name]: a diarizer voice that is entirely among them is settled for good in this transcription (the row of
+  /// chips in the header names it too), the other segments are set one by one. Without it the segments are
+  /// set one by one and the voices are left alone. Read the outcome back with [get].
+  Future<Speaker> assignSpeaker(String id, Set<int> segmentIndexes, String name, {bool allBySpeaker = false});
 
   // AI suggestions (`docs/api-gaps.md` §2.4, still marked TBD there). Each call
   // resolves part of the suggestions of a transcription; the record disappears

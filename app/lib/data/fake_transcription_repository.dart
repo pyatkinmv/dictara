@@ -550,7 +550,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   }
 
   @override
-  Future<Speaker> assignSpeaker(String id, Set<int> segmentIndexes, String name) async {
+  Future<Speaker> assignSpeaker(String id, Set<int> segmentIndexes, String name, {bool allBySpeaker = false}) async {
     final wanted = name.trim();
     // The library matches names case-insensitively; a new one keeps the case it was typed in.
     var speaker = _speakerLibrary.where((s) => s.name.toLowerCase() == wanted.toLowerCase()).firstOrNull;
@@ -559,8 +559,48 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
       _speakerLibrary.add(speaker);
     }
     final assigned = _segmentSpeakers.putIfAbsent(id, () => {});
-    for (final index in segmentIndexes) {
-      assigned[index] = speaker;
+    final slots = _slotsOf(id);
+    final marked = {...segmentIndexes}; // the segments that end up with a mark of their own
+
+    if (allBySpeaker) {
+      // A voice that is entirely among the segments is settled once and for all; its marks are dropped.
+      final bySlot = <int, Set<int>>{};
+      for (final index in segmentIndexes) {
+        final slot = _transcript[index].speakerSlot;
+        if (slot != null) bySlot.putIfAbsent(slot, () => {}).add(index);
+      }
+      for (final entry in bySlot.entries) {
+        final all = [for (var i = 0; i < _transcript.length; i++) if (_transcript[i].speakerSlot == entry.key) i];
+        if (entry.value.length == all.length) {
+          slots[entry.key] = speaker;
+          all.forEach(assigned.remove);
+          marked.removeAll(entry.value);
+        }
+      }
+    }
+
+    for (final index in marked) {
+      // A mark that only repeats what the voice already says is not kept.
+      final slot = _transcript[index].speakerSlot;
+      if (slot != null && slots[slot] == speaker) {
+        assigned.remove(index);
+      } else {
+        assigned[index] = speaker;
+      }
+    }
+
+    // A voice whose segments all end up with one speaker is that speaker's voice: record it, drop the marks.
+    final bySlot = <int, List<int>>{};
+    for (var i = 0; i < _transcript.length; i++) {
+      final slot = _transcript[i].speakerSlot;
+      if (slot != null) bySlot.putIfAbsent(slot, () => []).add(i);
+    }
+    for (final entry in bySlot.entries) {
+      final who = {for (final i in entry.value) assigned[i] ?? slots[entry.key]};
+      if (who.length == 1 && who.single != null) {
+        slots[entry.key] = who.single!;
+        entry.value.forEach(assigned.remove);
+      }
     }
     return speaker;
   }

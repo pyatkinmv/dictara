@@ -2,15 +2,19 @@ package com.dictara.gateway.controller
 
 import com.dictara.gateway.service.SpeakerRef
 import com.dictara.gateway.service.SpeakerService
+import com.dictara.gateway.service.TranscriptSpeakerService
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
-/** The user's speaker library. Which speaker says what in a transcript is set elsewhere (later iterations). */
+/** The user's speaker library, and who speaks in a transcript (the Speaker Picker). */
 @RestController
-class SpeakerController(private val speakerService: SpeakerService) {
+class SpeakerController(
+    private val speakerService: SpeakerService,
+    private val transcriptSpeakers: TranscriptSpeakerService,
+) {
 
     data class DeleteResponse(val affectedTranscriptions: Int)
 
@@ -36,6 +40,34 @@ class SpeakerController(private val speakerService: SpeakerService) {
     @DeleteMapping("/speakers/{id}")
     fun delete(@PathVariable id: String, request: HttpServletRequest): DeleteResponse =
         DeleteResponse(speakerService.delete(userId(request), uuid(id)))
+
+    /** What the Speaker Picker sends: which phrases, which speaker, and how far it reaches. */
+    data class AssignRequest(
+        /** `segment` or `all` (everything the user sees under one name; see [TranscriptSpeakerService]). */
+        val scope: String?,
+        /** Phrase numbers in the transcript, from 0. */
+        val segmentIndexes: List<Int>?,
+        /** A speaker of the library... */
+        val speakerId: String?,
+        /** ...or a name: the library speaker of that name, created if there is none. */
+        val name: String?,
+    )
+
+    /**
+     * Makes phrases of a transcription the speaker's (the Speaker Picker). Answers the speaker. 404 for someone
+     * else's transcription or speaker, 409 while there is no transcript, 400 for a phrase that does not exist,
+     * an unknown scope, or neither a speaker id nor a name.
+     */
+    @PutMapping("/transcriptions/{id}/speakers")
+    fun assign(@PathVariable id: String, @RequestBody body: AssignRequest, request: HttpServletRequest): SpeakerRef {
+        val scope = TranscriptSpeakerService.Scope.parse(body.scope)
+            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "scope is 'segment' or 'all'")
+        return transcriptSpeakers.assign(
+            userId(request), uuid(id), scope, body.segmentIndexes.orEmpty().toSet(),
+            body.speakerId?.let { uuid(it) }, body.name,
+        )
+    }
+
 
     private fun userId(request: HttpServletRequest): UUID =
         request.getAttribute("authenticatedUserId") as UUID? ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
