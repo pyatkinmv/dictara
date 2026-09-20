@@ -42,8 +42,8 @@
 
 - [ ] **0. Подготовка**
   - [x] Создать ветку `redesign`
-  - [ ] Проверить `flutter run -d chrome` с hot reload на этой машине (запасной вариант — Docker)
-  - [ ] Добавить зависимости `provider`, `go_router`
+  - [x] Проверить запуск на этой машине: `flutter run -d web-server` работает (`-d chrome` не проверялся, см. «Как запускать приложение»)
+  - [x] Добавить зависимости `provider`, `go_router` (заодно `pubspec.lock` очищен от устаревших записей)
   - [ ] Положить шрифт Inter в assets (файлы нужно скачать — согласовать перед скачиванием)
 - [ ] **1. Каркас:** тема teal, сайдбар (логотип, навигация, usage, профиль-меню), топбар с Upload, go_router с пустыми страницами `/transcriptions`, `/threads`, `/tags`, `/speakers`, `/settings`; `main_material.dart` переключается на каркас; обновить `test/widget_test.dart`
 - [ ] **2. Список транскрипций** на моках: поиск, фильтр (статус, теги), сортировка, строки со статусом и прогрессом
@@ -67,7 +67,7 @@ _Пока пусто._
 
 - **Цвет тегов и спикеров.** `design.md` описывает поле `color`, назначаемое при создании по циклу из 10 цветов. `api-gaps.md` решает иначе: цвет считается на фронтенде по хэшу имени и API его не возвращает. Нужно выбрать одно.
 - **Тип `Job.id`.** В `design.md` int, в БД UUID.
-- **`app/pubspec.lock` устарел.** В нём лишние записи (`fluent_ui`, `intl` и др.), которых нет в `pubspec.yaml`; обычный `flutter pub get` их удаляет. Файл не менялся, решить, коммитить ли обновление.
+- **`app/pubspec.lock` был устаревшим.** В нём были лишние записи (`fluent_ui`, `intl` и др.), которых нет в `pubspec.yaml`. При добавлении `provider` и `go_router` (итерация 0) файл пересобран `flutter pub add`, лишнее ушло.
 - **`dart:html`.** `AuthService`, `history_section.dart`, `transcribe_page.dart` используют устаревшую библиотеку. Из-за неё тесты работают только на браузерной платформе. В новом коде её не использовать; для скачивания и буфера обмена брать `package:web`.
 - **CI не запускает Flutter-тесты.** В `ci.yml` нет `flutter test`.
 
@@ -95,4 +95,17 @@ docker run --rm -v "C:\Users\pyatk\IdeaProjects\dictara\app:/src:ro" ghcr.io/cir
 
 ## Как запускать приложение
 
-Работает ли `flutter run -d chrome` на этой машине — проверяется в итерации 0. Приложение ходит на относительный `/api/...`, который в проде проксирует nginx; на моках это не нужно. Для запуска с реальным gateway понадобятся Postgres + gateway (`docker compose up -d postgres gateway`) и прокси на `/api` (в gateway CORS не настроен). Без Telegram-токена gateway считает пользователя анонимным, так что интерфейс работает и без логина.
+Приложение ходит на относительный `/api/...`, который в проде проксирует nginx; на моках это не нужно. Для запуска с реальным gateway понадобятся Postgres + gateway (`docker compose up -d postgres gateway`) и прокси на `/api` (в gateway CORS не настроен). Без Telegram-токена gateway считает пользователя анонимным, так что интерфейс работает и без логина.
+
+### Запуск нового UI на моках (проверено)
+
+Точка входа проекта — `lib/material/main_material.dart` (не `lib/main.dart`), её нужно указывать явно:
+
+```powershell
+cd app
+flutter run -d chrome -t lib/material/main_material.dart
+```
+
+В терминале, где запущен `flutter run`, доступны hot reload (`r`) и hot restart (`R`). Вариант `-d chrome` открывает браузер сам; **он на этой машине пока не проверялся**. Проверен вариант без запуска браузера: `flutter run -d web-server --web-port 3001 -t lib/material/main_material.dart`, затем открыть `http://localhost:3001` вручную (страница поднимается, CanvasKit отдаётся, в консоли ошибок нет; первая сборка ~40 с). Ошибка 404 на CanvasKit касается только тестового сервера `flutter test`, не `flutter run`.
+
+`flutter run` при каждом запуске сам дописывает блок `analyzer.exclude` в `app/analysis_options.yaml`. Это побочный эффект инструмента, в коммиты его не берём (`git checkout -- app/analysis_options.yaml`).
