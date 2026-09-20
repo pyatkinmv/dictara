@@ -2,7 +2,7 @@ package com.dictara.gateway
 
 import com.dictara.gateway.service.JwtTokenProvider
 import com.dictara.gateway.storage.AudioStorage
-import com.dictara.gateway.util.TagColors
+import com.dictara.gateway.util.NameColors
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.assertj.core.api.Assertions.assertThat
@@ -95,7 +95,7 @@ class TagLibraryIntegrationTest : AbstractSharedContextIntegrationTest() {
 
         assertThat(reply.status).isEqualTo(HttpStatus.CREATED)
         assertThat(reply.body!!["label"].asText()).isEqualTo("meeting")
-        assertThat(reply.body["color"].asText()).isEqualTo(TagColors.of("meeting"))
+        assertThat(reply.body["color"].asText()).isEqualTo(NameColors.of("meeting"))
         val entry = library()["tags"].single()
         assertThat(entry["id"].asText()).isEqualTo(reply.body["id"].asText())
         assertThat(entry["description"].asText()).isEqualTo("Regular meetings")
@@ -281,7 +281,7 @@ class TagLibraryIntegrationTest : AbstractSharedContextIntegrationTest() {
 
         assertThat(first.status).isEqualTo(HttpStatus.OK)
         assertThat(first.body!!["id"].asText()).isEqualTo(id.toString())
-        assertThat(first.body["color"].asText()).isEqualTo(TagColors.of("meeting"))
+        assertThat(first.body["color"].asText()).isEqualTo(NameColors.of("meeting"))
         assertThat(again.status).isEqualTo(HttpStatus.OK)
         assertThat(tagsOf(s)).containsExactly("meeting")
         assertThat(library()["tags"].single()["transcription_count"].asInt()).isEqualTo(1)

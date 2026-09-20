@@ -6,7 +6,7 @@ import com.dictara.gateway.repository.TagLibraryQueries
 import com.dictara.gateway.repository.TagRepository
 import com.dictara.gateway.repository.TranscriptRepository
 import com.dictara.gateway.repository.TranscriptTagRepository
-import com.dictara.gateway.util.TagColors
+import com.dictara.gateway.util.NameColors
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -16,7 +16,7 @@ import java.util.UUID
 
 /** A tag as the API shows it wherever one appears: with the color worked out from its name. */
 data class TagRef(val id: UUID, val label: String) {
-    val color: String get() = TagColors.of(label)
+    val color: String get() = NameColors.of(label)
 }
 
 /**
@@ -69,7 +69,7 @@ class TagService(
         /** The titles of the latest transcriptions that carry the tag, newest first. */
         val sampleTitles: List<String>,
     ) {
-        val color: String get() = TagColors.of(label)
+        val color: String get() = NameColors.of(label)
     }
 
     data class Library(val tags: List<LibraryEntry>, val taggedTranscriptions: Int)

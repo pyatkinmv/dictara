@@ -3,13 +3,13 @@ package com.dictara.gateway.util
 import java.util.Locale
 
 /**
- * The color of a tag, worked out from its name: the same name always gets the same color and nothing is
+ * The color of a tag or a speaker, worked out from its name: the same name always gets the same color and nothing is
  * stored. Colors are spread over the whole hue circle (with a few saturations and lightnesses), so there
  * are hundreds of distinct ones, and all of them are dark enough for white text.
  *
- * Renaming a tag therefore changes its color; that was accepted in favour of storing nothing.
+ * Renaming therefore changes the color; that was accepted in favour of storing nothing.
  */
-object TagColors {
+object NameColors {
     private val saturations = intArrayOf(60, 70, 80)
     private val lightnesses = intArrayOf(38, 42, 46)
 

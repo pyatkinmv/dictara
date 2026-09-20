@@ -123,8 +123,22 @@ class LocalProfileIntegrationTest {
     }
 
     @Test
+    fun `the seed gives the speaker library of the design, with usage from the voices`() {
+        val speakers = get("/speakers")["speakers"].associateBy { it["name"].asText() }
+
+        assertThat(speakers.keys).containsExactly("Alexei Sorokin", "Maria Chen", "James Wright") // in the design's order
+        assertThat(speakers["Maria Chen"]!!["description"].asText()).startsWith("Head of Engineering")
+        // Alexei and Maria are in the quarterly review (3 voices), the interview (2 voices) and the standup (3);
+        // James only in the two with three voices.
+        assertThat(speakers["Alexei Sorokin"]!!["transcription_count"].asInt()).isEqualTo(3)
+        assertThat(speakers["James Wright"]!!["transcription_count"].asInt()).isEqualTo(2)
+        assertThat(speakers["James Wright"]!!["speaking_s"].asDouble()).isGreaterThan(0.0)
+        assertThat(speakers["Alexei Sorokin"]!!["sample_titles"].map { it.asText() }).containsExactly("Quarterly Review Meeting", "Interview: Anna K.") // the two newest
+    }
+
+    @Test
     fun `the seed can be applied again without changing anything`() {
-        fun counts() = listOf("users", "audio_meta", "submissions", "transcripts", "tags", "transcript_tags").map {
+        fun counts() = listOf("users", "audio_meta", "submissions", "transcripts", "tags", "transcript_tags", "speakers", "transcript_voices", "transcript_segments").map {
             jdbc.queryForObject("SELECT count(*) FROM $it", Long::class.java)
         }
         val before = counts()

@@ -295,6 +295,6 @@ class TranscriptSegmentsMigrationTest {
         flyway().migrate()
 
         assertThat(rows(id).map { it.text }).containsExactly("fixed")
-        assertThat(schemaVersion()).isEqualTo("30")
+        assertThat(tableExists("transcript_segments")).isTrue()
     }
 }

@@ -25,7 +25,7 @@ class NotIntegratedException implements Exception {
 /// The real data source: the gateway over HTTP.
 ///
 /// Being connected screen by screen (`docs/local-backend-integration.md`): so far the transcription list,
-/// the tag names and the detail page (text, summary, rename, download) work. Everything else throws
+/// the tag and speaker libraries and the detail page (text, summary, rename, download) work. Everything else throws
 /// [NotIntegratedException].
 class HttpTranscriptionRepository implements TranscriptionRepository {
   HttpTranscriptionRepository(this._client);
@@ -168,23 +168,64 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
   Future<Transcription> upload(UploadRequest request) => _notYet('Uploading', 7);
 
 
-  /// The detail page asks for the library to offer it in the Speaker Picker; until it is connected there is
-  /// none (the gateway has no speaker names yet), so the picker offers nothing.
+  /// The speaker library, for the Speaker Picker of the detail page. (Choosing one there is connected in
+  /// iteration 6.)
   @override
-  Future<List<Speaker>> speakers() async => const [];
+  Future<List<Speaker>> speakers() async => [for (final entry in await _speakerEntries()) entry.speaker];
 
   @override
-  Future<List<SpeakerEntry>> speakerLibrary() => _notYet('The speaker library', 5);
+  Future<List<SpeakerEntry>> speakerLibrary() => _speakerEntries();
+
+  Future<List<SpeakerEntry>> _speakerEntries() async {
+    final body = await _client.getJson('/speakers');
+    if (body is! Map<String, dynamic> || body['speakers'] is! List) {
+      throw const GatewayException('Expected the speaker library');
+    }
+    return [
+      for (final entry in body['speakers'] as List<dynamic>)
+        SpeakerEntry(
+          speaker: _speakerFromJson(entry as Map<String, dynamic>),
+          description: entry['description'] as String? ?? '',
+          transcriptions: [for (final title in (entry['sample_titles'] as List<dynamic>? ?? const [])) title as String],
+          totalDuration: _secondsFromJson(entry['speaking_s']) ?? Duration.zero,
+          count: (entry['transcription_count'] as num?)?.toInt() ?? 0,
+        ),
+    ];
+  }
+
+  /// The gateway names speakers by id, the screens by name (unique per user, whatever the case), so the id is
+  /// looked up when a speaker is changed or deleted. Null when no such speaker exists any more.
+  Future<String?> _speakerId(String name) async {
+    final body = await _client.getJson('/speakers');
+    if (body is! Map<String, dynamic> || body['speakers'] is! List) {
+      throw const GatewayException('Expected the speaker library');
+    }
+    for (final entry in body['speakers'] as List<dynamic>) {
+      if ((entry as Map<String, dynamic>)['name'] == name) return entry['id'] as String;
+    }
+    return null;
+  }
 
   @override
-  Future<Speaker> createSpeaker(String name, String description) => _notYet('Creating a speaker', 5);
+  Future<Speaker> createSpeaker(String name, String description) async {
+    final body = await _client.postJson('/speakers', {'name': name, 'description': description});
+    return _speakerFromJson(body as Map<String, dynamic>);
+  }
 
   @override
-  Future<void> updateSpeaker(String name, {required String newName, required String description}) =>
-      _notYet('Editing a speaker', 5);
+  Future<void> updateSpeaker(String name, {required String newName, required String description}) async {
+    final id = await _speakerId(name);
+    if (id == null) return;
+    await _client.putJson('/speakers/${Uri.encodeComponent(id)}', {'name': newName, 'description': description});
+  }
 
   @override
-  Future<int> deleteSpeaker(String name) => _notYet('Deleting a speaker', 5);
+  Future<int> deleteSpeaker(String name) async {
+    final id = await _speakerId(name);
+    if (id == null) return 0;
+    final body = await _client.deleteJson('/speakers/${Uri.encodeComponent(id)}');
+    return ((body as Map<String, dynamic>)['affected_transcriptions'] as num?)?.toInt() ?? 0;
+  }
 
   @override
   Future<Speaker> assignSpeaker(String id, Set<int> segmentIndexes, String name) =>
@@ -303,3 +344,6 @@ Color _colorFromJson(String? hex) {
   final value = hex != null && RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(hex) ? int.parse(hex.substring(1), radix: 16) : null;
   return value == null ? _fallbackTagColor : Color(0xFF000000 | value);
 }
+
+/// A speaker as the gateway describes it (`{id, name, color}`), the color worked out by the gateway.
+Speaker _speakerFromJson(Map<String, dynamic> json) => Speaker(json['name'] as String, _colorFromJson(json['color'] as String?));

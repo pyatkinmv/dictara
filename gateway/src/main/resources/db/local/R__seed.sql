@@ -174,3 +174,25 @@ FROM (VALUES
 ) AS link(n, tag_name)
 JOIN tags t ON t.user_id = '00000000-0000-4000-8000-000000000001' AND t.name = link.tag_name
 ON CONFLICT (transcript_id, tag_id) DO NOTHING;
+
+-- ── Speakers with the descriptions of the design's Speakers page, and which voices they are ─────────────
+-- created_at fixes the order of the library (the design's order).
+INSERT INTO speakers (id, user_id, name, description, created_at)
+VALUES
+    ('00000000-0000-4000-8000-0000000f0001', '00000000-0000-4000-8000-000000000001', 'Alexei Sorokin', 'Product lead. Discusses roadmap, feature prioritization, and team updates.', '2025-06-01 09:00:01+00'),
+    ('00000000-0000-4000-8000-0000000f0002', '00000000-0000-4000-8000-000000000001', 'Maria Chen',     'Head of Engineering. Covers architecture, sprints, and code quality.', '2025-06-01 09:00:02+00'),
+    ('00000000-0000-4000-8000-0000000f0003', '00000000-0000-4000-8000-000000000001', 'James Wright',   'Sales & Marketing lead. Focuses on customer acquisition and GTM strategy.', '2025-06-01 09:00:03+00')
+ON CONFLICT (user_id, name) DO UPDATE SET description = EXCLUDED.description, created_at = EXCLUDED.created_at;
+
+-- Voices 0, 1, 2 of the diarized transcripts are Alexei, Maria and James (the interview has two voices).
+-- Not the product sync (n = 6): it stays without names, for the AI suggestions of a later iteration.
+-- The speaker is looked up by name: one made by hand under the same name keeps its own id.
+INSERT INTO transcript_voices (transcript_id, voice, speaker_id)
+SELECT ('00000000-0000-4000-8000-0000000c00' || lpad(m.n::text, 2, '0'))::uuid, 'SPEAKER_0' || m.voice, sp.id
+FROM (VALUES
+    (0, 0, 'Alexei Sorokin'), (0, 1, 'Maria Chen'), (0, 2, 'James Wright'),
+    (2, 0, 'Alexei Sorokin'), (2, 1, 'Maria Chen'),
+    (5, 0, 'Alexei Sorokin'), (5, 1, 'Maria Chen'), (5, 2, 'James Wright')
+) AS m(n, voice, speaker_name)
+JOIN speakers sp ON sp.user_id = '00000000-0000-4000-8000-000000000001' AND sp.name = m.speaker_name
+ON CONFLICT (transcript_id, voice) DO UPDATE SET speaker_id = EXCLUDED.speaker_id;

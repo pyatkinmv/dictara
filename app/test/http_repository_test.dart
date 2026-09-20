@@ -410,6 +410,119 @@ void main() {
     });
   });
 
+  group('speakers', () {
+    const libraryJson = <String, dynamic>{
+      'speakers': [
+        {
+          'id': 'a',
+          'name': 'Maria Chen',
+          'color': '#8F13AE',
+          'description': 'Head of Engineering',
+          'transcription_count': 5,
+          'speaking_s': 3725.5,
+          'sample_titles': ['New one', 'Older one'],
+        },
+        {'id': 'b', 'name': 'Unused', 'color': '#059669', 'transcription_count': 0, 'speaking_s': 0.0, 'sample_titles': <String>[]},
+      ],
+    };
+
+    (HttpTranscriptionRepository, List<http.Request>) repoWith(Map<String, http.Response Function(http.Request)> routes) {
+      final seen = <http.Request>[];
+      final repo = _repo(MockClient((request) async {
+        seen.add(request);
+        final route = routes['${request.method} ${request.url.path}'];
+        return route == null ? http.Response('no route', 500) : route(request);
+      }));
+      return (repo, seen);
+    }
+
+    test('the library comes from /speakers: description, count, speaking time, latest titles, colors', () async {
+      final (repo, seen) = repoWith({'GET /api/speakers': (_) => _json(libraryJson)});
+
+      final library = await repo.speakerLibrary();
+
+      expect(seen.single.url.toString(), '/api/speakers');
+      final maria = library.first;
+      expect(maria.speaker.name, 'Maria Chen');
+      expect(maria.speaker.color, const Color(0xFF8F13AE));
+      expect(maria.description, 'Head of Engineering');
+      expect(maria.count, 5);
+      expect(maria.transcriptions, ['New one', 'Older one']); // the latest two: count says the rest
+      expect(maria.totalDuration, const Duration(hours: 1, minutes: 2, seconds: 5, milliseconds: 500));
+      final unused = library.last;
+      expect(unused.description, '');
+      expect(unused.count, 0);
+      expect(unused.totalDuration, Duration.zero);
+    });
+
+    test('speakers() are the library entries, for the picker', () async {
+      final (repo, _) = repoWith({'GET /api/speakers': (_) => _json(libraryJson)});
+
+      expect((await repo.speakers()).map((s) => s.name), ['Maria Chen', 'Unused']);
+    });
+
+    test('an answer that is not the library is an error', () async {
+      final (repo, _) = repoWith({'GET /api/speakers': (_) => _json(['oops'])});
+
+      await expectLater(repo.speakers(), throwsA(isA<GatewayException>()));
+      await expectLater(repo.speakerLibrary(), throwsA(isA<GatewayException>()));
+    });
+
+    test('a speaker is created with POST /speakers and keeps the case', () async {
+      final (repo, seen) = repoWith({
+        'POST /api/speakers': (_) => _json({'id': 'x', 'name': 'Ann Lee', 'color': '#2563EB'}, status: 201),
+      });
+
+      final speaker = await repo.createSpeaker('Ann Lee', 'Designer');
+
+      expect(jsonDecode(seen.single.body), {'name': 'Ann Lee', 'description': 'Designer'});
+      expect(speaker.name, 'Ann Lee');
+      expect(speaker.color, const Color(0xFF2563EB));
+    });
+
+    test('a taken name comes back as the gateways own message', () async {
+      final (repo, _) = repoWith({
+        'POST /api/speakers': (_) => _json({'message': 'A speaker with this name already exists'}, status: 409),
+      });
+
+      await expectLater(
+        repo.createSpeaker('maria chen', ''),
+        throwsA(isA<GatewayException>().having((e) => e.statusCode, 'statusCode', 409)),
+      );
+    });
+
+    test('editing looks the id up by name and PUTs the new name and description', () async {
+      final (repo, seen) = repoWith({
+        'GET /api/speakers': (_) => _json(libraryJson),
+        'PUT /api/speakers/a': (_) => _json({'id': 'a', 'name': 'Masha', 'color': '#2563EB'}),
+      });
+
+      await repo.updateSpeaker('Maria Chen', newName: 'Masha', description: 'new text');
+
+      expect(seen.map((r) => '${r.method} ${r.url.path}'), ['GET /api/speakers', 'PUT /api/speakers/a']);
+      expect(jsonDecode(seen.last.body), {'name': 'Masha', 'description': 'new text'});
+    });
+
+    test('editing or deleting a speaker that no longer exists does nothing', () async {
+      final (repo, seen) = repoWith({'GET /api/speakers': (_) => _json(libraryJson)});
+
+      await repo.updateSpeaker('Gone', newName: 'x', description: '');
+      expect(await repo.deleteSpeaker('Gone'), 0);
+
+      expect(seen.map((r) => r.method).toSet(), {'GET'});
+    });
+
+    test('deleting returns how many transcriptions lost the speaker', () async {
+      final (repo, seen) = repoWith({
+        'GET /api/speakers': (_) => _json(libraryJson),
+        'DELETE /api/speakers/a': (_) => _json({'affected_transcriptions': 5}),
+      });
+
+      expect(await repo.deleteSpeaker('Maria Chen'), 5);
+      expect(seen.last.url.path, '/api/speakers/a');
+    });
+  });
+
   group('detail', () {
     const detailJson = <String, dynamic>{
       'job_id': '3f1c2f0e-0000-4000-8000-000000000003',
@@ -530,16 +643,12 @@ void main() {
       expect(await _repo(MockClient((_) async => http.Response('', 404))).transcriptText('abc'), isNull);
     });
 
-    test('the speaker library is empty until it is connected', () async {
-      expect(await _repo(MockClient((_) async => _json([]))).speakers(), isEmpty);
-    });
   });
 
   group('not connected yet', () {
     final repo = _repo(MockClient((request) async => _json([])));
 
     test('other calls say which iteration connects them', () async {
-      await expectLater(repo.speakerLibrary(), throwsA(isA<NotIntegratedException>().having((e) => e.iteration, 'iteration', 5)));
       await expectLater(
         repo.upload(const UploadRequest(file: ChosenFile(name: 'a.mp3', sizeBytes: 1))),
         throwsA(isA<NotIntegratedException>().having((e) => e.iteration, 'iteration', 7)),
