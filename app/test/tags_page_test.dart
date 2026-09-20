@@ -15,7 +15,7 @@ void main() {
   group('FakeTranscriptionRepository tag library', () {
     test('usage is derived from the transcriptions that carry each tag', () async {
       final repo = FakeTranscriptionRepository();
-      final entries = {for (final e in await repo.tagLibrary()) e.tag.label: e};
+      final entries = {for (final e in (await repo.tagLibrary()).entries) e.tag.label: e};
 
       expect(entries.keys, ['meeting', 'quarterly', 'interview', 'hiring', 'ideas', 'standup']);
       expect(entries['meeting']!.transcriptions, ['Quarterly Review Meeting', 'Daily Standup 19 Jun']);
@@ -30,7 +30,7 @@ void main() {
 
       expect(tag.label, 'budget');
       expect(tag.color, libraryPalette[6 % libraryPalette.length]);
-      final entry = (await repo.tagLibrary()).last;
+      final entry = (await repo.tagLibrary()).entries.last;
       expect(entry.tag.label, 'budget');
       expect(entry.description, 'Money talks');
       expect(entry.transcriptions, isEmpty);
@@ -40,7 +40,7 @@ void main() {
       final repo = FakeTranscriptionRepository();
       await repo.updateTag('meeting', newLabel: 'Sync', description: 'New text');
 
-      final library = await repo.tagLibrary();
+      final library = (await repo.tagLibrary()).entries;
       final sync = library.firstWhere((e) => e.tag.label == 'sync');
       expect(sync.tag.color, const Color(0xFF2563EB));
       expect(sync.description, 'New text');

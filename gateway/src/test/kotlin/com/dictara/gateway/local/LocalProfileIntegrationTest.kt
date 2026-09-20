@@ -106,10 +106,10 @@ class LocalProfileIntegrationTest {
         assertThat(quarterly["status"].asText()).isEqualTo("done")
         assertThat(quarterly["audio_duration_s"].asDouble()).isEqualTo(862.0)
         assertThat(quarterly["speaker_count"].asInt()).isEqualTo(3)
-        assertThat(quarterly["tags"].map { it.asText() }).containsExactly("meeting", "quarterly")
+        assertThat(quarterly["tags"].map { it["label"].asText() }).containsExactly("meeting", "quarterly")
 
         assertThat(byName["interview_anna_k.mp3"]!!["speaker_count"].asInt()).isEqualTo(2)
-        assertThat(byName["interview_anna_k.mp3"]!!["tags"].map { it.asText() }).containsExactly("hiring", "interview")
+        assertThat(byName["interview_anna_k.mp3"]!!["tags"].map { it["label"].asText() }).containsExactly("hiring", "interview")
         assertThat(byName["voice_memo_2025-06-20.m4a"]!!["speaker_count"].asInt()).isZero()
         assertThat(byName["standup_2025-06-19.mp3"]!!["audio_duration_s"].asDouble()).isEqualTo(480.0)
         // No title of its own: shown under the file name.

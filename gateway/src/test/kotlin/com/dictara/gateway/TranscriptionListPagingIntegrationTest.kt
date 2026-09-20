@@ -164,7 +164,13 @@ class TranscriptionListPagingIntegrationTest : AbstractSharedContextIntegrationT
     fun `a page has the same entries as the array`() {
         addSubmission("call.mp3", 0, title = "Weekly call", tags = listOf("meeting"))
 
-        assertThat(ok("/transcriptions?page=0&size=10")["items"]).isEqualTo(ok("/transcriptions"))
+        // The array names its tags (the old client); the page describes them (id, label, color).
+        val pageItems = ok("/transcriptions?page=0&size=10")["items"].map { item ->
+            (item.deepCopy<com.fasterxml.jackson.databind.node.ObjectNode>()).also { copy ->
+                copy.set<JsonNode>("tags", copy.arrayNode().also { labels -> item["tags"].forEach { labels.add(it["label"].asText()) } })
+            }
+        }
+        assertThat(pageItems).isEqualTo(ok("/transcriptions").toList())
     }
 
     @Test
@@ -233,7 +239,7 @@ class TranscriptionListPagingIntegrationTest : AbstractSharedContextIntegrationT
 
         val named = items.first { it["file_name"].asText() == "mid.mp3" }
         assertThat(named["title"].asText()).isEqualTo("Named")
-        assertThat(named["tags"].map { it.asText() }).containsExactly("a", "b")
+        assertThat(named["tags"].map { it["label"].asText() }).containsExactly("a", "b")
         assertThat(items.first { it["file_name"].asText() == "new.mp3" }["status"].asText()).isEqualTo("processing")
         assertThat(items.first { it["file_name"].asText() == "old.mp3" }["title"].asText()).isEqualTo("old.mp3")
     }

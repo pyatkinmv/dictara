@@ -1,24 +1,28 @@
 import 'dart:convert';
 
+import 'dart:ui' show Color;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:dictara_web/data/gateway_client.dart';
 import 'package:dictara_web/data/http_transcription_repository.dart';
 import 'package:dictara_web/data/transcription_repository.dart';
-import 'package:dictara_web/models/tag.dart';
 import 'package:dictara_web/models/transcription.dart';
 import 'package:dictara_web/models/upload.dart';
 
+/// A tag as the gateway describes it in the list and in the detail.
+Map<String, String> _tag(String label, {String color = '#2563EB'}) => {'id': 'id-$label', 'label': label, 'color': color};
+
 /// What `GET /transcriptions` of the gateway returns (`snake_case`, newest first).
-const List<Map<String, dynamic>> _listJson = [
+final List<Map<String, dynamic>> _listJson = [
   {
     'job_id': '3f1c2f0e-0000-4000-8000-000000000003',
     'file_name': 'standup.mp3',
     'title': 'Daily Standup',
     'created_at': '2026-09-20T16:36:21.609254Z',
     'status': 'done',
-    'tags': ['meeting', 'standup'],
+    'tags': [_tag('meeting'), _tag('standup')],
   },
   {
     'job_id': '3f1c2f0e-0000-4000-8000-000000000002',
@@ -34,7 +38,7 @@ const List<Map<String, dynamic>> _listJson = [
     'title': 'Voice memo',
     'created_at': '2026-09-18T08:30:00Z',
     'status': 'failed',
-    'tags': ['meeting'],
+    'tags': [_tag('meeting')],
   },
   {
     'job_id': '3f1c2f0e-0000-4000-8000-000000000000',
@@ -237,37 +241,172 @@ void main() {
     });
   });
 
-  group('HttpTranscriptionRepository.tags', () {
-    test('are the library, asked for from /tags, in the order the gateway sends them', () async {
-      final requests = <Uri>[];
+  group('tags', () {
+    const libraryJson = <String, dynamic>{
+      'tags': [
+        {
+          'id': 'a',
+          'label': 'meeting',
+          'color': '#2563EB',
+          'description': 'Regular meetings',
+          'transcription_count': 5,
+          'sample_titles': ['New one', 'Older one'],
+        },
+        {'id': 'b', 'label': 'unused', 'color': '#059669', 'transcription_count': 0, 'sample_titles': <String>[]},
+      ],
+      'tagged_transcriptions': 4,
+    };
+
+    /// Answers by method and path, and records what was asked.
+    (HttpTranscriptionRepository, List<http.Request>) repoWith(Map<String, http.Response Function(http.Request)> routes) {
+      final seen = <http.Request>[];
       final repo = _repo(MockClient((request) async {
-        requests.add(request.url);
-        return _json([
-          {'id': 'a', 'label': 'meeting'},
-          {'id': 'b', 'label': 'standup'},
-          {'id': 'c', 'label': 'unused'},
-        ]);
+        seen.add(request);
+        final route = routes['${request.method} ${request.url.path}'];
+        return route == null ? http.Response('no route', 500) : route(request);
       }));
+      return (repo, seen);
+    }
 
-      final tags = await repo.tags();
+    test('the library comes from /tags: description, count, latest titles, colors from the gateway', () async {
+      final (repo, seen) = repoWith({'GET /api/tags': (_) => _json(libraryJson)});
 
-      expect(requests.single.toString(), '/api/tags');
-      expect(tags.map((t) => t.label), ['meeting', 'standup', 'unused']); // unused ones too
-      expect(tags.first.color, colorForLabel('meeting'));
+      final library = await repo.tagLibrary();
+
+      expect(seen.single.url.toString(), '/api/tags');
+      expect(library.taggedTranscriptions, 4);
+      final meeting = library.entries.first;
+      expect(meeting.tag.label, 'meeting');
+      expect(meeting.tag.color, const Color(0xFF2563EB));
+      expect(meeting.description, 'Regular meetings');
+      expect(meeting.count, 5);
+      expect(meeting.transcriptions, ['New one', 'Older one']); // only the latest two: count says the rest
+      final unused = library.entries.last;
+      expect(unused.description, '');
+      expect(unused.count, 0);
+      expect(unused.transcriptions, isEmpty);
     });
 
-    test('an answer that is not a list is an error', () async {
-      final repo = _repo(MockClient((request) async => _json({'oops': true})));
+    test('tags() are the library entries, unused ones too', () async {
+      final (repo, _) = repoWith({'GET /api/tags': (_) => _json(libraryJson)});
+
+      expect((await repo.tags()).map((t) => t.label), ['meeting', 'unused']);
+    });
+
+    test('an answer that is not the library is an error', () async {
+      final (repo, _) = repoWith({'GET /api/tags': (_) => _json(['oops'])});
+
       await expectLater(repo.tags(), throwsA(isA<GatewayException>()));
+      await expectLater(repo.tagLibrary(), throwsA(isA<GatewayException>()));
     });
 
-    test('a tag always gets the same color, whatever the case', () {
-      expect(colorForLabel('meeting'), colorForLabel('meeting'));
-      expect(colorForLabel('Meeting'), colorForLabel('meeting'));
-      expect(libraryPalette, contains(colorForLabel('anything at all')));
-      // Different names do not all collapse into one color.
-      final colors = {for (final l in ['meeting', 'hiring', 'ideas', 'standup', 'interview', 'quarterly']) colorForLabel(l)};
-      expect(colors.length, greaterThan(2));
+    test('a color the gateway sends wrongly becomes grey instead of breaking the list', () async {
+      final (repo, _) = repoWith({
+        'GET /api/tags': (_) => _json({
+              'tags': [
+                {'id': 'a', 'label': 'x', 'color': 'blue'},
+                {'id': 'b', 'label': 'y'},
+              ],
+              'tagged_transcriptions': 0,
+            }),
+      });
+
+      expect((await repo.tags()).map((t) => t.color), [const Color(0xFF64748B), const Color(0xFF64748B)]);
+    });
+
+    test('a tag is created with POST /tags', () async {
+      final (repo, seen) = repoWith({'POST /api/tags': (_) => _json(_tag('fresh', color: '#8F13AE'), status: 201)});
+
+      final tag = await repo.createTag('fresh', 'made here');
+
+      expect(seen.single.method, 'POST');
+      expect(jsonDecode(seen.single.body), {'label': 'fresh', 'description': 'made here'});
+      expect(tag.label, 'fresh');
+      expect(tag.color, const Color(0xFF8F13AE));
+    });
+
+    test('a taken name comes back as the gateways own message', () async {
+      final (repo, _) = repoWith({
+        'POST /api/tags': (_) => _json({'message': 'A tag with this name already exists'}, status: 409),
+      });
+
+      await expectLater(
+        repo.createTag('meeting', ''),
+        throwsA(isA<GatewayException>()
+            .having((e) => e.statusCode, 'statusCode', 409)
+            .having((e) => e.message, 'message', contains('already exists'))),
+      );
+    });
+
+    test('editing looks the id up by label and PUTs the new name and description', () async {
+      final (repo, seen) = repoWith({
+        'GET /api/tags': (_) => _json(libraryJson),
+        'PUT /api/tags/a': (_) => _json(_tag('sync')),
+      });
+
+      await repo.updateTag('meeting', newLabel: 'sync', description: 'new text');
+
+      expect(seen.map((r) => '${r.method} ${r.url.path}'), ['GET /api/tags', 'PUT /api/tags/a']);
+      expect(jsonDecode(seen.last.body), {'label': 'sync', 'description': 'new text'});
+    });
+
+    test('editing or deleting a tag that no longer exists does nothing', () async {
+      final (repo, seen) = repoWith({'GET /api/tags': (_) => _json(libraryJson)});
+
+      await repo.updateTag('gone', newLabel: 'x', description: '');
+      expect(await repo.deleteTag('gone'), 0);
+
+      expect(seen.map((r) => r.method).toSet(), {'GET'});
+    });
+
+    test('deleting returns how many transcriptions lost the tag', () async {
+      final (repo, seen) = repoWith({
+        'GET /api/tags': (_) => _json(libraryJson),
+        'DELETE /api/tags/a': (_) => _json({'affected_transcriptions': 5}),
+      });
+
+      expect(await repo.deleteTag('meeting'), 5);
+      expect(seen.last.url.path, '/api/tags/a');
+    });
+
+    test('a tag is put on a transcription by label, the gateway creates it if new', () async {
+      final (repo, seen) = repoWith({'POST /api/transcriptions/t1/tags': (_) => _json(_tag('fresh', color: '#8F13AE'))});
+
+      final tag = await repo.addTag('t1', 'fresh');
+
+      expect(jsonDecode(seen.single.body), {'label': 'fresh'});
+      expect(tag.color, const Color(0xFF8F13AE));
+    });
+
+    test('taking a tag off looks the id up and DELETEs it from that transcription only', () async {
+      final (repo, seen) = repoWith({
+        'GET /api/tags': (_) => _json(libraryJson),
+        'DELETE /api/transcriptions/t1/tags/a': (_) => http.Response('', 204),
+      });
+
+      await repo.removeTag('t1', 'meeting');
+
+      expect(seen.map((r) => '${r.method} ${r.url.path}'), ['GET /api/tags', 'DELETE /api/transcriptions/t1/tags/a']);
+    });
+
+    test('list entries carry the colors of their tags', () async {
+      final (repo, _) = repoWith({
+        'GET /api/transcriptions': (_) => _json({
+              'items': [
+                {
+                  ..._listJson[0],
+                  'tags': [_tag('meeting', color: '#8F13AE')],
+                },
+              ],
+              'page': 0,
+              'size': 30,
+              'has_next': false,
+            }),
+      });
+
+      final page = await repo.list(const TranscriptionQuery());
+
+      expect(page.items.single.tags.single.color, const Color(0xFF8F13AE));
     });
   });
 
@@ -282,8 +421,10 @@ void main() {
       'audio_duration_s': 862.5,
       'language': 'en',
       'word_count': 1840,
-      'tags': ['meeting'],
       'summary': '**Key points**\n* one',
+      'tags': [
+        {'id': 'id-meeting', 'label': 'meeting', 'color': '#2563EB'},
+      ],
       'segments': [
         {'start': 0.0, 'end': 30.5, 'text': 'Good morning.', 'speaker': 'SPEAKER_00'},
         {'start': 34.0, 'end': 70.0, 'text': 'Right.', 'speaker': 'SPEAKER_01'},
@@ -398,8 +539,6 @@ void main() {
     final repo = _repo(MockClient((request) async => _json([])));
 
     test('other calls say which iteration connects them', () async {
-      await expectLater(repo.addTag('1', 'x'), throwsA(isA<NotIntegratedException>().having((e) => e.iteration, 'iteration', 4)));
-      await expectLater(repo.tagLibrary(), throwsA(isA<NotIntegratedException>().having((e) => e.iteration, 'iteration', 4)));
       await expectLater(repo.speakerLibrary(), throwsA(isA<NotIntegratedException>().having((e) => e.iteration, 'iteration', 5)));
       await expectLater(
         repo.upload(const UploadRequest(file: ChosenFile(name: 'a.mp3', sizeBytes: 1))),
@@ -426,7 +565,7 @@ List<Map<String, dynamic>> _many(int count) => [
       'title': 'File ${i.toString().padLeft(3, '0')}',
       'created_at': DateTime.utc(2026, 1, 1).subtract(Duration(minutes: i)).toIso8601String(),
       'status': 'done',
-      'tags': i.isEven ? ['even'] : <String>[],
+      'tags': i.isEven ? [_tag('even')] : <Map<String, String>>[],
     },
 ];
 

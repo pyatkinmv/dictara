@@ -428,9 +428,10 @@ class TranscriptionListFilterIntegrationTest : AbstractSharedContextIntegrationT
 
         val body = json.readTree(request("/tags", emptyList()).body)
 
-        assertThat(body.map { it["label"].asText() }).containsExactly("zebra", "alpha", "beta")
-        assertThat(body.first().fieldNames().asSequence().toList()).containsExactlyInAnyOrder("id", "label")
-        assertThat(UUID.fromString(body.first()["id"].asText())).isNotNull()
+        assertThat(body["tags"].map { it["label"].asText() }).containsExactly("zebra", "alpha", "beta")
+        assertThat(body["tags"].first().fieldNames().asSequence().toList())
+            .containsExactlyInAnyOrder("id", "label", "color", "transcription_count", "sample_titles") // no description: left out
+        assertThat(UUID.fromString(body["tags"].first()["id"].asText())).isNotNull()
     }
 
     @Test
@@ -440,14 +441,14 @@ class TranscriptionListFilterIntegrationTest : AbstractSharedContextIntegrationT
         jdbcTemplate.update("INSERT INTO tags(id, user_id, name) VALUES (?, ?, 'unused')", UUID.randomUUID(), userId)
         jdbcTemplate.update("INSERT INTO tags(id, user_id, name) VALUES (?, ?, 'theirs')", UUID.randomUUID(), other)
 
-        val labels = json.readTree(request("/tags", emptyList()).body).map { it["label"].asText() }
+        val labels = json.readTree(request("/tags", emptyList()).body)["tags"].map { it["label"].asText() }
 
         assertThat(labels).containsExactly("unused")
     }
 
     @Test
     fun `GET tags is empty for a user without tags and needs a token`() {
-        assertThat(json.readTree(request("/tags", emptyList()).body).size()).isZero()
+        assertThat(json.readTree(request("/tags", emptyList()).body)["tags"].size()).isZero()
         assertThat(request("/tags", emptyList(), user = null).statusCode).isEqualTo(HttpStatus.UNAUTHORIZED)
     }
 }

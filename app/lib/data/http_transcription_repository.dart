@@ -64,15 +64,74 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
     ).toString();
   }
 
-  /// The tag library (for the filter). Only the names so far; the Tags screen brings the rest.
+  /// The tags of the library, for the filter and the "Add tag" menu.
   @override
-  Future<List<Tag>> tags() async {
+  Future<List<Tag>> tags() async => [for (final entry in (await _library()).entries) entry.tag];
+
+  @override
+  Future<TagLibrary> tagLibrary() async => _library();
+
+  Future<TagLibrary> _library() async {
     final body = await _client.getJson('/tags');
-    if (body is! List) throw const GatewayException('Expected a list of tags');
-    return [
-      for (final entry in body)
-        Tag((entry as Map<String, dynamic>)['label'] as String, colorForLabel(entry['label'] as String)),
-    ];
+    if (body is! Map<String, dynamic> || body['tags'] is! List) throw const GatewayException('Expected the tag library');
+    return TagLibrary(
+      entries: [
+        for (final entry in body['tags'] as List<dynamic>)
+          TagEntry(
+            tag: _tagFromJson(entry as Map<String, dynamic>),
+            description: entry['description'] as String? ?? '',
+            transcriptions: [for (final title in (entry['sample_titles'] as List<dynamic>? ?? const [])) title as String],
+            count: (entry['transcription_count'] as num?)?.toInt() ?? 0,
+          ),
+      ],
+      taggedTranscriptions: (body['tagged_transcriptions'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  /// The gateway names tags by id; the screens know them by label (unique per user), so the id is looked up
+  /// when a tag is changed, deleted or taken off. Null when no such tag exists any more.
+  Future<String?> _tagId(String label) async {
+    final body = await _client.getJson('/tags');
+    if (body is! Map<String, dynamic> || body['tags'] is! List) throw const GatewayException('Expected the tag library');
+    for (final entry in body['tags'] as List<dynamic>) {
+      if ((entry as Map<String, dynamic>)['label'] == label) return entry['id'] as String;
+    }
+    return null;
+  }
+
+  @override
+  Future<Tag> createTag(String label, String description) async {
+    final body = await _client.postJson('/tags', {'label': label, 'description': description});
+    return _tagFromJson(body as Map<String, dynamic>);
+  }
+
+  @override
+  Future<void> updateTag(String label, {required String newLabel, required String description}) async {
+    final id = await _tagId(label);
+    if (id == null) return;
+    await _client.putJson('/tags/${Uri.encodeComponent(id)}', {'label': newLabel, 'description': description});
+  }
+
+  @override
+  Future<int> deleteTag(String label) async {
+    final id = await _tagId(label);
+    if (id == null) return 0;
+    final body = await _client.deleteJson('/tags/${Uri.encodeComponent(id)}');
+    return ((body as Map<String, dynamic>)['affected_transcriptions'] as num?)?.toInt() ?? 0;
+  }
+
+  /// Puts the tag on the transcription; the gateway creates it in the library when the label is new.
+  @override
+  Future<Tag> addTag(String id, String label) async {
+    final body = await _client.postJson('/transcriptions/${Uri.encodeComponent(id)}/tags', {'label': label});
+    return _tagFromJson(body as Map<String, dynamic>);
+  }
+
+  @override
+  Future<void> removeTag(String id, String label) async {
+    final tagId = await _tagId(label);
+    if (tagId == null) return;
+    await _client.deleteJson('/transcriptions/${Uri.encodeComponent(id)}/tags/${Uri.encodeComponent(tagId)}');
   }
 
   /// `GET /transcriptions/{id}`. The gateway answers 404 for an id that does not exist or is not the user's;
@@ -108,24 +167,6 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
   @override
   Future<Transcription> upload(UploadRequest request) => _notYet('Uploading', 7);
 
-  @override
-  Future<Tag> addTag(String id, String label) => _notYet('Adding a tag', 4);
-
-  @override
-  Future<void> removeTag(String id, String label) => _notYet('Removing a tag', 4);
-
-  @override
-  Future<List<TagEntry>> tagLibrary() => _notYet('The tag library', 4);
-
-  @override
-  Future<Tag> createTag(String label, String description) => _notYet('Creating a tag', 4);
-
-  @override
-  Future<void> updateTag(String label, {required String newLabel, required String description}) =>
-      _notYet('Editing a tag', 4);
-
-  @override
-  Future<int> deleteTag(String label) => _notYet('Deleting a tag', 4);
 
   /// The detail page asks for the library to offer it in the Speaker Picker; until it is connected there is
   /// none (the gateway has no speaker names yet), so the picker offers nothing.
@@ -184,8 +225,8 @@ Transcription _transcriptionFromJson(Map<String, dynamic> json) {
     processingPct: (json['processing_pct'] as num?)?.toInt(),
     processingPhase: _phaseFromJson(json['processing_phase'] as String?),
     tags: [
-      for (final label in (json['tags'] as List<dynamic>? ?? const []))
-        if (label is String && label.isNotEmpty) Tag(label, colorForLabel(label)),
+      for (final tag in (json['tags'] as List<dynamic>? ?? const []))
+        if (tag is Map<String, dynamic>) _tagFromJson(tag),
     ],
   );
 }
@@ -211,8 +252,8 @@ TranscriptionDetail _detailFromJson(Map<String, dynamic> json) {
       duration: _secondsFromJson(json['audio_duration_s']),
       speakerCount: {for (final s in segments) if (s.speakerSlot != null) s.speakerSlot}.length,
       tags: [
-        for (final label in (json['tags'] as List<dynamic>? ?? const []))
-          if (label is String && label.isNotEmpty) Tag(label, colorForLabel(label)),
+        for (final tag in (json['tags'] as List<dynamic>? ?? const []))
+          if (tag is Map<String, dynamic>) _tagFromJson(tag),
       ],
     ),
     segments: segments,
@@ -251,12 +292,14 @@ TranscriptionStatus _statusFromJson(String? status) => switch (status) {
       _ => TranscriptionStatus.pending,
     };
 
-/// A color for a tag that has none of its own: the gateway does not send one (`docs/api-gaps.md` decides that
-/// clients derive it from the name). The same label always gets the same color.
-Color colorForLabel(String label) {
-  var hash = 0;
-  for (final unit in label.toLowerCase().codeUnits) {
-    hash = (hash * 31 + unit) & 0x7fffffff;
-  }
-  return libraryPalette[hash % libraryPalette.length];
+/// A tag as the gateway describes it (`{id, label, color}`); the color is `#RRGGBB`, worked out by the
+/// gateway from the label.
+Tag _tagFromJson(Map<String, dynamic> json) => Tag(json['label'] as String, _colorFromJson(json['color'] as String?));
+
+/// Grey, for a tag the gateway sent without a usable color.
+const _fallbackTagColor = Color(0xFF64748B);
+
+Color _colorFromJson(String? hex) {
+  final value = hex != null && RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(hex) ? int.parse(hex.substring(1), radix: 16) : null;
+  return value == null ? _fallbackTagColor : Color(0xFF000000 | value);
 }

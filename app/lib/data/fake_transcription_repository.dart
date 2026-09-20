@@ -390,18 +390,21 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   Future<List<Tag>> tags() async => List.unmodifiable(_library);
 
   @override
-  Future<List<TagEntry>> tagLibrary() async => [
-        for (final tag in _library)
-          TagEntry(
-            tag: tag,
-            description: _tagDescriptions[tag.label] ?? '',
-            // Items are kept oldest first, so this reads oldest first too.
-            transcriptions: [
-              for (final item in _items)
-                if (item.tags.contains(tag)) item.title,
-            ],
-          ),
-      ];
+  Future<TagLibrary> tagLibrary() async => TagLibrary(
+        entries: [
+          for (final tag in _library)
+            TagEntry(
+              tag: tag,
+              description: _tagDescriptions[tag.label] ?? '',
+              // Items are kept oldest first, so this reads oldest first too.
+              transcriptions: [
+                for (final item in _items)
+                  if (item.tags.contains(tag)) item.title,
+              ],
+            ),
+        ],
+        taggedTranscriptions: _items.where((item) => item.tags.isNotEmpty).length,
+      );
 
   @override
   Future<Tag> createTag(String label, String description) async {

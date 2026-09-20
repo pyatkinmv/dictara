@@ -7,6 +7,7 @@ import com.dictara.gateway.service.ListSort
 import com.dictara.gateway.service.ListStatuses
 import com.dictara.gateway.service.OrchestratorService
 import com.dictara.gateway.service.SubmissionService
+import com.dictara.gateway.service.TagRef
 import com.dictara.gateway.service.TranscriptionListFilter
 import com.dictara.gateway.service.UserService
 import com.dictara.gateway.util.TranscriptFormatter
@@ -225,13 +226,14 @@ class TranscribeController(
         )
     }
 
-    data class TranscriptionSummary(
+    /** One entry of the list. [T] is how a tag is shown: the plain array keeps names (the old client), the paged shape sends [TagRef]s with id and color. */
+    data class TranscriptionSummary<T>(
         val jobId: String,
         val fileName: String,
         val title: String,
         val createdAt: String,
         val status: String,
-        val tags: List<String>,
+        val tags: List<T>,
         /** Seconds of audio; absent until the transcriber has finished. */
         val audioDurationS: Double? = null,
         /** Distinct diarizer speakers in the transcript; absent while there is no transcript. */
@@ -243,7 +245,7 @@ class TranscribeController(
     )
 
     /** The paged shape of the list: what `GET /transcriptions?page=&size=` returns. */
-    data class TranscriptionPage(val items: List<TranscriptionSummary>, val page: Int, val size: Int, val hasNext: Boolean)
+    data class TranscriptionPage(val items: List<TranscriptionSummary<TagRef>>, val page: Int, val size: Int, val hasNext: Boolean)
 
     /**
      * The user's transcriptions, newest first unless `sort` says otherwise.
@@ -272,9 +274,9 @@ class TranscribeController(
     ): Any {
         val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
             ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
-        fun summary(it: SubmissionService.SubmissionSummary) =
+        fun <T> summary(it: SubmissionService.SubmissionSummary, tag: (TagRef) -> T) =
             TranscriptionSummary(
-                it.jobId.toString(), it.fileName, it.title, it.createdAt, it.status, it.tags,
+                it.jobId.toString(), it.fileName, it.title, it.createdAt, it.status, it.tags.map(tag),
                 it.audioDurationS, it.speakerCount, it.processingPct, it.processingPhase,
             )
 
@@ -295,7 +297,7 @@ class TranscribeController(
             ),
         )
 
-        if (page == null && size == null) return submissionService.listForUser(userId, filter).map(::summary)
+        if (page == null && size == null) return submissionService.listForUser(userId, filter).map { summary(it) { tag -> tag.label } }
 
         val pageNumber = page ?: 0
         val pageSize = size ?: DEFAULT_PAGE_SIZE
@@ -304,7 +306,7 @@ class TranscribeController(
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "size must be between 1 and $MAX_PAGE_SIZE")
         }
         val result = submissionService.listPageForUser(userId, filter, pageNumber, pageSize)
-        return TranscriptionPage(result.items.map(::summary), pageNumber, pageSize, result.hasNext)
+        return TranscriptionPage(result.items.map { summary(it) { tag -> tag } }, pageNumber, pageSize, result.hasNext)
     }
 
     /**

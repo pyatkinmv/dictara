@@ -104,7 +104,9 @@ class TranscriptionDetailIntegrationTest : AbstractSharedContextIntegrationTest(
         assertThat(body["audio_duration_s"].asDouble()).isEqualTo(862.5)
         assertThat(body["language"].asText()).isEqualTo("en")
         assertThat(body["word_count"].asInt()).isEqualTo(9) // words, however much space is between them
-        assertThat(body["tags"].map { it.asText() }).containsExactly("meeting")
+        assertThat(body["tags"].map { it["label"].asText() }).containsExactly("meeting")
+        assertThat(body["tags"][0]["color"].asText()).matches("#[0-9A-F]{6}")
+        assertThat(UUID.fromString(body["tags"][0]["id"].asText())).isNotNull()
         assertThat(body["summary"].asText()).isEqualTo("**Key points**\n* one")
         assertThat(body["segments"]).hasSize(2)
         assertThat(body["segments"][0]["speaker"].asText()).isEqualTo("SPEAKER_00")

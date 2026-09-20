@@ -44,6 +44,23 @@ class GatewayClient {
         ));
   }
 
+  /// POST [body] as JSON to [path] and decode the JSON answer.
+  Future<Object?> postJson(String path, Object body) async => _decode(await _send(() => _http.post(
+        Uri.parse('$baseUrl$path'),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      )));
+
+  /// PUT [body] as JSON to [path] and decode the JSON answer.
+  Future<Object?> putJson(String path, Object body) async => _decode(await _send(() => _http.put(
+        Uri.parse('$baseUrl$path'),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      )));
+
+  /// DELETE [path]; the answer, if there is one, is decoded (`null` for the gateway's 204).
+  Future<Object?> deleteJson(String path) async => _decode(await _send(() => _http.delete(Uri.parse('$baseUrl$path'))));
+
   Future<http.Response> _send(Future<http.Response> Function() request) async {
     final http.Response response;
     try {

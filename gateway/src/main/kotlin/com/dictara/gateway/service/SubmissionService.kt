@@ -39,7 +39,7 @@ class SubmissionService(
         val title: String,
         val createdAt: String,
         val status: String,
-        val tags: List<String>,
+        val tags: List<TagRef>,
         /** Length of the audio; known once the transcriber has finished. */
         val audioDurationS: Double? = null,
         /** Distinct speaker labels in the transcript; null while there is no transcript. */
@@ -66,7 +66,7 @@ class SubmissionService(
         val audioDurationS: Double?,
         val language: String?,
         val wordCount: Int,
-        val tags: List<String>,
+        val tags: List<TagRef>,
         /** The summary as the summarizer wrote it (Markdown), or null when there is none. */
         val summary: String?,
         /** Empty until the transcript exists; a segment's speaker is null when the audio was not diarized. */
@@ -156,12 +156,13 @@ class SubmissionService(
         val transcriptBySubmissionId = transcriptListQueries.findRows(submissionIds).associateBy { it.submissionId }
         val transcriptIds = transcriptBySubmissionId.values.map { it.transcriptId }
 
-        val tagsByTranscriptId: Map<UUID, List<String>> = if (transcriptIds.isEmpty()) {
+        val tagsByTranscriptId: Map<UUID, List<TagRef>> = if (transcriptIds.isEmpty()) {
             emptyMap()
         } else {
             val transcriptTags = transcriptTagRepo.findByTranscriptIdIn(transcriptIds)
             val tagsById = tagRepository.findAllById(transcriptTags.map { it.tagId }).associateBy { it.id }
-            transcriptTags.groupBy({ it.transcriptId }, { tagsById[it.tagId]?.name ?: "" })
+            transcriptTags.groupBy({ it.transcriptId }) { tt -> tagsById[tt.tagId]?.let { TagRef(it.id!!, it.name) } }
+                .mapValues { (_, refs) -> refs.filterNotNull() }
         }
 
         return submissions.map { s ->
@@ -175,7 +176,7 @@ class SubmissionService(
                 title = transcript?.title ?: fileName,
                 createdAt = s.createdAt.toString(),
                 status = s.status,
-                tags = (tagsByTranscriptId[transcript?.transcriptId] ?: emptyList()).sorted(),
+                tags = (tagsByTranscriptId[transcript?.transcriptId] ?: emptyList()).sortedBy { it.label },
                 audioDurationS = audio?.durationS,
                 speakerCount = transcript?.speakerCount,
                 processingPct = pct,
@@ -209,7 +210,7 @@ class SubmissionService(
             audioDurationS = audio?.durationS,
             language = transcript?.detectedLanguage,
             wordCount = segments.sumOf { seg -> seg.text.split(Regex("\\s+")).count { it.isNotEmpty() } },
-            tags = transcript?.id?.let { tagRepository.findByTranscriptId(it).map { tag -> tag.name } } ?: emptyList(),
+            tags = transcript?.id?.let { tagRepository.findByTranscriptId(it).map { tag -> TagRef(tag.id!!, tag.name) } } ?: emptyList(),
             summary = summaryRepo.findBySubmissionId(submissionId)?.text?.takeIf { it.isNotBlank() },
             segments = segments,
         )

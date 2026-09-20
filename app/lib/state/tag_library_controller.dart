@@ -14,6 +14,7 @@ class TagLibraryController extends ChangeNotifier {
   final VoidCallback? _onChanged;
 
   List<TagEntry> _entries = const [];
+  int _tagged = 0;
   bool _loaded = false;
   bool _disposed = false;
 
@@ -23,7 +24,7 @@ class TagLibraryController extends ChangeNotifier {
   bool get loaded => _loaded;
 
   /// How many distinct transcriptions carry at least one tag.
-  int get taggedTranscriptions => {for (final e in _entries) ...e.transcriptions}.length;
+  int get taggedTranscriptions => _tagged;
 
   /// Tags are matched case-insensitively. [except] is the tag being edited.
   bool labelTaken(String label, {String? except}) {
@@ -32,9 +33,10 @@ class TagLibraryController extends ChangeNotifier {
   }
 
   Future<void> load() async {
-    final entries = await _repository.tagLibrary();
+    final library = await _repository.tagLibrary();
     if (_disposed) return;
-    _entries = entries;
+    _entries = library.entries;
+    _tagged = library.taggedTranscriptions;
     _loaded = true;
     notifyListeners();
   }
