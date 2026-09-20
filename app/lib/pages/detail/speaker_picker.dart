@@ -17,7 +17,7 @@ class SpeakerPicker extends StatefulWidget {
   const SpeakerPicker({
     super.key,
     required this.detail,
-    required this.run,
+    required this.segmentIndex,
     required this.library,
     required this.onPick,
     required this.onClose,
@@ -25,8 +25,9 @@ class SpeakerPicker extends StatefulWidget {
 
   final TranscriptionDetail detail;
 
-  /// The block whose header was clicked.
-  final SpeakerRun run;
+  /// The segment the picker was opened for: the first of a block when its header was clicked, or the one whose
+  /// own button was clicked. "This segment only" changes exactly this one.
+  final int segmentIndex;
   final List<Speaker> library;
 
   /// Called with the segments to reassign, the chosen (or new) speaker name and whether the choice is for
@@ -50,6 +51,9 @@ class _SpeakerPickerState extends State<SpeakerPicker> {
 
   String get _typed => _input.text.trim();
 
+  /// Who speaks the segment now (never null: pickers are only offered where there is a speaker).
+  String get _currentName => widget.detail.speakerOfSegment(widget.segmentIndex)!.name;
+
   Speaker? get _exact {
     final q = _typed.toLowerCase();
     for (final s in widget.library) {
@@ -58,12 +62,12 @@ class _SpeakerPickerState extends State<SpeakerPicker> {
     return null;
   }
 
-  /// "This segment only" changes the first segment of the block, as in the
-  /// design; "All segments by X" every segment now attributed to X.
+  /// "This segment only" changes the segment the picker was opened for;
+  /// "All segments by X" every segment now attributed to X.
   void _pick(String name) {
     final segments = switch (_scope) {
-      PickerScope.segment => {widget.run.firstIndex},
-      PickerScope.allBySpeaker => widget.detail.segmentsBySpeaker(widget.run.speaker!.name),
+      PickerScope.segment => {widget.segmentIndex},
+      PickerScope.allBySpeaker => widget.detail.segmentsBySpeaker(_currentName),
     };
     widget.onPick(segments, name, _scope == PickerScope.allBySpeaker);
     widget.onClose();
@@ -130,7 +134,7 @@ class _SpeakerPickerState extends State<SpeakerPicker> {
               ),
               _ScopeChooser(
                 scope: _scope,
-                currentName: widget.run.speaker!.name,
+                currentName: _currentName,
                 onChanged: (scope) => setState(() => _scope = scope),
               ),
             ],

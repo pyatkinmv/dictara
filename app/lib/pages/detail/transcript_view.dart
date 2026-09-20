@@ -76,7 +76,7 @@ class _RunBlockState extends State<_RunBlock> {
                 targetBuilder: (context, open, toggle) => _RunHeader(speaker: speaker, onTap: toggle),
                 panelBuilder: (context, close) => SpeakerPicker(
                   detail: widget.detail,
-                  run: run,
+                  segmentIndex: run.firstIndex,
                   library: widget.library,
                   onPick: widget.onAssign,
                   onClose: close,
@@ -86,30 +86,124 @@ class _RunBlockState extends State<_RunBlock> {
             ],
             for (var i = 0; i < run.segments.length; i++) ...[
               if (i > 0) const SizedBox(height: 2),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  SizedBox(
-                    width: 36,
-                    child: Text(
-                      formatTimestamp(run.segments[i].start),
-                      style: TextStyle(fontSize: 11, color: p.text3),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      run.segments[i].text,
-                      style: TextStyle(fontSize: 13.5, height: 1.52, color: _hover ? p.text : p.text2),
-                    ),
-                  ),
-                ],
+              _PhraseRow(
+                detail: widget.detail,
+                index: run.firstIndex + i, // a run is a stretch of consecutive segments
+                library: widget.library,
+                onAssign: widget.onAssign,
+                blockHovered: _hover,
+                canChangeSpeaker: speaker != null,
               ),
             ],
           ],
         ),
       ),
+    );
+  }
+}
+
+/// One line of a block: timestamp and text. Clicking the timestamp changes the speaker of this phrase alone:
+/// phrases of one speaker are shown as one block, and only the first of them has a header to click.
+class _PhraseRow extends StatefulWidget {
+  const _PhraseRow({
+    required this.detail,
+    required this.index,
+    required this.library,
+    required this.onAssign,
+    required this.blockHovered,
+    required this.canChangeSpeaker,
+  });
+
+  final TranscriptionDetail detail;
+  final int index;
+  final List<Speaker> library;
+  final void Function(Set<int> segmentIndexes, String name, bool allBySpeaker) onAssign;
+  final bool blockHovered;
+
+  /// False without diarization: there is nobody to change.
+  final bool canChangeSpeaker;
+
+  @override
+  State<_PhraseRow> createState() => _PhraseRowState();
+}
+
+class _PhraseRowState extends State<_PhraseRow> {
+  bool _timeHover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final segment = widget.detail.segments[widget.index];
+
+    Widget time(bool open, VoidCallback? toggle) {
+      final active = widget.canChangeSpeaker && (_timeHover || open);
+      final text = Text(
+        formatTimestamp(segment.start),
+        style: TextStyle(fontSize: 11, color: active ? p.accent : p.text3),
+      );
+      if (!widget.canChangeSpeaker) return text;
+      return Tooltip(
+        message: 'Change speaker of this phrase',
+        waitDuration: const Duration(milliseconds: 600),
+        child: MouseRegion(
+          onEnter: (_) => setState(() => _timeHover = true),
+          onExit: (_) => setState(() => _timeHover = false),
+          child: GestureDetector(
+            onTap: toggle,
+            behavior: HitTestBehavior.opaque,
+            // Scales down instead of overflowing when the time is long (1:02:03) and the pencil does not fit.
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Text in a selectable area asks for the text cursor on its own, which beats the region above.
+                  DefaultSelectionStyle(mouseCursor: SystemMouseCursors.click, child: text),
+                  const SizedBox(width: 3),
+                  // A pencil on hover, like the one next to a speaker's name in a block header.
+                  AnimatedOpacity(
+                    duration: const Duration(milliseconds: 150),
+                    opacity: active ? 1 : 0,
+                    child: Icon(Icons.edit_rounded, size: 11, color: p.text3),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        SizedBox(
+          width: 36,
+          child: widget.canChangeSpeaker
+              ? Popover(
+                  estimatedSize: const Size(280, 320),
+                  useRootOverlay: true,
+                  targetBuilder: (context, open, toggle) => time(open, toggle),
+                  panelBuilder: (context, close) => SpeakerPicker(
+                    detail: widget.detail,
+                    segmentIndex: widget.index,
+                    library: widget.library,
+                    onPick: widget.onAssign,
+                    onClose: close,
+                  ),
+                )
+              : time(false, null),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            segment.text,
+            style: TextStyle(fontSize: 13.5, height: 1.52, color: widget.blockHovered ? p.text : p.text2),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -156,13 +250,16 @@ class _RunHeaderState extends State<_RunHeader> {
                 children: [
                   Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
                   const SizedBox(width: 6),
-                  Text(
-                    widget.speaker.name.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: .07 * 10.5,
-                      color: color,
+                  DefaultSelectionStyle(
+                    mouseCursor: SystemMouseCursors.click,
+                    child: Text(
+                      widget.speaker.name.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: .07 * 10.5,
+                        color: color,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 6),

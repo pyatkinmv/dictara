@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -268,6 +269,76 @@ void main() {
       expect(find.text('ALEXEI SOROKIN'), findsNothing); // no block
       expect(find.text('Alexei Sorokin'), findsNothing); // and no chip: the voice is James now
       expect(find.text('James Wright'), findsNWidgets(2)); // the chips of voice 1 and voice 3
+    });
+
+    testWidgets('every phrase of a block has its own button, so a merged block can be split again', (tester) async {
+      await openDetail(tester);
+      final jamesBefore = tester.widgetList(find.text('JAMES WRIGHT')).length;
+
+      // Phrase 1 (Maria's) goes to Alexei: it joins the block of phrase 0, which now has two phrases.
+      await openPicker(tester, 'MARIA CHEN');
+      await tester.tap(inPicker(find.text('Alexei Sorokin')));
+      await settle(tester);
+      expect(find.text('MARIA CHEN'), findsNWidgets(3)); // was 4 blocks
+      expect(find.text('ALEXEI SOROKIN'), findsNWidgets(3)); // phrases 0 and 1 are one block
+
+      // The second phrase of that block was a mistake: its own button changes it alone.
+      await tester.tap(find.byTooltip('Change speaker of this phrase').at(1));
+      await settle(tester);
+      expect(find.byKey(_picker), findsOneWidget);
+      await tester.tap(inPicker(find.text('James Wright')));
+      await settle(tester);
+
+      expect(find.byKey(_picker), findsNothing);
+      // Phrase 1 is James's now and joins the James block right after it: no new block, so no new header.
+      expect(tester.widgetList(find.text('JAMES WRIGHT')).length, jamesBefore);
+      expect(find.text('MARIA CHEN'), findsNWidgets(3));
+      expect(find.textContaining('Good morning everyone'), findsOneWidget);
+      expect(find.text('ALEXEI SOROKIN'), findsNWidgets(3)); // phrase 0 is Alexei's again on its own
+    });
+
+    testWidgets('the phrase button offers "all segments by" the speaker of that phrase', (tester) async {
+      await openDetail(tester);
+
+      await tester.tap(find.byTooltip('Change speaker of this phrase').at(1)); // a phrase of Maria's
+      await settle(tester);
+
+      expect(inPicker(find.textContaining('All segments by Maria Chen')), findsOneWidget);
+    });
+
+    testWidgets('the pointer is a hand over the time and the speaker name, a text cursor over the text', (tester) async {
+      await openDetail(tester);
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: Offset.zero);
+      addTearDown(mouse.removePointer);
+
+      Future<SystemMouseCursor?> cursorOver(Finder f) async {
+        await mouse.moveTo(tester.getCenter(f));
+        await tester.pump();
+        return tester.binding.mouseTracker.debugDeviceActiveCursor(1) as SystemMouseCursor?;
+      }
+
+      expect(await cursorOver(find.text('MARIA CHEN').first), SystemMouseCursors.click);
+      expect(await cursorOver(find.text('0:34')), SystemMouseCursors.click);
+      expect(await cursorOver(find.textContaining('Right. So Q2')), SystemMouseCursors.text);
+    });
+
+    testWidgets('hovering the time of a phrase shows a pencil next to it, like a speaker name does', (tester) async {
+      await openDetail(tester);
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: Offset.zero);
+      addTearDown(mouse.removePointer);
+      final timeRow = find.ancestor(of: find.text('0:34'), matching: find.byType(Row)).first;
+      final pencil = find.descendant(of: timeRow, matching: find.byType(AnimatedOpacity));
+      expect(tester.widget<AnimatedOpacity>(pencil).opacity, 0);
+
+      await mouse.moveTo(tester.getCenter(find.text('0:34')));
+      await tester.pump();
+
+      expect(tester.widget<AnimatedOpacity>(pencil).opacity, 1);
+      await mouse.moveTo(tester.getCenter(find.textContaining('Right. So Q2')));
+      await tester.pump();
+      expect(tester.widget<AnimatedOpacity>(pencil).opacity, 0);
     });
 
     testWidgets('typing filters the library and offers to create a speaker', (tester) async {
