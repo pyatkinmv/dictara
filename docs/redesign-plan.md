@@ -45,7 +45,7 @@
   - [x] Проверить запуск на этой машине: `flutter run -d web-server` работает (`-d chrome` не проверялся, см. «Как запускать приложение»)
   - [x] Добавить зависимости `provider`, `go_router` (заодно `pubspec.lock` очищен от устаревших записей)
   - [x] Положить шрифт Inter в assets: `app/assets/fonts/` (Regular, Medium, SemiBold, Bold, ExtraBold из Inter 4.1, лицензия SIL OFL рядом), подключён в `pubspec.yaml`
-- [ ] **1. Каркас:** тема teal, сайдбар (логотип, навигация, usage, профиль-меню), топбар с Upload, go_router с пустыми страницами `/transcriptions`, `/threads`, `/tags`, `/speakers`, `/settings`; `main_material.dart` переключается на каркас; обновить `test/widget_test.dart`
+- [x] **1. Каркас:** тема teal (`lib/theme/`, палитра — `ThemeExtension` с пресетами teal/blue/violet), сайдбар, профиль-меню, топбар с Upload (`lib/shell/`), go_router с пустыми страницами `/transcriptions`, `/threads`, `/tags`, `/speakers`, `/settings` (`lib/router.dart`), `DictaraApp` в `lib/app.dart`; `main_material.dart` только запускает приложение (`usePathUrlStrategy`, адреса вида `/tags`); тест `test/widget_test.dart` переписан (3 теста). Кнопка Upload пока ничего не делает (модалка — итерация 10), данные сайдбара (имя, usage) — моки в коде
 - [ ] **2. Список транскрипций** на моках: поиск, фильтр (статус, теги), сортировка, строки со статусом и прогрессом
 - [ ] **3. Деталь:** шапка (хлебные крошки, переименование заголовка, мета) и вкладка Transcript
 - [ ] **4. Деталь:** вкладка Overview (summary, key points, action items, панель Details)
@@ -68,8 +68,9 @@ _Пока пусто._
 - **Цвет тегов и спикеров.** `design.md` описывает поле `color`, назначаемое при создании по циклу из 10 цветов. `api-gaps.md` решает иначе: цвет считается на фронтенде по хэшу имени и API его не возвращает. Нужно выбрать одно.
 - **Тип `Job.id`.** В `design.md` int, в БД UUID.
 - **`app/pubspec.lock` был устаревшим.** В нём были лишние записи (`fluent_ui`, `intl` и др.), которых нет в `pubspec.yaml`. При добавлении `provider` и `go_router` (итерация 0) файл пересобран `flutter pub add`, лишнее ушло.
-- **`dart:html`.** `AuthService`, `history_section.dart`, `transcribe_page.dart` используют устаревшую библиотеку. Из-за неё тесты работают только на браузерной платформе. В новом коде её не использовать; для скачивания и буфера обмена брать `package:web`.
+- **`dart:html`.** `AuthService`, `history_section.dart`, `transcribe_page.dart` используют устаревшую библиотеку; после итерации 1 они нигде не подключены (мёртвый код, удаляется по мере замены экранами). Пока такой файл импортирован, тесты работают только на браузерной платформе. В новом коде её не использовать; для скачивания и буфера обмена брать `package:web`.
 - **CI не запускает Flutter-тесты.** В `ci.yml` нет `flutter test`.
+- **`app/CLAUDE.md` устарел.** Он описывает старую структуру (`TranscribePage`, `HistorySection`) и решение «без state management»; обновить, когда старый UI будет полностью заменён.
 
 ## Окружение (Windows, настроено)
 
@@ -80,12 +81,21 @@ _Пока пусто._
 | Python 3.12 | через winget; тесты transcriber — в `transcriber/.venv` |
 | Flutter 3.47.5 stable | `C:\flutter`, в PATH. Установлен из zip, поэтому `flutter upgrade` не работает |
 | Docker | Docker Desktop, WSL2 |
-| Chrome | установлен (нужен для `flutter run -d chrome`) |
+| Chrome | установлен; `flutter run -d chrome` не проверялся, а скриншоты для сравнения с дизайном делаются headless-Chrome (см. ниже) |
 | `.env` | шаблон в корне (в `.gitignore`), значения `CHANGE_ME` нужно заполнить |
 
 Результаты тестов на момент настройки: `gateway` 75/75, `transcriber` 18/18, `tg-bot` 2/2, `app` 1/1 (в Docker).
 
-**Flutter-тесты на этой машине.** `flutter test --platform chrome` локально зависает: тестовый сервер Flutter 3.47.5 отдаёт 404 на `/canvaskit/chromium/canvaskit.js`, хотя файлы в SDK есть (вероятно, баг на Windows, не проверено). Тесты запускаются в Docker:
+**Flutter-тесты локально.** С итерации 1 тесты не импортируют `dart:html`, поэтому обычный запуск на Dart VM работает на этой машине без Docker и без браузера:
+
+```powershell
+cd app
+flutter test
+```
+
+В тестах грузится настоящий Inter (`FontLoader` в `setUpAll`): иначе Flutter рисует текст широким служебным шрифтом и даёт ложные ошибки переполнения.
+
+**Браузерная платформа и Docker (нужны, только если тест импортирует код с `dart:html`).** `flutter test --platform chrome` локально зависает: тестовый сервер Flutter 3.47.5 отдаёт 404 на `/canvaskit/chromium/canvaskit.js`, хотя файлы в SDK есть (вероятно, баг на Windows, не проверено). Тесты запускаются в Docker:
 
 ```bash
 docker run --rm -v "C:\Users\pyatk\IdeaProjects\dictara\app:/src:ro" ghcr.io/cirruslabs/flutter:stable bash -c 'export DEBIAN_FRONTEND=noninteractive; apt-get update -qq && curl -sSfL -o /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && apt-get install -y -qq /tmp/chrome.deb && cp -r /src /work && cd /work && rm -rf .dart_tool build && flutter pub get && flutter test --platform chrome'
@@ -109,3 +119,14 @@ flutter run -d chrome -t lib/material/main_material.dart
 В терминале, где запущен `flutter run`, доступны hot reload (`r`) и hot restart (`R`). Вариант `-d chrome` открывает браузер сам; **он на этой машине пока не проверялся**. Проверен вариант без запуска браузера: `flutter run -d web-server --web-port 3001 -t lib/material/main_material.dart`, затем открыть `http://localhost:3001` вручную (страница поднимается, CanvasKit отдаётся, в консоли ошибок нет; первая сборка ~40 с). Ошибка 404 на CanvasKit касается только тестового сервера `flutter test`, не `flutter run`.
 
 `flutter run` при каждом запуске сам дописывает блок `analyzer.exclude` в `app/analysis_options.yaml`. Это побочный эффект инструмента, в коммиты его не берём (`git checkout -- app/analysis_options.yaml`).
+
+### Сравнение с дизайном по скриншотам
+
+Встроенный браузер Claude иногда не отдаёт скриншот (окно скрыто), поэтому для сравнения используется headless-Chrome: при запущенном `flutter run -d web-server --web-port 3001 ...`
+
+```powershell
+& "C:\Program Files\Google\Chrome\Application\chrome.exe" --headless=new --disable-gpu --no-sandbox --user-data-dir=$env:TEMP\chrome-shot --window-size=1280,760 --virtual-time-budget=25000 --screenshot=app.png http://localhost:3001/transcriptions
+& "C:\Program Files\Google\Chrome\Application\chrome.exe" --headless=new --disable-gpu --no-sandbox --user-data-dir=$env:TEMP\chrome-shot2 --window-size=1280,760 --virtual-time-budget=8000 --screenshot=design.png file:///C:/Users/pyatk/IdeaProjects/dictara/designs/1.9/cards-teal.html
+```
+
+Итерация 1: каркас совпадает с макетом по цветам, размерам (сайдбар 220, топбар 56), состояниям и меню профиля. Остаточные расхождения — единицы пикселей по вертикали в блоке usage и у профиля, текст в HTML рендерится чуть иначе (браузерный рендеринг против CanvasKit); на этом этапе не выравниваем.

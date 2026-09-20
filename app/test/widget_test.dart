@@ -1,26 +1,67 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:dictara_web/material/main_material.dart';
-import 'package:dictara_web/shared/api_client.dart';
-import 'package:dictara_web/shared/auth_service.dart';
+import 'package:dictara_web/app.dart';
 
-class _FakeApiClient extends ApiClient {
-  @override
-  Future<bool> checkHealth() async => true;
-
-  @override
-  Future<List<String>> fetchSupportedExtensions() async => ['mp3'];
-}
-
-// Uses dart:html (AuthService) — run with: flutter test --platform chrome
 void main() {
-  testWidgets('App renders smoke test', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      DictaraApp(authService: AuthService(), api: _FakeApiClient()),
-    );
-    expect(find.text('Dictara'), findsOneWidget);
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-    // Dispose the page so its periodic health-check timer doesn't stay pending.
-    await tester.pumpWidget(const SizedBox());
+  // Tests render text with a wide placeholder font unless a real one is loaded,
+  // which produces false overflow errors. Load the bundled Inter.
+  setUpAll(() async {
+    final loader = FontLoader('Inter');
+    for (final w in ['Regular', 'Medium', 'SemiBold', 'Bold', 'ExtraBold']) {
+      loader.addFont(rootBundle.load('assets/fonts/Inter-$w.ttf'));
+    }
+    await loader.load();
+  });
+
+  // The design targets a wide browser window.
+  void useDesktopSize(WidgetTester tester) {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+  }
+
+  testWidgets('shell shows sidebar navigation and topbar title', (tester) async {
+    useDesktopSize(tester);
+    await tester.pumpWidget(const DictaraApp());
+    await tester.pumpAndSettle();
+
+    // Sidebar item + topbar title.
+    expect(find.text('Transcriptions'), findsNWidgets(2));
+    for (final label in ['Threads', 'Tags', 'Speakers', 'Settings']) {
+      expect(find.text(label), findsOneWidget);
+    }
+    expect(find.text('Upload'), findsOneWidget);
+  });
+
+  testWidgets('navigating updates the topbar title', (tester) async {
+    useDesktopSize(tester);
+    await tester.pumpWidget(const DictaraApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Tags'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tags'), findsNWidgets(2));
+    expect(find.text('Transcriptions'), findsOneWidget);
+  });
+
+  testWidgets('profile menu opens and closes', (tester) async {
+    useDesktopSize(tester);
+    await tester.pumpWidget(const DictaraApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sign out'), findsNothing);
+
+    await tester.tap(find.text('Maxim P.'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sign out'), findsOneWidget);
+    expect(find.text('pyatkinmv@gmail.com'), findsOneWidget);
+
+    // Tapping outside closes it.
+    await tester.tapAt(const Offset(800, 400));
+    await tester.pumpAndSettle();
+    expect(find.text('Sign out'), findsNothing);
   });
 }
