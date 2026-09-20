@@ -10,8 +10,14 @@ void main() {
   usePathUrlStrategy(); // /tags instead of /#/tags; nginx already falls back to index.html
   runApp(
     DictaraApp(
-      // Suggestion actions take up to a second, like a server would, so their spinners are visible.
-      repository: FakeTranscriptionRepository(latency: () => Duration(milliseconds: Random().nextInt(1000))),
+      repository: FakeTranscriptionRepository(
+        // Actions take up to a second, like a server would, so their spinners are visible.
+        latency: () => Duration(milliseconds: Random().nextInt(1000)),
+        // An uploaded file waits 4 s, is transcribed for 20 s and is then done.
+        jobTiming: const JobTiming(queue: Duration(seconds: 4), processing: Duration(seconds: 20)),
+      ),
+      // Lets the list follow that progress.
+      pollInterval: const Duration(seconds: 2),
     ),
   );
 }

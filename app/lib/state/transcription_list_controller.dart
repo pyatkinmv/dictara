@@ -1,18 +1,26 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../data/transcription_repository.dart';
 import '../models/tag.dart';
 import '../models/transcription.dart';
+import '../models/upload.dart';
 
 /// State of the transcriptions list screen: the query (search, filters, sort)
 /// and the result. Lives above the router so filters survive navigation.
 class TranscriptionListController extends ChangeNotifier {
-  TranscriptionListController(this._repository) {
+  /// [pollInterval]: while some transcription is still pending or processing,
+  /// ask again this often, so progress moves without the user reloading. Null
+  /// (the default) never polls.
+  TranscriptionListController(this._repository, {this.pollInterval}) {
     _loadTags();
     _load();
   }
 
   final TranscriptionRepository _repository;
+  final Duration? pollInterval;
+  Timer? _poll;
 
   TranscriptionQuery _query = const TranscriptionQuery();
   List<Transcription> _items = const [];
@@ -39,6 +47,15 @@ class TranscriptionListController extends ChangeNotifier {
     if (_query.tags.any((label) => !known.contains(label))) {
       _query = _query.copyWith(tags: {for (final label in _query.tags) if (known.contains(label)) label});
     }
+    await _load();
+  }
+
+  /// Sends a file for transcription. The list then shows everything again, so
+  /// that the new item is not hidden by a search or filter left over.
+  Future<void> upload(UploadRequest request) async {
+    await _repository.upload(request);
+    _query = _query.copyWith(search: '', statuses: {}, tags: {});
+    notifyListeners();
     await _load();
   }
 
@@ -79,11 +96,21 @@ class TranscriptionListController extends ChangeNotifier {
     _items = items;
     _loading = false;
     notifyListeners();
+    _schedulePoll();
+  }
+
+  void _schedulePoll() {
+    _poll?.cancel();
+    _poll = null;
+    final interval = pollInterval;
+    if (interval == null || !_items.any((i) => i.status != TranscriptionStatus.done)) return;
+    _poll = Timer(interval, _load);
   }
 
   @override
   void dispose() {
     _disposed = true;
+    _poll?.cancel();
     super.dispose();
   }
 }

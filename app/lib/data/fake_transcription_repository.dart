@@ -1,11 +1,13 @@
 import 'dart:ui' show Color;
 
 import '../models/speaker.dart';
+import '../models/speaker_entry.dart';
 import '../models/suggestions.dart';
 import '../models/tag.dart';
 import '../models/tag_entry.dart';
 import '../models/transcription.dart';
 import '../models/transcription_detail.dart';
+import '../models/upload.dart';
 import 'transcription_repository.dart';
 
 // Mock data copied from `designs/1.9/cards-teal.html`.
@@ -184,12 +186,102 @@ List<Transcription> _seedItems() => [
       ),
     ];
 
+/// How long an uploaded file waits and is processed in the mock.
+class JobTiming {
+  const JobTiming({required this.queue, required this.processing});
+
+  /// Time spent `pending` before the transcriber picks the file up.
+  final Duration queue;
+
+  /// Time spent `processing`, until the transcription is `done`.
+  final Duration processing;
+}
+
+/// An upload the mock is still working on.
+class _Job {
+  _Job(this.startedAt, this.speakers);
+
+  final DateTime startedAt;
+
+  /// Speakers found once it is done.
+  final int speakers;
+}
+
+/// The last id of the design's own transcriptions; later ones are uploads.
+const _lastSeedId = 6;
+
 class FakeTranscriptionRepository implements TranscriptionRepository {
-  /// [latency] makes the suggestion actions take a while, like a server would;
-  /// the app uses it so the spinners of the design can be seen, tests do not.
-  FakeTranscriptionRepository({this.latency});
+  /// [latency] makes the actions take a while, like a server would; the app
+  /// uses it so the spinners of the design can be seen, tests do not.
+  ///
+  /// [jobTiming] makes uploads move on from `pending` through `processing` to
+  /// `done` as time passes (judged by [clock] whenever data is asked for). Without
+  /// it an upload stays `pending` forever, which keeps tests deterministic.
+  FakeTranscriptionRepository({this.latency, this.jobTiming, DateTime Function()? clock})
+      : _clock = clock ?? DateTime.now;
 
   final Duration Function()? latency;
+  final JobTiming? jobTiming;
+  final DateTime Function() _clock;
+
+  /// Uploads that have not finished yet, by transcription id.
+  final Map<int, _Job> _jobs = {};
+
+  /// Moves uploads along their `pending` → `processing` → `done` path.
+  void _advanceJobs() {
+    final timing = jobTiming;
+    if (timing == null || _jobs.isEmpty) return;
+    for (final id in _jobs.keys.toList()) {
+      final job = _jobs[id]!;
+      final index = _items.indexWhere((i) => i.id == id);
+      if (index < 0) {
+        _jobs.remove(id);
+        continue;
+      }
+      final elapsed = _clock().difference(job.startedAt);
+      final old = _items[index];
+      final TranscriptionStatus status;
+      int? pct;
+      if (elapsed < timing.queue) {
+        status = TranscriptionStatus.pending;
+      } else if (elapsed < timing.queue + timing.processing) {
+        status = TranscriptionStatus.processing;
+        final done = elapsed - timing.queue;
+        pct = (done.inMilliseconds * 100 ~/ timing.processing.inMilliseconds).clamp(0, 99);
+      } else {
+        status = TranscriptionStatus.done;
+        _jobs.remove(id);
+      }
+      _items[index] = Transcription(
+        id: old.id,
+        title: old.title,
+        duration: old.duration,
+        uploadedAt: old.uploadedAt,
+        status: status,
+        processingPct: pct,
+        tags: old.tags,
+        speakerCount: status == TranscriptionStatus.done ? job.speakers : 0,
+      );
+    }
+  }
+
+  @override
+  Future<Transcription> upload(UploadRequest request) async {
+    await _wait();
+    final id = _items.fold(-1, (max, i) => i.id > max ? i.id : max) + 1;
+    // No real audio to measure: about a minute per megabyte, at least one.
+    final minutes = (request.file.sizeBytes / (1024 * 1024)).ceil().clamp(1, 180);
+    final item = Transcription(
+      id: id,
+      title: request.file.name,
+      duration: Duration(minutes: minutes),
+      uploadedAt: _clock(),
+      status: TranscriptionStatus.pending,
+    );
+    _items.add(item);
+    _jobs[id] = _Job(_clock(), request.speakers.expected ?? 2);
+    return item;
+  }
 
   Future<void> _wait() async {
     final delay = latency?.call();
@@ -216,20 +308,32 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   /// The speaker library, in creation order. Mutable like the tag library.
   final List<Speaker> _speakerLibrary = [_alexei, _maria, _james];
 
+  /// Who each speaker is, by name (from the design's Speakers page).
+  final Map<String, String> _speakerDescriptions = {
+    'Alexei Sorokin': 'Product lead. Discusses roadmap, feature prioritization, and team updates.',
+    'Maria Chen': 'Head of Engineering. Covers architecture, sprints, and code quality.',
+    'James Wright': 'Sales & Marketing lead. Focuses on customer acquisition and GTM strategy.',
+  };
+
   /// Speakers assigned by hand, per transcription id, then per segment index.
   final Map<int, Map<int, Speaker>> _segmentSpeakers = {};
 
   /// Confirmed slot → speaker mapping per transcription id.
   final Map<int, Map<int, Speaker>> _slotSpeakers = {};
 
-  Map<int, Speaker> _slotsOf(int id) =>
-      _slotSpeakers.putIfAbsent(id, () => id == _itemWithSuggestions ? {} : {..._confirmedSpeakers});
+  /// The design's own transcriptions have everyone confirmed (bar the one with
+  /// suggestions); a new upload starts with "Speaker N" everywhere.
+  Map<int, Speaker> _slotsOf(int id) => _slotSpeakers.putIfAbsent(
+        id,
+        () => id == _itemWithSuggestions || id > _lastSeedId ? {} : {..._confirmedSpeakers},
+      );
 
   /// Suggestions still waiting for the user, per transcription id.
   final Map<int, Suggestions> _suggestions = {_itemWithSuggestions: _seedSuggestions};
 
   @override
   Future<List<Transcription>> list(TranscriptionQuery query) async {
+    _advanceJobs();
     final q = query.search.trim().toLowerCase();
     final items = _items.where((i) {
       if (query.statuses.isNotEmpty && !query.statuses.contains(i.status)) return false;
@@ -253,6 +357,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
 
   @override
   Future<TranscriptionDetail?> get(int id) async {
+    _advanceJobs();
     final index = _items.indexWhere((i) => i.id == id);
     if (index < 0 || _items[index].status != TranscriptionStatus.done) return null;
     return TranscriptionDetail(
@@ -340,6 +445,101 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
 
   @override
   Future<List<Speaker>> speakers() async => List.unmodifiable(_speakerLibrary);
+
+  @override
+  Future<List<SpeakerEntry>> speakerLibrary() async {
+    _advanceJobs();
+    return [
+      for (final speaker in _speakerLibrary)
+        () {
+          final items = [for (final item in _items) if (_takesPart(item, speaker)) item];
+          return SpeakerEntry(
+            speaker: speaker,
+            description: _speakerDescriptions[speaker.name] ?? '',
+            transcriptions: [for (final item in items) item.title],
+            totalDuration: items.fold(Duration.zero, (sum, item) => sum + item.duration),
+          );
+        }(),
+    ];
+  }
+
+  @override
+  Future<Speaker> createSpeaker(String name, String description) async {
+    final wanted = name.trim();
+    var speaker = _speakerNamed(wanted);
+    if (speaker == null) {
+      speaker = Speaker(wanted, libraryPalette[_speakerLibrary.length % libraryPalette.length]);
+      _speakerLibrary.add(speaker);
+    }
+    _speakerDescriptions[speaker.name] = description.trim();
+    return speaker;
+  }
+
+  @override
+  Future<void> updateSpeaker(String name, {required String newName, required String description}) async {
+    final index = _speakerLibrary.indexWhere((s) => s.name == name);
+    if (index < 0) return;
+    final old = _speakerLibrary[index];
+    final renamed = Speaker(newName.trim(), old.color);
+    _speakerLibrary[index] = renamed;
+    _speakerDescriptions
+      ..remove(name)
+      ..[renamed.name] = description.trim();
+    _replaceSpeaker(old, renamed);
+  }
+
+  @override
+  Future<int> deleteSpeaker(String name) async {
+    final speaker = _speakerLibrary.where((s) => s.name == name).firstOrNull;
+    if (speaker == null) return 0;
+    final affected = _items.where((item) => _takesPart(item, speaker)).length;
+    _speakerLibrary.remove(speaker);
+    _speakerDescriptions.remove(name);
+    _replaceSpeaker(speaker, null);
+    return affected;
+  }
+
+  /// Library speaker called [name], ignoring case.
+  Speaker? _speakerNamed(String name) =>
+      _speakerLibrary.where((s) => s.name.toLowerCase() == name.toLowerCase()).firstOrNull;
+
+  /// Whether [speaker] is heard in the transcription: confirmed for one of its
+  /// diarizer slots or put on some of its segments by hand.
+  bool _takesPart(Transcription item, Speaker speaker) {
+    if (item.status != TranscriptionStatus.done) return false;
+    final bySlot = _slotsOf(item.id).entries.any((e) => e.key <= item.speakerCount && e.value == speaker);
+    final byHand = (_segmentSpeakers[item.id] ?? const <int, Speaker>{}).values.contains(speaker);
+    return bySlot || byHand;
+  }
+
+  /// Swaps [old] for [replacement] in every transcription (and in pending
+  /// suggestions), or takes them off when [replacement] is null.
+  void _replaceSpeaker(Speaker old, Speaker? replacement) {
+    // Slots of transcriptions nobody opened yet are created on demand: do it now,
+    // or they would come back with the old speaker.
+    for (final item in _items) {
+      _slotsOf(item.id);
+    }
+    void apply(Map<int, Speaker> map) {
+      for (final key in map.keys.toList()) {
+        if (map[key] != old) continue;
+        if (replacement == null) {
+          map.remove(key);
+        } else {
+          map[key] = replacement;
+        }
+      }
+    }
+
+    _slotSpeakers.values.forEach(apply);
+    _segmentSpeakers.values.forEach(apply);
+    if (replacement != null) {
+      for (final id in _suggestions.keys.toList()) {
+        final s = _suggestions[id]!;
+        _suggestions[id] = s.copyWith(speakers: {...s.speakers}..updateAll((_, v) => v == old ? replacement : v));
+      }
+    }
+  }
 
   @override
   Future<Speaker> assignSpeaker(int id, Set<int> segmentIndexes, String name) async {

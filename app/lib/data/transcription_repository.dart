@@ -1,8 +1,10 @@
 import '../models/speaker.dart';
+import '../models/speaker_entry.dart';
 import '../models/tag.dart';
 import '../models/tag_entry.dart';
 import '../models/transcription.dart';
 import '../models/transcription_detail.dart';
+import '../models/upload.dart';
 
 enum TranscriptionSort { newest, oldest, longest, name }
 
@@ -51,6 +53,11 @@ abstract class TranscriptionRepository {
   /// transcription or it is not done yet.
   Future<TranscriptionDetail?> get(int id);
 
+  /// Sends a file for transcription (`POST /transcriptions`) and returns the new
+  /// item, which starts out `pending`. The server settings of the dialog
+  /// (language, summary, speakers) travel with it.
+  Future<Transcription> upload(UploadRequest request);
+
   /// Renames a transcription (`PATCH /jobs/{id}/title`).
   Future<void> rename(int id, String title);
 
@@ -83,6 +90,23 @@ abstract class TranscriptionRepository {
 
   /// The speaker library, in creation order.
   Future<List<Speaker>> speakers();
+
+  /// The speaker library with descriptions and usage, for the Speakers page
+  /// (`GET /speakers`, `docs/api-gaps.md` §2.2).
+  Future<List<SpeakerEntry>> speakerLibrary();
+
+  /// Creates a speaker in the library (`POST /speakers`); they get the next
+  /// palette color and keep the name's case.
+  Future<Speaker> createSpeaker(String name, String description);
+
+  /// Renames and/or re-describes the speaker called [name] (`PUT /speakers/{id}`).
+  /// Transcriptions that use them follow the new name.
+  Future<void> updateSpeaker(String name, {required String newName, required String description});
+
+  /// Deletes the speaker from the library (`DELETE /speakers/{id}`); the slots
+  /// and segments that were theirs go back to "Speaker N". Returns how many
+  /// transcriptions they were removed from.
+  Future<int> deleteSpeaker(String name);
 
   /// Attributes the given segments of a transcription to the speaker called
   /// [name] and returns that speaker. A name that is not in the library yet is

@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'data/fake_transcription_repository.dart';
 import 'data/transcription_repository.dart';
 import 'router.dart';
+import 'services/file_chooser.dart';
+import 'state/speaker_library_controller.dart';
 import 'state/tag_library_controller.dart';
 import 'state/transcription_detail_controller.dart';
 import 'state/transcription_list_controller.dart';
@@ -17,6 +19,8 @@ class DictaraApp extends StatefulWidget {
     this.palette = AppPalette.teal,
     this.initialLocation = '/transcriptions',
     this.repository,
+    this.fileChooser = const BrowserFileChooser(),
+    this.pollInterval,
   });
 
   final AppPalette palette;
@@ -24,6 +28,12 @@ class DictaraApp extends StatefulWidget {
 
   /// Where data comes from; the mock one until the gateway is wired in.
   final TranscriptionRepository? repository;
+
+  /// How files are picked in the Upload dialog.
+  final FileChooser fileChooser;
+
+  /// How often the list refreshes while something is being transcribed; null = never.
+  final Duration? pollInterval;
 
   @override
   State<DictaraApp> createState() => _DictaraAppState();
@@ -44,8 +54,12 @@ class _DictaraAppState extends State<DictaraApp> {
     return MultiProvider(
       providers: [
         Provider<TranscriptionRepository>.value(value: _repository),
+        Provider<FileChooser>.value(value: widget.fileChooser),
         ChangeNotifierProvider(
-          create: (context) => TranscriptionListController(context.read<TranscriptionRepository>()),
+          create: (context) => TranscriptionListController(
+            context.read<TranscriptionRepository>(),
+            pollInterval: widget.pollInterval,
+          ),
         ),
         ChangeNotifierProvider(
           create: (context) => TagLibraryController(
@@ -53,6 +67,9 @@ class _DictaraAppState extends State<DictaraApp> {
             // The list filter offers the library, so it must follow changes.
             onChanged: context.read<TranscriptionListController>().reload,
           ),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => SpeakerLibraryController(context.read<TranscriptionRepository>()),
         ),
         ChangeNotifierProvider(
           create: (context) => TranscriptionDetailController(

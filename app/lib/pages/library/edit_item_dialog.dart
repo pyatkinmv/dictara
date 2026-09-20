@@ -102,14 +102,7 @@ class _EditItemDialogState extends State<_EditItemDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(widget.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-              _CloseButton(onTap: () => Navigator.of(context).pop()),
-            ],
-          ),
-          const SizedBox(height: 20),
+          ModalHeader(title: widget.title, onClose: () => Navigator.of(context).pop()),
           _Field(
             label: widget.nameLabel,
             footnote: _error == null
@@ -147,41 +140,6 @@ class _EditItemDialogState extends State<_EditItemDialog> {
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _CloseButton extends StatefulWidget {
-  const _CloseButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  State<_CloseButton> createState() => _CloseButtonState();
-}
-
-class _CloseButtonState extends State<_CloseButton> {
-  bool _hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            color: _hover ? p.background : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(Icons.close_rounded, size: 20, color: p.text3),
-        ),
       ),
     );
   }

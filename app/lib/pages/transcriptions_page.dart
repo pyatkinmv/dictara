@@ -41,6 +41,14 @@ class _TranscriptionsPageState extends State<TranscriptionsPage> {
     final list = context.watch<TranscriptionListController>();
     final p = context.palette;
 
+    // The query can be reset from outside (a new upload clears the search).
+    final wanted = list.query.search;
+    if (_search.text != wanted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _search.text != wanted) _search.text = wanted;
+      });
+    }
+
     return CustomScrollView(
       slivers: [
         SliverPadding(

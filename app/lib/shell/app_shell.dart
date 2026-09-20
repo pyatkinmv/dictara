@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../pages/upload/upload_dialog.dart';
+import '../services/file_chooser.dart';
 import '../state/transcription_detail_controller.dart';
+import '../state/transcription_list_controller.dart';
 import 'nav_destinations.dart';
 import 'sidebar.dart';
 import 'topbar.dart';
@@ -13,6 +17,16 @@ class AppShell extends StatelessWidget {
   /// Current route path.
   final String location;
   final Widget child;
+
+  /// The topbar's Upload button: pick a file and options, send it, and show
+  /// the list, where the new transcription appears.
+  Future<void> _upload(BuildContext context) async {
+    final list = context.read<TranscriptionListController>();
+    final request = await showUploadDialog(context, chooser: context.read<FileChooser>());
+    if (request == null) return;
+    await list.upload(request);
+    if (context.mounted) context.go('/transcriptions');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,8 +43,7 @@ class AppShell extends StatelessWidget {
           Expanded(
             child: Column(
               children: [
-                // The Upload modal arrives in a later iteration.
-                Topbar(title: title, onUpload: () {}),
+                Topbar(title: title, onUpload: () => _upload(context)),
                 Expanded(child: child),
               ],
             ),

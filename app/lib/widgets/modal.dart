@@ -144,3 +144,61 @@ class ModalFooter extends StatelessWidget {
     );
   }
 }
+
+/// Title on the left, close button on the right, 20 px above the content
+/// (`.modal-head`).
+class ModalHeader extends StatelessWidget {
+  const ModalHeader({super.key, required this.title, required this.onClose});
+
+  final String title;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          _CloseButton(onTap: onClose),
+        ],
+      ),
+    );
+  }
+}
+
+class _CloseButton extends StatefulWidget {
+  const _CloseButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  State<_CloseButton> createState() => _CloseButtonState();
+}
+
+class _CloseButtonState extends State<_CloseButton> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: _hover ? p.background : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(Icons.close_rounded, size: 20, color: p.text3),
+        ),
+      ),
+    );
+  }
+}

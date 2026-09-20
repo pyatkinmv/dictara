@@ -1,5 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:dictara_web/models/upload.dart';
+import 'package:dictara_web/services/file_chooser.dart';
 
 /// Loads the bundled Inter font. Without it tests render text with a wide
 /// placeholder font, which produces false overflow errors.
@@ -23,4 +25,18 @@ void useDesktopSize(WidgetTester tester) {
 Future<void> settle(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
+}
+
+/// Picks whatever [next] holds, without a browser dialog.
+class FakeFileChooser implements FileChooser {
+  FakeFileChooser([this.next]);
+
+  ChosenFile? next;
+  int calls = 0;
+
+  @override
+  Future<ChosenFile?> choose() async {
+    calls++;
+    return next;
+  }
 }

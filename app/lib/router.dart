@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import 'pages/detail/transcription_detail_page.dart';
 import 'pages/placeholder_page.dart';
+import 'pages/speakers_page.dart';
 import 'pages/tags_page.dart';
 import 'pages/transcriptions_page.dart';
 import 'shell/app_shell.dart';
@@ -35,7 +36,8 @@ GoRouter createRouter({String initialLocation = '/transcriptions'}) {
             ],
           ),
           GoRoute(path: '/tags', pageBuilder: (context, state) => page(state, const TagsPage())),
-          for (final d in navDestinations.where((d) => d.path != '/transcriptions' && d.path != '/tags'))
+          GoRoute(path: '/speakers', pageBuilder: (context, state) => page(state, const SpeakersPage())),
+          for (final d in navDestinations.where((d) => d.path != '/transcriptions' && d.path != '/tags' && d.path != '/speakers'))
             GoRoute(
               path: d.path,
               pageBuilder: (context, state) => page(state, PlaceholderPage(label: d.label)),
