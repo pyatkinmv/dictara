@@ -148,7 +148,7 @@ class _DetailsPanel extends StatelessWidget {
     final item = detail.item;
     final chips = <Widget>[
       _FilenameChip(filename: detail.originalFilename),
-      _DetailChip(icon: Icons.schedule_rounded, value: formatTimestamp(item.duration), label: 'Duration'),
+      _DetailChip(icon: Icons.schedule_rounded, value: formatTimestamp(item.duration ?? Duration.zero), label: 'Duration'),
       _DetailChip(
         icon: Icons.record_voice_over_rounded,
         value: item.speakerCount > 0 ? '${item.speakerCount}' : '—',

@@ -44,7 +44,7 @@ class TranscriptionDetailController extends ChangeNotifier {
   /// The last requested id does not exist or is not done yet.
   bool get notFound => _notFound;
 
-  Future<void> open(int id) async {
+  Future<void> open(String id) async {
     if (_current?.item.id != id) {
       _current = null;
       _notFound = false;
@@ -137,7 +137,7 @@ class TranscriptionDetailController extends ChangeNotifier {
 
   /// Runs one suggestion action, then re-reads the transcription (an accepted
   /// suggestion changes its title, tags and speakers) and the libraries.
-  Future<void> _resolve(String key, Future<void> Function(int id) action) async {
+  Future<void> _resolve(String key, Future<void> Function(String id) action) async {
     final current = _current;
     if (current == null || _busy.contains(key)) return;
     final id = current.item.id;

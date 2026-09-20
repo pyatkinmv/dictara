@@ -30,7 +30,7 @@ GoRouter createRouter({String initialLocation = '/transcriptions'}) {
                 path: ':id',
                 pageBuilder: (context, state) => page(
                   state,
-                  TranscriptionDetailPage(id: int.tryParse(state.pathParameters['id'] ?? '')),
+                  TranscriptionDetailPage(id: state.pathParameters['id']),
                 ),
               ),
             ],

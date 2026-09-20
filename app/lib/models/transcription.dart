@@ -1,13 +1,13 @@
 import 'tag.dart';
 
-enum TranscriptionStatus { done, processing, pending }
+enum TranscriptionStatus { done, processing, pending, failed }
 
 /// One item of the transcriptions list (see `docs/design.md`, "Job").
 class Transcription {
   const Transcription({
     required this.id,
     required this.title,
-    required this.duration,
+    this.duration,
     required this.uploadedAt,
     required this.status,
     this.processingPct,
@@ -15,9 +15,11 @@ class Transcription {
     this.speakerCount = 0,
   });
 
-  final int id;
+  final String id;
   final String title;
-  final Duration duration;
+
+  /// Null when the source does not know it (the gateway list does not send it yet).
+  final Duration? duration;
   final DateTime uploadedAt;
   final TranscriptionStatus status;
 

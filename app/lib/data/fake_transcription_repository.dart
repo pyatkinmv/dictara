@@ -112,7 +112,7 @@ const _summary = Summary(
 /// suggestions in the design (id 6); its slots stay "Speaker N" until the
 /// suggestions are accepted (iteration 7).
 const _confirmedSpeakers = <int, Speaker>{1: _alexei, 2: _maria, 3: _james};
-const _itemWithSuggestions = 6;
+const _itemWithSuggestions = '6';
 
 /// What the design's AI proposes for the item that has suggestions.
 const _seedSuggestions = Suggestions(
@@ -127,7 +127,7 @@ const _seedSuggestions = Suggestions(
 
 List<Transcription> _seedItems() => [
       Transcription(
-        id: 0,
+        id: '0',
         title: 'Quarterly Review Meeting',
         duration: const Duration(minutes: 14, seconds: 22),
         uploadedAt: DateTime(2025, 6, 22, 14, 41),
@@ -136,7 +136,7 @@ List<Transcription> _seedItems() => [
         speakerCount: 3,
       ),
       Transcription(
-        id: 1,
+        id: '1',
         title: 'Economics Lecture — Part 2',
         duration: const Duration(minutes: 72),
         uploadedAt: DateTime(2025, 6, 22, 11, 5),
@@ -144,7 +144,7 @@ List<Transcription> _seedItems() => [
         processingPct: 41,
       ),
       Transcription(
-        id: 2,
+        id: '2',
         title: 'Interview: Anna K.',
         duration: const Duration(minutes: 47),
         uploadedAt: DateTime(2025, 6, 21, 16, 20),
@@ -153,14 +153,14 @@ List<Transcription> _seedItems() => [
         speakerCount: 2,
       ),
       Transcription(
-        id: 3,
+        id: '3',
         title: 'Podcast Episode #47',
         duration: const Duration(minutes: 38),
         uploadedAt: DateTime(2025, 6, 22, 9, 30),
         status: TranscriptionStatus.pending,
       ),
       Transcription(
-        id: 4,
+        id: '4',
         title: 'Product Ideas — Voice Memo',
         duration: const Duration(minutes: 12),
         uploadedAt: DateTime(2025, 6, 20, 18, 2),
@@ -168,7 +168,7 @@ List<Transcription> _seedItems() => [
         tags: const [_ideas],
       ),
       Transcription(
-        id: 5,
+        id: '5',
         title: 'Daily Standup 19 Jun',
         duration: const Duration(minutes: 8),
         uploadedAt: DateTime(2025, 6, 19, 10, 0),
@@ -177,7 +177,7 @@ List<Transcription> _seedItems() => [
         speakerCount: 3,
       ),
       Transcription(
-        id: 6,
+        id: '6',
         title: 'product_sync_2025_06_23.mp4',
         duration: const Duration(minutes: 34),
         uploadedAt: DateTime(2025, 6, 23, 13, 15),
@@ -225,7 +225,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   final DateTime Function() _clock;
 
   /// Uploads that have not finished yet, by transcription id.
-  final Map<int, _Job> _jobs = {};
+  final Map<String, _Job> _jobs = {};
 
   /// Moves uploads along their `pending` → `processing` → `done` path.
   void _advanceJobs() {
@@ -268,7 +268,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   @override
   Future<Transcription> upload(UploadRequest request) async {
     await _wait();
-    final id = _items.fold(-1, (max, i) => i.id > max ? i.id : max) + 1;
+    final id = '${_items.fold(-1, (max, i) => _order(i) > max ? _order(i) : max) + 1}';
     // No real audio to measure: about a minute per megabyte, at least one.
     final minutes = (request.file.sizeBytes / (1024 * 1024)).ceil().clamp(1, 180);
     final item = Transcription(
@@ -316,39 +316,36 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   };
 
   /// Speakers assigned by hand, per transcription id, then per segment index.
-  final Map<int, Map<int, Speaker>> _segmentSpeakers = {};
+  final Map<String, Map<int, Speaker>> _segmentSpeakers = {};
 
   /// Confirmed slot → speaker mapping per transcription id.
-  final Map<int, Map<int, Speaker>> _slotSpeakers = {};
+  final Map<String, Map<int, Speaker>> _slotSpeakers = {};
 
   /// The design's own transcriptions have everyone confirmed (bar the one with
   /// suggestions); a new upload starts with "Speaker N" everywhere.
-  Map<int, Speaker> _slotsOf(int id) => _slotSpeakers.putIfAbsent(
+  Map<int, Speaker> _slotsOf(String id) => _slotSpeakers.putIfAbsent(
         id,
-        () => id == _itemWithSuggestions || id > _lastSeedId ? {} : {..._confirmedSpeakers},
+        () => id == _itemWithSuggestions || (int.tryParse(id) ?? _lastSeedId + 1) > _lastSeedId ? {} : {..._confirmedSpeakers},
       );
 
   /// Suggestions still waiting for the user, per transcription id.
-  final Map<int, Suggestions> _suggestions = {_itemWithSuggestions: _seedSuggestions};
+  final Map<String, Suggestions> _suggestions = {_itemWithSuggestions: _seedSuggestions};
+
+  /// The mock hands out numeric ids (creation order), which the server would not.
+  int _order(Transcription item) => int.parse(item.id);
 
   @override
   Future<List<Transcription>> list(TranscriptionQuery query) async {
     _advanceJobs();
-    final q = query.search.trim().toLowerCase();
-    final items = _items.where((i) {
-      if (query.statuses.isNotEmpty && !query.statuses.contains(i.status)) return false;
-      if (query.tags.isNotEmpty && !i.tags.any((t) => query.tags.contains(t.label))) return false;
-      if (q.isNotEmpty && !i.title.toLowerCase().contains(q)) return false;
-      return true;
-    }).toList();
+    final items = filterTranscriptions(_items, query);
 
     switch (query.sort) {
       case TranscriptionSort.newest:
-        items.sort((a, b) => b.id.compareTo(a.id));
+        items.sort((a, b) => _order(b).compareTo(_order(a)));
       case TranscriptionSort.oldest:
-        items.sort((a, b) => a.id.compareTo(b.id));
+        items.sort((a, b) => _order(a).compareTo(_order(b)));
       case TranscriptionSort.longest:
-        items.sort((a, b) => b.duration.compareTo(a.duration));
+        items.sort((a, b) => (b.duration ?? Duration.zero).compareTo(a.duration ?? Duration.zero));
       case TranscriptionSort.name:
         items.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
     }
@@ -356,7 +353,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   }
 
   @override
-  Future<TranscriptionDetail?> get(int id) async {
+  Future<TranscriptionDetail?> get(String id) async {
     _advanceJobs();
     final index = _items.indexWhere((i) => i.id == id);
     if (index < 0 || _items[index].status != TranscriptionStatus.done) return null;
@@ -376,7 +373,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   }
 
   @override
-  Future<void> rename(int id, String title) async {
+  Future<void> rename(String id, String title) async {
     final index = _items.indexWhere((i) => i.id == id);
     if (index >= 0) _items[index] = _items[index].copyWith(title: title);
   }
@@ -457,7 +454,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
             speaker: speaker,
             description: _speakerDescriptions[speaker.name] ?? '',
             transcriptions: [for (final item in items) item.title],
-            totalDuration: items.fold(Duration.zero, (sum, item) => sum + item.duration),
+            totalDuration: items.fold(Duration.zero, (sum, item) => sum + (item.duration ?? Duration.zero)),
           );
         }(),
     ];
@@ -542,7 +539,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   }
 
   @override
-  Future<Speaker> assignSpeaker(int id, Set<int> segmentIndexes, String name) async {
+  Future<Speaker> assignSpeaker(String id, Set<int> segmentIndexes, String name) async {
     final wanted = name.trim();
     // The library matches names case-insensitively; a new one keeps the case it was typed in.
     var speaker = _speakerLibrary.where((s) => s.name.toLowerCase() == wanted.toLowerCase()).firstOrNull;
@@ -558,7 +555,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   }
 
   @override
-  Future<Tag> addTag(int id, String label) async {
+  Future<Tag> addTag(String id, String label) async {
     final wanted = label.trim().toLowerCase();
     final tag = _libraryTag(wanted) ?? _createTag(Tag(wanted, libraryPalette[_library.length % libraryPalette.length]));
     _link(id, tag);
@@ -573,7 +570,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   }
 
   /// Puts [tag] on a transcription unless it is already there.
-  void _link(int id, Tag tag) {
+  void _link(String id, Tag tag) {
     final index = _items.indexWhere((i) => i.id == id);
     if (index >= 0 && !_items[index].tags.contains(tag)) {
       _items[index] = _items[index].copyWith(tags: [..._items[index].tags, tag]);
@@ -588,7 +585,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   }
 
   /// Stores what is left of the suggestions, dropping the record when nothing is.
-  void _keep(int id, Suggestions left) {
+  void _keep(String id, Suggestions left) {
     if (left.isEmpty) {
       _suggestions.remove(id);
     } else {
@@ -596,12 +593,12 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
     }
   }
 
-  void _acceptTag(int id, Tag suggested) => _link(id, _libraryTag(suggested.label) ?? _createTag(suggested));
+  void _acceptTag(String id, Tag suggested) => _link(id, _libraryTag(suggested.label) ?? _createTag(suggested));
 
-  void _acceptSpeaker(int id, int slot, Speaker suggested) => _slotsOf(id)[slot] = _librarySpeaker(suggested);
+  void _acceptSpeaker(String id, int slot, Speaker suggested) => _slotsOf(id)[slot] = _librarySpeaker(suggested);
 
   @override
-  Future<void> removeTag(int id, String label) async {
+  Future<void> removeTag(String id, String label) async {
     final index = _items.indexWhere((i) => i.id == id);
     if (index < 0) return;
     _items[index] = _items[index].copyWith(tags: [
@@ -611,7 +608,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   }
 
   @override
-  Future<void> acceptAllSuggestions(int id) async {
+  Future<void> acceptAllSuggestions(String id) async {
     await _wait();
     final s = _suggestions[id];
     if (s == null) return;
@@ -627,13 +624,13 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   }
 
   @override
-  Future<void> dismissAllSuggestions(int id) async {
+  Future<void> dismissAllSuggestions(String id) async {
     await _wait();
     _suggestions.remove(id);
   }
 
   @override
-  Future<void> acceptTagSuggestion(int id, String label) async {
+  Future<void> acceptTagSuggestion(String id, String label) async {
     await _wait();
     final s = _suggestions[id];
     final tag = s?.tags.where((t) => t.label == label).firstOrNull;
@@ -643,7 +640,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   }
 
   @override
-  Future<void> rejectTagSuggestion(int id, String label) async {
+  Future<void> rejectTagSuggestion(String id, String label) async {
     await _wait();
     final s = _suggestions[id];
     if (s == null) return;
@@ -651,7 +648,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   }
 
   @override
-  Future<void> acceptSpeakerSuggestion(int id, int slot) async {
+  Future<void> acceptSpeakerSuggestion(String id, int slot) async {
     await _wait();
     final s = _suggestions[id];
     final speaker = s?.speakers[slot];
@@ -661,7 +658,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   }
 
   @override
-  Future<void> rejectSpeakerSuggestion(int id, int slot) async {
+  Future<void> rejectSpeakerSuggestion(String id, int slot) async {
     await _wait();
     final s = _suggestions[id];
     if (s == null) return;

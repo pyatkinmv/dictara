@@ -51,7 +51,7 @@ abstract class TranscriptionRepository {
 
   /// A finished transcription with its transcript; null if there is no such
   /// transcription or it is not done yet.
-  Future<TranscriptionDetail?> get(int id);
+  Future<TranscriptionDetail?> get(String id);
 
   /// Sends a file for transcription (`POST /transcriptions`) and returns the new
   /// item, which starts out `pending`. The server settings of the dialog
@@ -59,16 +59,16 @@ abstract class TranscriptionRepository {
   Future<Transcription> upload(UploadRequest request);
 
   /// Renames a transcription (`PATCH /jobs/{id}/title`).
-  Future<void> rename(int id, String title);
+  Future<void> rename(String id, String title);
 
   /// Puts the tag with this label on a transcription and returns it. If the
   /// library has no such tag yet it is created first (`POST /jobs/{id}/tags`
   /// with either a `tag_id` or a `label`, api-gaps §2.3).
-  Future<Tag> addTag(int id, String label);
+  Future<Tag> addTag(String id, String label);
 
   /// Takes a tag off one transcription; it stays in the library
   /// (`DELETE /jobs/{id}/tags/{tagId}`).
-  Future<void> removeTag(int id, String label);
+  Future<void> removeTag(String id, String label);
 
   /// The tag library, in display order.
   Future<List<Tag>> tags();
@@ -116,26 +116,39 @@ abstract class TranscriptionRepository {
   /// `PUT /jobs/{id}/speakers/{slot}` with a scope of a whole slot or one
   /// segment, and §1.3 leaves the storage open. This mock works per segment,
   /// as the design does.
-  Future<Speaker> assignSpeaker(int id, Set<int> segmentIndexes, String name);
+  Future<Speaker> assignSpeaker(String id, Set<int> segmentIndexes, String name);
 
   // AI suggestions (`docs/api-gaps.md` §2.4, still marked TBD there). Each call
   // resolves part of the suggestions of a transcription; the record disappears
   // once nothing is left. Read the outcome back with [get].
 
   /// Accepts everything that is left: the new title, every tag, every speaker.
-  Future<void> acceptAllSuggestions(int id);
+  Future<void> acceptAllSuggestions(String id);
 
   /// Rejects everything that is left.
-  Future<void> dismissAllSuggestions(int id);
+  Future<void> dismissAllSuggestions(String id);
 
   /// Adds the suggested tag to the transcription (and to the library if new).
-  Future<void> acceptTagSuggestion(int id, String label);
+  Future<void> acceptTagSuggestion(String id, String label);
 
-  Future<void> rejectTagSuggestion(int id, String label);
+  Future<void> rejectTagSuggestion(String id, String label);
 
   /// Confirms the suggested speaker for a diarizer slot (adding them to the
   /// library if new).
-  Future<void> acceptSpeakerSuggestion(int id, int slot);
+  Future<void> acceptSpeakerSuggestion(String id, int slot);
 
-  Future<void> rejectSpeakerSuggestion(int id, int slot);
+  Future<void> rejectSpeakerSuggestion(String id, int slot);
+}
+
+/// The items that match the search text, status and tag filters of [query];
+/// ordering is left to the caller. Used where the source cannot filter itself.
+List<Transcription> filterTranscriptions(Iterable<Transcription> items, TranscriptionQuery query) {
+  final q = query.search.trim().toLowerCase();
+  return [
+    for (final i in items)
+      if ((query.statuses.isEmpty || query.statuses.contains(i.status)) &&
+          (query.tags.isEmpty || i.tags.any((t) => query.tags.contains(t.label))) &&
+          (q.isEmpty || i.title.toLowerCase().contains(q)))
+        i,
+  ];
 }

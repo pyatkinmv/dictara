@@ -45,7 +45,7 @@ void main() {
 
     test('a hand-assigned speaker counts for that transcription', () async {
       final repo = FakeTranscriptionRepository();
-      await repo.assignSpeaker(4, {
+      await repo.assignSpeaker('4', {
         0,
       }, 'Maria Chen'); // the voice memo has no diarization
 
@@ -87,9 +87,9 @@ void main() {
         expect(masha.description, 'New text');
         expect(masha.count, 3);
         expect(library.any((e) => e.speaker.name == 'Maria Chen'), isFalse);
-        expect((await repo.get(0))!.speakers[2]!.name, 'Masha Chen');
+        expect((await repo.get('0'))!.speakers[2]!.name, 'Masha Chen');
         expect(
-          (await repo.get(2))!.speakers[2]!.name,
+          (await repo.get('2'))!.speakers[2]!.name,
           'Masha Chen',
         ); // never opened before
         expect(
@@ -103,16 +103,16 @@ void main() {
       'renaming follows manual assignments and pending suggestions',
       () async {
         final repo = FakeTranscriptionRepository();
-        await repo.assignSpeaker(0, {0}, 'Maria Chen');
+        await repo.assignSpeaker('0', {0}, 'Maria Chen');
         await repo.updateSpeaker(
           'Maria Chen',
           newName: 'Masha Chen',
           description: '',
         );
 
-        expect((await repo.get(0))!.segmentSpeakers[0]!.name, 'Masha Chen');
+        expect((await repo.get('0'))!.segmentSpeakers[0]!.name, 'Masha Chen');
         expect(
-          (await repo.get(6))!.suggestions!.speakers[2]!.name,
+          (await repo.get('6'))!.suggestions!.speakers[2]!.name,
           'Masha Chen',
         );
       },
@@ -122,7 +122,7 @@ void main() {
       'deleting removes the speaker from the library and from every transcription',
       () async {
         final repo = FakeTranscriptionRepository();
-        await repo.assignSpeaker(0, {0}, 'James Wright');
+        await repo.assignSpeaker('0', {0}, 'James Wright');
         final affected = await repo.deleteSpeaker('James Wright');
 
         expect(affected, 2);
@@ -130,10 +130,10 @@ void main() {
           'Alexei Sorokin',
           'Maria Chen',
         ]);
-        final detail = (await repo.get(0))!;
+        final detail = (await repo.get('0'))!;
         expect(detail.speakers.containsKey(3), isFalse);
         expect(detail.segmentSpeakers, isEmpty);
-        expect((await repo.get(5))!.speakers.containsKey(3), isFalse);
+        expect((await repo.get('5'))!.speakers.containsKey(3), isFalse);
         expect(await repo.deleteSpeaker('James Wright'), 0); // already gone
       },
     );

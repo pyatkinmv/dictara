@@ -13,7 +13,7 @@ import 'test_utils.dart';
 const _picker = ValueKey('speaker-picker');
 
 Transcription _item() => Transcription(
-      id: 1,
+      id: '1',
       title: 'T',
       duration: const Duration(minutes: 1),
       uploadedAt: DateTime(2025, 6, 22),
@@ -82,17 +82,17 @@ void main() {
 
     test('assigning an existing speaker matches the name case-insensitively', () async {
       final repo = FakeTranscriptionRepository();
-      final speaker = await repo.assignSpeaker(0, {0, 3}, 'maria chen');
+      final speaker = await repo.assignSpeaker('0', {0, 3}, 'maria chen');
 
       expect(speaker.name, 'Maria Chen');
       expect(speaker.color, const Color(0xFF7C3AED)); // the library's own color
-      expect((await repo.get(0))!.segmentSpeakers.keys, {0, 3});
+      expect((await repo.get('0'))!.segmentSpeakers.keys, {0, 3});
       expect((await repo.speakers()).length, 3);
     });
 
     test('a new speaker keeps the case it was typed in and gets the next palette color', () async {
       final repo = FakeTranscriptionRepository();
-      final speaker = await repo.assignSpeaker(0, {1}, '  Dana Whitfield ');
+      final speaker = await repo.assignSpeaker('0', {1}, '  Dana Whitfield ');
 
       expect(speaker.name, 'Dana Whitfield');
       expect(speaker.color, libraryPalette[3 % libraryPalette.length]); // library had 3 speakers
@@ -101,8 +101,8 @@ void main() {
 
     test('assignments belong to one transcription', () async {
       final repo = FakeTranscriptionRepository();
-      await repo.assignSpeaker(0, {0}, 'James Wright');
-      expect((await repo.get(2))!.segmentSpeakers, isEmpty);
+      await repo.assignSpeaker('0', {0}, 'James Wright');
+      expect((await repo.get('2'))!.segmentSpeakers, isEmpty);
     });
   });
 

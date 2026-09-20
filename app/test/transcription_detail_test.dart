@@ -9,7 +9,7 @@ import 'package:dictara_web/models/transcription_detail.dart';
 import 'test_utils.dart';
 
 Transcription _item() => Transcription(
-      id: 1,
+      id: '1',
       title: 'Title',
       duration: const Duration(minutes: 5),
       uploadedAt: DateTime(2025, 6, 22),

@@ -4,7 +4,7 @@
 
 Предыдущий этап — редизайн интерфейса на моках — описан в [redesign-plan.md](redesign-plan.md) (итерации 0–10, готово, документ оставлен как история). Расхождения дизайна и текущего gateway: [api-gaps.md](api-gaps.md). Домен и экраны: [design.md](design.md).
 
-**Статус: итерация 0 (локальное окружение) выполнена, дальше итерация 1.** Чеклист — в разделе 7; решения и факты, установленные на этапе обсуждения, — в остальных разделах (сводка: «Что решено, а что нет»).
+**Статус: итерации 0 (локальное окружение) и 1 (подключение Flutter) выполнены, дальше итерация 2.** Чеклист — в разделе 7; решения и факты, установленные на этапе обсуждения, — в остальных разделах (сводка: «Что решено, а что нет»).
 
 ## Содержание
 
@@ -274,12 +274,13 @@ server:
   - [x] Начальный `db/local/R__seed.sql`: пока только dev-пользователь (тарифный план `unlimited`), идемпотентный (`ON CONFLICT DO NOTHING`); данные записей, тегов и спикеров появятся в итерациях 2–5
   - [x] Тесты: заглушка transcriber, `LocalDbAudioStorage`, guards; существующие тесты gateway зелёные
   - [x] **Критерий готовности:** `dev.ps1` поднимает окружение; `GET /health` отвечает; загрузка файла через `POST /transcribe` доходит до `done` на заглушке; `GET /transcriptions` без токена возвращает записи dev-пользователя
-- [ ] **1. Flutter: подключение к gateway**
-  - [ ] `app/web_dev_config.yaml` с прокси `/api/*` → `localhost:8080` (проверить синтаксис `replace` на настоящем запросе)
-  - [ ] Скелет `HttpTranscriptionRepository`, разбор JSON (`snake_case`)
-  - [ ] Переключатель `--dart-define=BACKEND=mock|local` в `main_material.dart` (по умолчанию `mock`)
-  - [ ] Дымовая проверка: приложение стартует против `local` и показывает данные сида
-  - [ ] Документация запуска (команды `dev.ps1` + `flutter run` + `BACKEND=local`)
+- [x] **1. Flutter: подключение к gateway**
+  - [x] `app/web_dev_config.yaml` с прокси `/api/*` → `localhost:8080` (правило `prefix` + `replace`, синтаксис проверен на настоящем запросе)
+  - [x] Скелет `HttpTranscriptionRepository`, разбор JSON (`snake_case`)
+  - [x] Переключатель `--dart-define=BACKEND=mock|local` в `main_material.dart` (по умолчанию `mock`)
+  - [x] Дымовая проверка: приложение стартует против `local` и показывает записи из gateway (сид пока содержит только пользователя, поэтому записи созданы загрузкой)
+  - [x] Документация запуска (команды `dev.ps1` + `flutter run` + `BACKEND=local`)
+  - [x] Предпосылка: `id` записи во Flutter теперь `String` (в gateway это UUID); статус `failed`; `Transcription.duration` может быть неизвестна
 - [ ] **2. Срез: список транскрипций**
   - [ ] gateway: `GET /transcriptions` с `q`, `status`, `tag`/`tag_ids`, `sort`; поля для строки (длительность, число спикеров, процент и фаза прогресса)
   - [ ] Flutter: `list()` в `HttpTranscriptionRepository`; опрос прогресса при `pending`/`processing`
@@ -355,6 +356,34 @@ Ctrl+C останавливает gateway; Postgres остаётся подня�
 - Windows PowerShell 5.1 превращает вывод в stderr нативных команд (у `docker` там прогресс) в ошибки, если включён `$ErrorActionPreference = 'Stop'`: в скриптах он не включён, успех проверяется по `$LASTEXITCODE`.
 - Спикеры в результате заглушки — `SPEAKER_00`, `SPEAKER_01`…, как у настоящего transcriber (модель `Segment.speaker`).
 - Devtools подключён, но автоперезапуск при пересборке отдельно не проверялся.
+
+### Итерация 1: что важно знать
+
+**Как запустить приложение против локального gateway** (gateway запущен через `scripts\dev.ps1`):
+
+```powershell
+cd app
+flutter run -d web-server --web-port 3001 -t lib/material/main_material.dart --dart-define=BACKEND=local
+```
+
+Без `--dart-define` (или с `BACKEND=mock`) приложение работает на моках, как раньше. Прокси берётся из `app/web_dev_config.yaml` автоматически (при старте Flutter пишет `Loaded configuration from web_dev_config.yaml`); проверка: `curl http://localhost:3001/api/health` отвечает `{"status":"ok"}`.
+
+**Что сделано (`app/`):**
+
+- `web_dev_config.yaml`: правило `prefix: /api/`, `replace: /`, `target: http://localhost:8080`, то же, что делает nginx в проде.
+- `lib/data/gateway_client.dart`: `GatewayClient` (JSON поверх `package:http`, база `/api`), `GatewayException` (нет ответа / код ошибки / не JSON; сообщение берётся из поля `message` ответа Spring).
+- `lib/data/http_transcription_repository.dart`: `HttpTranscriptionRepository`. Работают `list()` и `tags()`; остальные методы бросают `NotIntegratedException` с номером итерации, которая их подключит. Список пока **временный**: gateway отдаёт `job_id`, `file_name`, `title`, `created_at`, `status`, `tags` и не умеет фильтровать, поэтому фильтры и сортировка выполняются на клиенте (общий `filterTranscriptions`), `tags()` собирается из тегов записей, цвет тега считается по хэшу имени (`colorForLabel`, как решено в `api-gaps.md`).
+- `lib/material/main_material.dart`: переключатель `BACKEND=mock|local` (неизвестное значение — ошибка при старте). Опрос списка каждые 3 с при `local`.
+
+**Изменения модели, нужные для настоящего API:**
+
+- `id` записи стал `String` во всём клиенте (в gateway это UUID; в макете и моках было `int`). Заглушка хранит числовые строки `'0'`…`'6'`, порядок «новые сверху» по-прежнему по числу. Закрывает пункт «Тип `Job.id`» из «Известных проблем» в `redesign-plan.md`.
+- Новый статус `TranscriptionStatus.failed` (значок ошибки, «Failed», цвета `danger`): gateway отдаёт `failed`, в макете этого состояния нет. Строка не кликается (как `pending`/`processing`); в фильтре списка появился пункт «Failed». Статус gateway `summarizing` показывается как `processing`.
+- `Transcription.duration` может быть неизвестной (`Duration?`): в списке gateway длительности нет. Строка тогда её не показывает; в шапке и Overview подставляется 0. Для `processing` без процента строка пишет «Processing…», а не «0%».
+
+**Проверено:** 204 теста Flutter (было 178; добавлено 26: клиент и репозиторий на `MockClient` 21, строка и статус 5), `flutter analyze` чист. Вручную: прокси отвечает; приложение на `BACKEND=local` показывает записи, загруженные в gateway (статусы `Done` и `Processing`).
+
+**Что пока не работает при `BACKEND=local`** (по замыслу, экраны подключаются по итерациям): страницы Tags (4), Speakers (5), открытие записи и переименование (3), загрузка через диалог Upload (7), AI-подсказки (8). Такие вызовы бросают `NotIntegratedException`, страница остаётся пустой, а ошибка видна в консоли браузера; понятное сообщение на экране можно сделать при подключении первого такого экрана.
 
 ## 8. Что решено, а что нет
 

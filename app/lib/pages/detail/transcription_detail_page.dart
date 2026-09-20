@@ -14,7 +14,7 @@ class TranscriptionDetailPage extends StatefulWidget {
   /// Null when the address does not hold a valid id.
   const TranscriptionDetailPage({super.key, required this.id});
 
-  final int? id;
+  final String? id;
 
   @override
   State<TranscriptionDetailPage> createState() => _TranscriptionDetailPageState();

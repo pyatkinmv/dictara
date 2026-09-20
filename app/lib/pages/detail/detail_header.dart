@@ -366,7 +366,7 @@ class _MetaRow extends StatelessWidget {
       spacing: 10,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        entry(Icons.schedule_rounded, formatDuration(item.duration)),
+        entry(Icons.schedule_rounded, formatDuration(item.duration ?? Duration.zero)),
         entry(Icons.calendar_today_rounded, formatDay(item.uploadedAt)),
         StatusBadge(item.status),
       ],

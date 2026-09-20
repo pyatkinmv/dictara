@@ -46,7 +46,7 @@ void main() {
       expect(sync.description, 'New text');
       expect(sync.transcriptions, ['Quarterly Review Meeting', 'Daily Standup 19 Jun']);
       expect(library.any((e) => e.tag.label == 'meeting'), isFalse);
-      expect((await repo.get(0))!.item.tags.map((t) => t.label), ['sync', 'quarterly']);
+      expect((await repo.get('0'))!.item.tags.map((t) => t.label), ['sync', 'quarterly']);
       expect((await repo.tags()).map((t) => t.label), contains('sync'));
     });
 
@@ -56,8 +56,8 @@ void main() {
 
       expect(affected, 2);
       expect((await repo.tags()).map((t) => t.label), isNot(contains('meeting')));
-      expect((await repo.get(0))!.item.tags.map((t) => t.label), ['quarterly']);
-      expect((await repo.get(5))!.item.tags.map((t) => t.label), ['standup']);
+      expect((await repo.get('0'))!.item.tags.map((t) => t.label), ['quarterly']);
+      expect((await repo.get('5'))!.item.tags.map((t) => t.label), ['standup']);
       expect(await repo.deleteTag('meeting'), 0); // already gone
     });
   });
@@ -103,7 +103,7 @@ void main() {
 
     testWidgets('more than two transcriptions collapse into "+N more"', (tester) async {
       final repo = FakeTranscriptionRepository();
-      await repo.addTag(4, 'meeting'); // a third one
+      await repo.addTag('4', 'meeting'); // a third one
       await openTags(tester, repo: repo);
 
       expect(find.text('3 files'), findsOneWidget);

@@ -102,8 +102,10 @@ class _Info extends StatelessWidget {
         const SizedBox(height: 2),
         Row(
           children: [
-            _Meta(icon: Icons.schedule_rounded, text: formatDuration(item.duration)),
-            const SizedBox(width: 10),
+            if (item.duration != null) ...[
+              _Meta(icon: Icons.schedule_rounded, text: formatDuration(item.duration!)),
+              const SizedBox(width: 10),
+            ],
             _Meta(icon: Icons.calendar_today_rounded, text: formatDay(item.uploadedAt)),
           ],
         ),
@@ -122,7 +124,7 @@ class _Info extends StatelessWidget {
           _Progress(pct: item.processingPct ?? 0),
           const SizedBox(height: 3),
           Text(
-            '${item.processingPct ?? 0}% — transcribing…',
+            item.processingPct == null ? 'Processing…' : '${item.processingPct}% — transcribing…',
             style: TextStyle(fontSize: 11, height: 14 / 11, color: p.warn),
           ),
         ],

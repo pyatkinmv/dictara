@@ -39,7 +39,7 @@ void main() {
     TranscriptionDetail detail({Suggestions? suggestions, Map<int, Speaker> speakers = const {}}) {
       return TranscriptionDetail(
         item: Transcription(
-          id: 1,
+          id: '1',
           title: 'T',
           duration: const Duration(minutes: 1),
           uploadedAt: DateTime(2025),
@@ -77,17 +77,17 @@ void main() {
     setUp(() => repo = FakeTranscriptionRepository());
 
     test('only the last item carries the design\'s suggestions', () async {
-      final s = (await repo.get(6))!.suggestions!;
+      final s = (await repo.get('6'))!.suggestions!;
       expect(s.title, 'Product Sync — Q3 Roadmap');
       expect(s.tags.map((t) => t.label), ['meeting', 'product', 'roadmap']);
       expect(s.speakers.keys, [1, 2, 3]);
-      expect((await repo.get(0))!.suggestions, isNull);
+      expect((await repo.get('0'))!.suggestions, isNull);
     });
 
     test('accepting a tag adds it to the transcription, and to the library when new', () async {
-      await repo.acceptTagSuggestion(6, 'product');
+      await repo.acceptTagSuggestion('6', 'product');
 
-      final d = (await repo.get(6))!;
+      final d = (await repo.get('6'))!;
       expect(d.item.tags.map((t) => t.label), ['product']);
       expect(d.item.tags.single.color, const Color(0xFF0891B2)); // the AI's color
       expect(d.suggestions!.tags.map((t) => t.label), ['meeting', 'roadmap']);
@@ -95,42 +95,42 @@ void main() {
     });
 
     test('accepting a suggested tag that the library has uses the library tag', () async {
-      await repo.acceptTagSuggestion(6, 'meeting');
+      await repo.acceptTagSuggestion('6', 'meeting');
       expect((await repo.tags()).where((t) => t.label == 'meeting').length, 1);
-      expect((await repo.get(6))!.item.tags.map((t) => t.label), ['meeting']);
+      expect((await repo.get('6'))!.item.tags.map((t) => t.label), ['meeting']);
     });
 
     test('rejecting a tag drops it without touching the transcription or the library', () async {
-      await repo.rejectTagSuggestion(6, 'roadmap');
+      await repo.rejectTagSuggestion('6', 'roadmap');
 
-      final d = (await repo.get(6))!;
+      final d = (await repo.get('6'))!;
       expect(d.item.tags, isEmpty);
       expect(d.suggestions!.tags.map((t) => t.label), ['meeting', 'product']);
       expect((await repo.tags()).map((t) => t.label), isNot(contains('roadmap')));
     });
 
     test('accepting a speaker confirms the slot', () async {
-      await repo.acceptSpeakerSuggestion(6, 2);
+      await repo.acceptSpeakerSuggestion('6', 2);
 
-      final d = (await repo.get(6))!;
+      final d = (await repo.get('6'))!;
       expect(d.speakers[2]!.name, 'Maria Chen');
       expect(d.speakerFor(1).name, 'Speaker 1'); // the others are still pending
       expect(d.suggestions!.speakers.keys, [1, 3]);
     });
 
     test('rejecting a speaker leaves the slot unassigned and untinted', () async {
-      await repo.rejectSpeakerSuggestion(6, 1);
+      await repo.rejectSpeakerSuggestion('6', 1);
 
-      final d = (await repo.get(6))!;
+      final d = (await repo.get('6'))!;
       expect(d.speakers.containsKey(1), isFalse);
       expect(d.speakerFor(1), const Speaker('Speaker 1', _grey));
       expect(d.suggestions!.speakers.keys, [2, 3]);
     });
 
     test('accept all renames, tags, maps the speakers and drops the record', () async {
-      await repo.acceptAllSuggestions(6);
+      await repo.acceptAllSuggestions('6');
 
-      final d = (await repo.get(6))!;
+      final d = (await repo.get('6'))!;
       expect(d.item.title, 'Product Sync — Q3 Roadmap');
       expect(d.item.tags.map((t) => t.label), ['meeting', 'product', 'roadmap']);
       expect(d.speakers.values.map((s) => s.name), ['Alexei Sorokin', 'Maria Chen', 'James Wright']);
@@ -138,9 +138,9 @@ void main() {
     });
 
     test('dismiss all drops the record and changes nothing else', () async {
-      await repo.dismissAllSuggestions(6);
+      await repo.dismissAllSuggestions('6');
 
-      final d = (await repo.get(6))!;
+      final d = (await repo.get('6'))!;
       expect(d.suggestions, isNull);
       expect(d.item.title, 'product_sync_2025_06_23.mp4');
       expect(d.item.tags, isEmpty);
@@ -148,9 +148,9 @@ void main() {
     });
 
     test('the record disappears when the last item is resolved, and stays gone', () async {
-      await repo.acceptAllSuggestions(6);
-      await repo.acceptTagSuggestion(6, 'meeting'); // nothing left to accept: a no-op
-      expect((await repo.get(6))!.suggestions, isNull);
+      await repo.acceptAllSuggestions('6');
+      await repo.acceptTagSuggestion('6', 'meeting'); // nothing left to accept: a no-op
+      expect((await repo.get('6'))!.suggestions, isNull);
     });
 
     test('the latency callback delays only the suggestion actions', () async {
@@ -159,9 +159,9 @@ void main() {
         calls++;
         return Duration.zero;
       });
-      await slow.rename(0, 'x');
+      await slow.rename('0', 'x');
       expect(calls, 0);
-      await slow.rejectTagSuggestion(6, 'meeting');
+      await slow.rejectTagSuggestion('6', 'meeting');
       expect(calls, 1);
     });
   });

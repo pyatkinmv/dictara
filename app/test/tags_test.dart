@@ -17,39 +17,39 @@ void main() {
   group('FakeTranscriptionRepository tags', () {
     test('adding a library tag links it to the transcription', () async {
       final repo = FakeTranscriptionRepository();
-      final tag = await repo.addTag(0, 'ideas');
+      final tag = await repo.addTag('0', 'ideas');
 
       expect(tag.label, 'ideas');
       expect(tag.color, const Color(0xFF0891B2)); // the library's own color
-      expect((await repo.get(0))!.item.tags.map((t) => t.label), ['meeting', 'quarterly', 'ideas']);
+      expect((await repo.get('0'))!.item.tags.map((t) => t.label), ['meeting', 'quarterly', 'ideas']);
       expect((await repo.tags()).length, 6);
     });
 
     test('a new label is created in the library, lowercase, with the next palette color', () async {
       final repo = FakeTranscriptionRepository();
-      final tag = await repo.addTag(0, '  Budget ');
+      final tag = await repo.addTag('0', '  Budget ');
 
       expect(tag.label, 'budget');
       expect(tag.color, libraryPalette[6 % libraryPalette.length]); // library had 6 tags
       expect((await repo.tags()).map((t) => t.label), contains('budget'));
-      expect((await repo.get(0))!.item.tags.map((t) => t.label), contains('budget'));
+      expect((await repo.get('0'))!.item.tags.map((t) => t.label), contains('budget'));
 
       // The next one gets the next color.
-      expect((await repo.addTag(0, 'second')).color, libraryPalette[7 % libraryPalette.length]);
+      expect((await repo.addTag('0', 'second')).color, libraryPalette[7 % libraryPalette.length]);
     });
 
     test('adding the same tag twice does not duplicate it', () async {
       final repo = FakeTranscriptionRepository();
-      await repo.addTag(0, 'meeting');
-      expect((await repo.get(0))!.item.tags.where((t) => t.label == 'meeting').length, 1);
+      await repo.addTag('0', 'meeting');
+      expect((await repo.get('0'))!.item.tags.where((t) => t.label == 'meeting').length, 1);
     });
 
     test('removing takes the tag off one transcription but keeps it in the library', () async {
       final repo = FakeTranscriptionRepository();
-      await repo.removeTag(0, 'meeting');
+      await repo.removeTag('0', 'meeting');
 
-      expect((await repo.get(0))!.item.tags.map((t) => t.label), ['quarterly']);
-      expect((await repo.get(5))!.item.tags.map((t) => t.label), contains('meeting'));
+      expect((await repo.get('0'))!.item.tags.map((t) => t.label), ['quarterly']);
+      expect((await repo.get('5'))!.item.tags.map((t) => t.label), contains('meeting'));
       expect((await repo.tags()).map((t) => t.label), contains('meeting'));
     });
   });

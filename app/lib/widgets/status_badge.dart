@@ -8,24 +8,28 @@ extension TranscriptionStatusStyle on TranscriptionStatus {
         TranscriptionStatus.done => Icons.check_circle_rounded,
         TranscriptionStatus.processing => Icons.autorenew_rounded,
         TranscriptionStatus.pending => Icons.schedule_rounded,
+        TranscriptionStatus.failed => Icons.error_rounded,
       };
 
   String get label => switch (this) {
         TranscriptionStatus.done => 'Done',
         TranscriptionStatus.processing => 'Processing',
         TranscriptionStatus.pending => 'Pending',
+        TranscriptionStatus.failed => 'Failed',
       };
 
   Color foreground(AppPalette p) => switch (this) {
         TranscriptionStatus.done => p.ok,
         TranscriptionStatus.processing => p.warn,
         TranscriptionStatus.pending => p.text3,
+        TranscriptionStatus.failed => p.danger,
       };
 
   Color background(AppPalette p) => switch (this) {
         TranscriptionStatus.done => p.okBg,
         TranscriptionStatus.processing => p.warnBg,
         TranscriptionStatus.pending => p.background,
+        TranscriptionStatus.failed => p.dangerBg,
       };
 }
 

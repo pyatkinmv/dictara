@@ -68,7 +68,7 @@ void main() {
 
         final item = await repo.upload(const UploadRequest(file: _memo));
 
-        expect(item.id, 7);
+        expect(item.id, '7');
         expect(item.title, 'team_call.mp3');
         expect(item.status, TranscriptionStatus.pending);
         expect(item.uploadedAt, now);
@@ -77,9 +77,9 @@ void main() {
           const Duration(minutes: 22),
         ); // about a minute per megabyte
         final list = await repo.list(const TranscriptionQuery());
-        expect(list.first.id, 7);
+        expect(list.first.id, '7');
         expect(list.length, 8);
-        expect(await repo.get(7), isNull); // not done yet
+        expect(await repo.get('7'), isNull); // not done yet
       },
     );
 
@@ -110,7 +110,7 @@ void main() {
 
       Future<Transcription> uploaded() async => (await repo.list(
         const TranscriptionQuery(),
-      )).firstWhere((i) => i.id == 7);
+      )).firstWhere((i) => i.id == '7');
 
       var item = await uploaded();
       expect(item.status, TranscriptionStatus.pending);
@@ -130,7 +130,7 @@ void main() {
       expect(item.processingPct, isNull);
       expect(item.speakerCount, 3);
 
-      final detail = await repo.get(7);
+      final detail = await repo.get('7');
       expect(detail, isNotNull);
       // A new recording has nobody confirmed: every slot is still "Speaker N".
       expect(detail!.speakers, isEmpty);
@@ -148,7 +148,7 @@ void main() {
       await repo.upload(const UploadRequest(file: _memo));
       now = now.add(const Duration(seconds: 5));
 
-      expect((await repo.get(7))!.item.speakerCount, 2);
+      expect((await repo.get('7'))!.item.speakerCount, 2);
     });
 
     test(
