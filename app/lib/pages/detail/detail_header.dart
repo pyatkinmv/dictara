@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/transcription_detail.dart';
+import '../../services/text_saver.dart';
 import '../../state/transcription_detail_controller.dart';
 import '../../theme/app_palette.dart';
 import '../../util/format.dart';
@@ -59,12 +62,21 @@ class DetailHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 16),
-              // The formats are not defined in the design yet, so these do nothing.
-              const Row(
+              Row(
                 children: [
-                  _HeaderButton(icon: Icons.download_rounded, label: '.txt'),
-                  SizedBox(width: 7),
-                  _HeaderButton(icon: Icons.content_copy_rounded, label: 'Copy'),
+                  _HeaderButton(
+                    icon: Icons.download_rounded,
+                    label: '.txt',
+                    doneLabel: 'Saved',
+                    onTap: () => _download(context),
+                  ),
+                  const SizedBox(width: 7),
+                  _HeaderButton(
+                    icon: Icons.content_copy_rounded,
+                    label: 'Copy',
+                    doneLabel: 'Copied',
+                    onTap: () => _copy(context),
+                  ),
                 ],
               ),
             ],
@@ -72,6 +84,22 @@ class DetailHeader extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// The transcript as a `.txt` file named after the title.
+  static Future<void> _download(BuildContext context) async {
+    final controller = context.read<TranscriptionDetailController>();
+    final saver = context.read<TextSaver>();
+    final title = controller.current?.item.title ?? '';
+    final text = await controller.transcriptText();
+    if (text == null) throw StateError('There is no transcript');
+    await saver.save(transcriptFileName(title), text);
+  }
+
+  static Future<void> _copy(BuildContext context) async {
+    final text = await context.read<TranscriptionDetailController>().transcriptText();
+    if (text == null) throw StateError('There is no transcript');
+    await Clipboard.setData(ClipboardData(text: text));
   }
 }
 
@@ -374,12 +402,19 @@ class _MetaRow extends StatelessWidget {
   }
 }
 
-/// Outlined action button of the header (`.d-btn`).
+/// Outlined action button of the header (`.d-btn`). While its action runs the label stays; after it, the
+/// label says for a moment how it went ("Copied", "Failed").
 class _HeaderButton extends StatefulWidget {
-  const _HeaderButton({required this.icon, required this.label});
+  const _HeaderButton({required this.icon, required this.label, required this.doneLabel, required this.onTap});
 
   final IconData icon;
   final String label;
+
+  /// Shown for a moment after the action succeeded.
+  final String doneLabel;
+
+  /// Does the action; throws when it failed.
+  final Future<void> Function() onTap;
 
   @override
   State<_HeaderButton> createState() => _HeaderButtonState();
@@ -387,32 +422,65 @@ class _HeaderButton extends StatefulWidget {
 
 class _HeaderButtonState extends State<_HeaderButton> {
   bool _hover = false;
+  bool _busy = false;
+  String? _feedback;
+  Timer? _reset;
+
+  @override
+  void dispose() {
+    _reset?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _run() async {
+    if (_busy) return;
+    _busy = true;
+    String feedback;
+    try {
+      await widget.onTap();
+      feedback = widget.doneLabel;
+    } on Object {
+      feedback = 'Failed';
+    }
+    _busy = false;
+    if (!mounted) return;
+    setState(() => _feedback = feedback);
+    _reset?.cancel();
+    _reset = Timer(const Duration(milliseconds: 1600), () {
+      if (mounted) setState(() => _feedback = null);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final color = _hover ? p.accent : p.text2;
     return MouseRegion(
+      cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-        decoration: BoxDecoration(
-          color: _hover ? p.accentLight : p.surface,
-          borderRadius: BorderRadius.circular(9),
-          border: Border.all(color: _hover ? p.accent : p.border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(widget.icon, size: 15, color: color),
-            const SizedBox(width: 5),
-            Text(
-              widget.label,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: color),
-            ),
-          ],
+      child: GestureDetector(
+        onTap: _run,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+          decoration: BoxDecoration(
+            color: _hover ? p.accentLight : p.surface,
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(color: _hover ? p.accent : p.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(widget.icon, size: 15, color: color),
+              const SizedBox(width: 5),
+              Text(
+                _feedback ?? widget.label,
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: color),
+              ),
+            ],
+          ),
         ),
       ),
     );

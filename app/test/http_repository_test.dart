@@ -271,14 +271,134 @@ void main() {
     });
   });
 
+  group('detail', () {
+    const detailJson = <String, dynamic>{
+      'job_id': '3f1c2f0e-0000-4000-8000-000000000003',
+      'file_name': 'review.m4a',
+      'title': 'Quarterly Review',
+      'file_size_bytes': 13800000,
+      'created_at': '2026-09-20T16:36:21.609254Z',
+      'status': 'done',
+      'audio_duration_s': 862.5,
+      'language': 'en',
+      'word_count': 1840,
+      'tags': ['meeting'],
+      'summary': '**Key points**\n* one',
+      'segments': [
+        {'start': 0.0, 'end': 30.5, 'text': 'Good morning.', 'speaker': 'SPEAKER_00'},
+        {'start': 34.0, 'end': 70.0, 'text': 'Right.', 'speaker': 'SPEAKER_01'},
+        {'start': 72.0, 'end': 80.0, 'text': 'Yes.', 'speaker': 'SPEAKER_00'},
+      ],
+    };
+
+    test('is read from GET /transcriptions/{id}', () async {
+      final requests = <Uri>[];
+      final repo = _repo(MockClient((request) async {
+        requests.add(request.url);
+        return _json(detailJson);
+      }));
+
+      final detail = (await repo.get('3f1c2f0e-0000-4000-8000-000000000003'))!;
+
+      expect(requests.single.path, '/api/transcriptions/3f1c2f0e-0000-4000-8000-000000000003');
+      expect(detail.item.title, 'Quarterly Review');
+      expect(detail.item.duration, const Duration(milliseconds: 862500));
+      expect(detail.item.tags.map((t) => t.label), ['meeting']);
+      expect(detail.originalFilename, 'review.m4a');
+      expect(detail.fileSizeBytes, 13800000);
+      expect(detail.language, 'EN');
+      expect(detail.wordCount, 1840);
+      expect(detail.summary, '**Key points**\n* one');
+      expect(detail.segments.map((s) => (s.start, s.speakerSlot, s.text)), [
+        (Duration.zero, 1, 'Good morning.'),
+        (const Duration(seconds: 34), 2, 'Right.'),
+        (const Duration(seconds: 72), 1, 'Yes.'),
+      ]);
+      expect(detail.item.speakerCount, 2);
+    });
+
+    test('without diarization the segments have no speaker and there are no speakers', () async {
+      final json = {
+        ...detailJson,
+        'summary': null,
+        'segments': [
+          {'start': 0.0, 'end': 1.0, 'text': 'Hello'},
+        ],
+      }..remove('language');
+      final detail = (await _repo(MockClient((_) async => _json(json))).get('x'))!;
+
+      expect(detail.segments.single.speakerSlot, isNull);
+      expect(detail.speakerOfSegment(0), isNull);
+      expect(detail.item.speakerCount, 0);
+      expect(detail.summary, isNull);
+      expect(detail.language, isNull);
+      expect(detail.runs.single.speaker, isNull);
+    });
+
+    test('a transcription that does not exist, or is not done yet, is null', () async {
+      expect(await _repo(MockClient((_) async => _json({'message': 'nope'}, status: 404))).get('x'), isNull);
+      expect(await _repo(MockClient((_) async => _json({...detailJson, 'status': 'processing'}))).get('x'), isNull);
+    });
+
+    test('other errors are not hidden', () async {
+      await expectLater(
+        _repo(MockClient((_) async => _json({'message': 'boom'}, status: 500))).get('x'),
+        throwsA(isA<GatewayException>().having((e) => e.statusCode, 'statusCode', 500)),
+      );
+    });
+
+    test('rename is a PATCH of the title', () async {
+      late http.Request seen;
+      final repo = _repo(MockClient((request) async {
+        seen = request;
+        return http.Response('', 204);
+      }));
+
+      await repo.rename('abc', 'New name');
+
+      expect(seen.method, 'PATCH');
+      expect(seen.url.path, '/api/jobs/abc/title');
+      expect(jsonDecode(seen.body), {'title': 'New name'});
+      expect(seen.headers['Content-Type'], startsWith('application/json'));
+    });
+
+    test('a rejected rename says why', () async {
+      final repo = _repo(MockClient((_) async => _json({'message': 'Title must be at most 200 characters'}, status: 400)));
+
+      await expectLater(
+        repo.rename('abc', 'x'),
+        throwsA(isA<GatewayException>().having((e) => e.message, 'message', contains('at most 200'))),
+      );
+    });
+
+    test('the transcript text is read from GET /transcript, as UTF-8', () async {
+      late Uri seen;
+      final repo = _repo(MockClient((request) async {
+        seen = request.url;
+        // No charset: the http package would decode this as Latin-1 on its own.
+        return http.Response.bytes(utf8.encode('[00:00:00.000 --> 00:00:01.000] Привет — hello'), 200,
+            headers: {'content-type': 'text/plain'});
+      }));
+
+      expect(await repo.transcriptText('abc'), '[00:00:00.000 --> 00:00:01.000] Привет — hello');
+      expect(seen.path, '/api/transcript');
+      expect(seen.queryParameters, {'jobId': 'abc'});
+    });
+
+    test('no transcript text is null', () async {
+      expect(await _repo(MockClient((_) async => http.Response('', 404))).transcriptText('abc'), isNull);
+    });
+
+    test('the speaker library is empty until it is connected', () async {
+      expect(await _repo(MockClient((_) async => _json([]))).speakers(), isEmpty);
+    });
+  });
+
   group('not connected yet', () {
     final repo = _repo(MockClient((request) async => _json([])));
 
     test('other calls say which iteration connects them', () async {
-      await expectLater(
-        repo.get('1'),
-        throwsA(isA<NotIntegratedException>().having((e) => e.iteration, 'iteration', 3)),
-      );
+      await expectLater(repo.addTag('1', 'x'), throwsA(isA<NotIntegratedException>().having((e) => e.iteration, 'iteration', 4)));
       await expectLater(repo.tagLibrary(), throwsA(isA<NotIntegratedException>().having((e) => e.iteration, 'iteration', 4)));
       await expectLater(repo.speakerLibrary(), throwsA(isA<NotIntegratedException>().having((e) => e.iteration, 'iteration', 5)));
       await expectLater(
@@ -290,8 +410,8 @@ void main() {
 
     test('the message names what is missing', () {
       expect(
-        const NotIntegratedException('Renaming', 3).toString(),
-        'Renaming is not connected to the gateway yet (integration iteration 3)',
+        const NotIntegratedException('Uploading', 7).toString(),
+        'Uploading is not connected to the gateway yet (integration iteration 7)',
       );
     });
   });

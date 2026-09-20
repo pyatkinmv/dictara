@@ -55,7 +55,9 @@ class _RunBlockState extends State<_RunBlock> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final run = widget.run;
-    final color = run.speaker.color;
+    final speaker = run.speaker;
+    // Without diarization there is nobody to name: a neutral rule and no header.
+    final color = speaker?.color ?? p.border;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -65,21 +67,23 @@ class _RunBlockState extends State<_RunBlock> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Popover(
-              // The picker is tall; flip it above the header near the bottom of
-              // the window, and draw it over everything like the design does.
-              estimatedSize: const Size(280, 320),
-              useRootOverlay: true,
-              targetBuilder: (context, open, toggle) => _RunHeader(speaker: run.speaker, onTap: toggle),
-              panelBuilder: (context, close) => SpeakerPicker(
-                detail: widget.detail,
-                run: run,
-                library: widget.library,
-                onPick: widget.onAssign,
-                onClose: close,
+            if (speaker != null) ...[
+              Popover(
+                // The picker is tall; flip it above the header near the bottom of
+                // the window, and draw it over everything like the design does.
+                estimatedSize: const Size(280, 320),
+                useRootOverlay: true,
+                targetBuilder: (context, open, toggle) => _RunHeader(speaker: speaker, onTap: toggle),
+                panelBuilder: (context, close) => SpeakerPicker(
+                  detail: widget.detail,
+                  run: run,
+                  library: widget.library,
+                  onPick: widget.onAssign,
+                  onClose: close,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
+              const SizedBox(height: 4),
+            ],
             for (var i = 0; i < run.segments.length; i++) ...[
               if (i > 0) const SizedBox(height: 2),
               Row(

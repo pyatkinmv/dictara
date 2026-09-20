@@ -53,6 +53,26 @@ class SubmissionService(
     /** A page of [SubmissionSummary]; [hasNext] tells whether another page follows. */
     data class SubmissionPage(val items: List<SubmissionSummary>, val hasNext: Boolean)
 
+    data class DetailSegment(val start: Double, val end: Double, val text: String, val speaker: String?)
+
+    /** Everything the detail page of one transcription shows (`GET /transcriptions/{id}`). */
+    data class TranscriptionDetail(
+        val jobId: UUID,
+        val fileName: String,
+        val title: String,
+        val fileSizeBytes: Long,
+        val createdAt: String,
+        val status: String,
+        val audioDurationS: Double?,
+        val language: String?,
+        val wordCount: Int,
+        val tags: List<String>,
+        /** The summary as the summarizer wrote it (Markdown), or null when there is none. */
+        val summary: String?,
+        /** Empty until the transcript exists; a segment's speaker is null when the audio was not diarized. */
+        val segments: List<DetailSegment>,
+    )
+
     data class ExportData(
         val submissionId: UUID,
         val createdAt: Instant,
@@ -162,6 +182,37 @@ class SubmissionService(
                 processingPhase = phase,
             )
         }
+    }
+
+    /** One transcription of [userId] with its text, or null when there is none with this id (also someone else's). */
+    @Transactional(readOnly = true)
+    fun getDetail(userId: UUID, submissionId: UUID): TranscriptionDetail? {
+        val submission = submissionRepo.findById(submissionId).orElse(null)?.takeIf { it.userId == userId } ?: return null
+        val audio = audioMetaRepo.findById(submission.audioId).orElse(null)
+        val transcript = transcriptRepo.findBySubmissionId(submissionId)
+        val segments = transcript?.segments?.map { seg ->
+            DetailSegment(
+                start = seg["start"].asDouble(),
+                end = seg["end"].asDouble(),
+                text = seg["text"].asText(),
+                speaker = seg["speaker"]?.takeIf { !it.isNull }?.asText(),
+            )
+        } ?: emptyList()
+        val fileName = audio?.originalName ?: "unknown"
+        return TranscriptionDetail(
+            jobId = submissionId,
+            fileName = fileName,
+            title = transcript?.title?.takeIf { it.isNotBlank() } ?: fileName,
+            fileSizeBytes = audio?.sizeBytes ?: 0,
+            createdAt = submission.createdAt.toString(),
+            status = submission.status,
+            audioDurationS = audio?.durationS,
+            language = transcript?.detectedLanguage,
+            wordCount = segments.sumOf { seg -> seg.text.split(Regex("\\s+")).count { it.isNotEmpty() } },
+            tags = transcript?.id?.let { tagRepository.findByTranscriptId(it).map { tag -> tag.name } } ?: emptyList(),
+            summary = summaryRepo.findBySubmissionId(submissionId)?.text?.takeIf { it.isNotBlank() },
+            segments = segments,
+        )
     }
 
     @Transactional(readOnly = true)

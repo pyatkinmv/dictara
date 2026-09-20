@@ -63,7 +63,7 @@ void main() {
 
       // Segment 0 → Bob: it merges with segment 1 (also Bob).
       final merged = _detail([1, 2, 1, 2], segmentSpeakers: const {0: _bob});
-      expect(merged.runs.map((r) => (r.speaker.name, r.firstIndex, r.segments.length)),
+      expect(merged.runs.map((r) => (r.speaker?.name, r.firstIndex, r.segments.length)),
           [('Bob', 0, 2), ('Ann', 2, 1), ('Bob', 3, 1)]);
     });
 

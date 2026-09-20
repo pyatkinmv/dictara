@@ -8,6 +8,7 @@ import '../models/tag_entry.dart';
 import '../models/transcription.dart';
 import '../models/transcription_detail.dart';
 import '../models/upload.dart';
+import '../util/format.dart';
 import 'transcription_repository.dart';
 
 // Mock data copied from `designs/1.9/cards-teal.html`.
@@ -91,22 +92,19 @@ const _transcript = <Segment>[
   ),
 ];
 
-const _summary = Summary(
-  text: 'Q2 closed strong: revenue up 18% QoQ, 12 features shipped vs. 9 planned. Heading into Q3, '
-      'the team will hire 4 engineers, reserve 20% of capacity for a payments refactor, and pivot '
-      'marketing to content-driven channels with a monthly webinar series launching in August.',
-  keyPoints: [
-    'Revenue up 18% QoQ — enterprise growth and May integrations as primary drivers',
-    '12 features shipped vs. 9 planned; technical debt in payments module flagged for Q3',
-    '4 engineers to be hired by September for parallel development tracks',
-    'Marketing pivoting to SEO content, case studies, and monthly webinars from August',
-  ],
-  actionItems: [
-    'Reserve 20% engineering capacity in July for payments refactor',
-    'Begin recruitment for 4 engineering roles — target: September',
-    'Sales team to co-present webinar series starting August',
-  ],
-);
+/// The summary as the summarizer writes it: Markdown, with the key points and action items in it.
+const _summary = '''Q2 closed strong: revenue up 18% QoQ, 12 features shipped vs. 9 planned. Heading into Q3, the team will hire 4 engineers, reserve 20% of capacity for a payments refactor, and pivot marketing to content-driven channels with a monthly webinar series launching in August.
+
+**Key points**
+* Revenue up 18% QoQ — enterprise growth and May integrations as primary drivers
+* 12 features shipped vs. 9 planned; technical debt in payments module flagged for Q3
+* 4 engineers to be hired by September for parallel development tracks
+* Marketing pivoting to SEO content, case studies, and monthly webinars from August
+
+**Action items**
+* Reserve 20% engineering capacity in July for payments refactor
+* Begin recruitment for 4 engineering roles — target: September
+* Sales team to co-present webinar series starting August''';
 
 /// Slots 1-3 mapped to people, for every item except the one that carries AI
 /// suggestions in the design (id 6); its slots stay "Speaker N" until the
@@ -370,6 +368,16 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
       language: 'EN',
       wordCount: 1840,
     );
+  }
+
+  @override
+  Future<String?> transcriptText(String id) async {
+    final detail = await get(id);
+    if (detail == null) return null;
+    return [
+      for (var i = 0; i < detail.segments.length; i++)
+        '[${formatTimestamp(detail.segments[i].start)}] ${detail.speakerOfSegment(i)?.name ?? ''}: ${detail.segments[i].text}',
+    ].join('\n');
   }
 
   @override

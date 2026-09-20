@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dictara_web/models/upload.dart';
 import 'package:dictara_web/services/file_chooser.dart';
+import 'package:dictara_web/services/text_saver.dart';
 
 /// Loads the bundled Inter font. Without it tests render text with a wide
 /// placeholder font, which produces false overflow errors.
@@ -39,4 +40,29 @@ class FakeFileChooser implements FileChooser {
     calls++;
     return next;
   }
+}
+
+/// Remembers what would have been downloaded, without a browser.
+class FakeTextSaver implements TextSaver {
+  final List<({String fileName, String text})> saved = [];
+
+  /// Set to make saving fail.
+  Object? error;
+
+  @override
+  Future<void> save(String fileName, String text) async {
+    if (error != null) throw error!;
+    saved.add((fileName: fileName, text: text));
+  }
+}
+
+/// Catches what the app puts on the clipboard, without a platform. Call before the app is shown.
+List<String> captureClipboard(WidgetTester tester) {
+  final copied = <String>[];
+  tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+    if (call.method == 'Clipboard.setData') copied.add((call.arguments as Map)['text'] as String);
+    return null;
+  });
+  addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+  return copied;
 }

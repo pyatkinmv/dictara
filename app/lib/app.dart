@@ -6,6 +6,7 @@ import 'data/fake_transcription_repository.dart';
 import 'data/transcription_repository.dart';
 import 'router.dart';
 import 'services/file_chooser.dart';
+import 'services/text_saver.dart';
 import 'state/speaker_library_controller.dart';
 import 'state/tag_library_controller.dart';
 import 'state/transcription_detail_controller.dart';
@@ -20,6 +21,7 @@ class DictaraApp extends StatefulWidget {
     this.initialLocation = '/transcriptions',
     this.repository,
     this.fileChooser = const BrowserFileChooser(),
+    this.textSaver = const BrowserTextSaver(),
     this.pollInterval,
   });
 
@@ -31,6 +33,9 @@ class DictaraApp extends StatefulWidget {
 
   /// How files are picked in the Upload dialog.
   final FileChooser fileChooser;
+
+  /// How the ".txt" button of the detail page hands the transcript over.
+  final TextSaver textSaver;
 
   /// How often the list refreshes while something is being transcribed; null = never.
   final Duration? pollInterval;
@@ -55,6 +60,7 @@ class _DictaraAppState extends State<DictaraApp> {
       providers: [
         Provider<TranscriptionRepository>.value(value: _repository),
         Provider<FileChooser>.value(value: widget.fileChooser),
+        Provider<TextSaver>.value(value: widget.textSaver),
         ChangeNotifierProvider(
           create: (context) => TranscriptionListController(
             context.read<TranscriptionRepository>(),

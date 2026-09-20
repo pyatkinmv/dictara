@@ -6,6 +6,7 @@ import '../../models/transcription_detail.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
+import '../../widgets/summary_markdown.dart';
 
 /// The Overview tab: the AI summary on the left, file facts on the right
 /// (`.ov-pane`).
@@ -37,24 +38,13 @@ class OverviewView extends StatelessWidget {
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({required this.summary});
 
-  final Summary? summary;
+  /// Markdown, as the summarizer wrote it; null when there is none.
+  final String? summary;
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final s = summary;
-    final sections = <Widget>[
-      if (s == null)
-        Text('No summary available.', style: TextStyle(fontSize: 13.5, color: p.text3))
-      else ...[
-        _Section(
-          label: 'Summary',
-          child: Text(s.text, style: TextStyle(fontSize: 13.5, height: 1.7, color: p.text2)),
-        ),
-        if (s.keyPoints.isNotEmpty) _Section(label: 'Key Points', child: _BulletList(items: s.keyPoints)),
-        if (s.actionItems.isNotEmpty) _Section(label: 'Action Items', child: _BulletList(items: s.actionItems)),
-      ],
-    ];
+    final text = summary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       decoration: BoxDecoration(
@@ -66,15 +56,10 @@ class _SummaryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            for (var i = 0; i < sections.length; i++) ...[
-              // `.summ-sec + .summ-sec`: 14 px gap and a rule above every section but the first.
-              if (i > 0)
-                Padding(
-                  padding: const EdgeInsets.only(top: 14, bottom: 14),
-                  child: SizedBox(height: 1, child: ColoredBox(color: p.border)),
-                ),
-              sections[i],
-            ],
+            if (text == null)
+              Text('No summary available.', style: TextStyle(fontSize: 13.5, color: p.text3))
+            else
+              _Section(label: 'Summary', child: SummaryMarkdown(data: text)),
           ],
         ),
       ),
@@ -100,38 +85,6 @@ class _Section extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         child,
-      ],
-    );
-  }
-}
-
-class _BulletList extends StatelessWidget {
-  const _BulletList({required this.items});
-
-  final List<String> items;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (var i = 0; i < items.length; i++) ...[
-          if (i > 0) const SizedBox(height: 7),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 7),
-                child: Container(width: 5, height: 5, decoration: BoxDecoration(color: p.accent, shape: BoxShape.circle)),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(items[i], style: TextStyle(fontSize: 13.5, height: 1.55, color: p.text2)),
-              ),
-            ],
-          ),
-        ],
       ],
     );
   }

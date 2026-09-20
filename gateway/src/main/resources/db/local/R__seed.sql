@@ -84,6 +84,57 @@ WHERE i.status = 'done'
 ON CONFLICT (id) DO UPDATE SET
     segments = EXCLUDED.segments, detected_language = EXCLUDED.detected_language, title = EXCLUDED.title;
 
+-- ── Summaries, as the summarizer writes them: Markdown text ──────────────────────────────────────────────
+-- Not for the voice memo (n = 4): it shows how the Overview looks without a summary. The interview (n = 2)
+-- uses "•" bullets instead of Markdown lists, which is another shape a model answers in.
+INSERT INTO summaries (id, submission_id, text, created_at)
+SELECT ('00000000-0000-4000-8000-0000000e00' || lpad(s.n::text, 2, '0'))::uuid,
+       ('00000000-0000-4000-8000-0000000b00' || lpad(s.n::text, 2, '0'))::uuid,
+       s.body, i.created_at + interval '3 minutes'
+FROM (VALUES
+    (0, $md$Q2 closed strong: revenue up 18% quarter over quarter, 12 features shipped versus 9 planned. Heading into Q3, the team will hire 4 engineers, reserve 20% of capacity for a payments refactor, and pivot marketing to content-driven channels with a monthly webinar series launching in August.
+
+**Key points**
+* Revenue up 18% QoQ — enterprise growth and the May integrations were the primary drivers.
+* 12 features shipped vs. 9 planned; technical debt in the payments module is flagged for Q3.
+* 4 engineers to be hired by September for parallel development tracks.
+* Marketing pivots to SEO content, case studies, and monthly webinars from August.
+
+**Action items**
+* Reserve 20% engineering capacity in July for the payments refactor.
+* Begin recruitment for 4 engineering roles — target: September.
+* Sales team to co-present the webinar series starting in August.$md$),
+    (2, $md$A conversation with Anna K. about her move from support into product, what she learned running the support queue, and what she would build first.
+
+• She spent three years in support before switching to product.
+• The most common request from users is still speaker names.
+• She would start with a simpler search before any AI features.
+
+Follow-ups
+• Send Anna the shortlist of open product roles.
+• Share the notes from the support-queue analysis.$md$),
+    (5, $md$A short standup: the payments refactor is on track, the webinar landing page needs copy, and one release is blocked on a review.
+
+**Blockers**
+* Release 2.4 is waiting for a code review.
+
+**Today**
+* Finish the payments refactor.
+* Write the copy for the webinar landing page.$md$),
+    (6, $md$The product sync went through the Q3 roadmap. Search and filters ship first, speaker names come next, and the mobile app moves to Q4.
+
+**Decisions**
+* Ship search and filters in July.
+* Speaker names are the next big feature.
+* Mobile app is postponed to Q4.
+
+**Open questions**
+* Who owns the export format?
+* Do we need a migration for existing transcripts?$md$)
+) AS s(n, body)
+JOIN seed_items i ON i.n = s.n
+ON CONFLICT (id) DO UPDATE SET text = EXCLUDED.text, created_at = EXCLUDED.created_at;
+
 -- ── Tags with the descriptions of the design's Tags page, and which transcriptions carry them ────────────
 -- created_at fixes the order the library lists them in (the design's order), which the default now() would not.
 INSERT INTO tags (id, user_id, name, description, created_at)

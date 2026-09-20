@@ -62,7 +62,7 @@ class _SpeakerPickerState extends State<SpeakerPicker> {
   void _pick(String name) {
     final segments = switch (_scope) {
       PickerScope.segment => {widget.run.firstIndex},
-      PickerScope.allBySpeaker => widget.detail.segmentsBySpeaker(widget.run.speaker.name),
+      PickerScope.allBySpeaker => widget.detail.segmentsBySpeaker(widget.run.speaker!.name),
     };
     widget.onPick(segments, name);
     widget.onClose();
@@ -129,7 +129,7 @@ class _SpeakerPickerState extends State<SpeakerPicker> {
               ),
               _ScopeChooser(
                 scope: _scope,
-                currentName: widget.run.speaker.name,
+                currentName: widget.run.speaker!.name,
                 onChanged: (scope) => setState(() => _scope = scope),
               ),
             ],

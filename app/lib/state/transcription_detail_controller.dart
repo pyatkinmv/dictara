@@ -63,6 +63,12 @@ class TranscriptionDetailController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The open transcription's transcript as plain text; null when there is none.
+  Future<String?> transcriptText() {
+    final current = _current;
+    return current == null ? Future.value() : _repository.transcriptText(current.item.id);
+  }
+
   /// Renames the open transcription. An empty title keeps the old one.
   Future<void> rename(String title) async {
     final current = _current;

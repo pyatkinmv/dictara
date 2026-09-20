@@ -42,7 +42,7 @@ void main() {
         speakers: const {1: _ann, 2: _bob},
       );
       final runs = detail.runs;
-      expect(runs.map((r) => r.speaker.name), ['Ann', 'Bob', 'Ann']);
+      expect(runs.map((r) => r.speaker?.name), ['Ann', 'Bob', 'Ann']);
       expect(runs.map((r) => r.segments.length), [2, 1, 1]);
     });
 
@@ -53,7 +53,7 @@ void main() {
 
     test('an unmapped slot is shown as "Speaker N"', () {
       final detail = _detail([_seg(3, 'a')]);
-      expect(detail.runs.single.speaker.name, 'Speaker 3');
+      expect(detail.runs.single.speaker?.name, 'Speaker 3');
     });
   });
 

@@ -47,3 +47,10 @@ String formatFileSize(int bytes) {
   if (bytes >= kb) return '${(bytes / kb).toStringAsFixed(1)} KB';
   return '$bytes B';
 }
+
+/// The name of the downloaded transcript: the title with what file systems do not allow replaced by a
+/// space, plus `.txt` ("Q2 review: notes/draft" -> "Q2 review notes draft.txt").
+String transcriptFileName(String title) {
+  final name = title.replaceAll(RegExp(r'[\/:*?"<>|\x00-\x1f]+'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+  return '${name.isEmpty ? 'transcript' : name}.txt';
+}

@@ -62,6 +62,10 @@ abstract class TranscriptionRepository {
   /// transcription or it is not done yet.
   Future<TranscriptionDetail?> get(String id);
 
+  /// The transcript as plain text, for the ".txt" and "Copy" buttons (`GET /transcript?jobId=`); null when
+  /// there is none.
+  Future<String?> transcriptText(String id);
+
   /// Sends a file for transcription (`POST /transcriptions`) and returns the new
   /// item, which starts out `pending`. The server settings of the dialog
   /// (language, summary, speakers) travel with it.

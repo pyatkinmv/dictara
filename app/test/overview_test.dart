@@ -49,16 +49,18 @@ void main() {
       await settle(tester);
     }
 
-    testWidgets('shows the summary, key points and action items', (tester) async {
+    testWidgets('shows the summary as rendered Markdown', (tester) async {
       await openOverview(tester);
 
-      for (final label in ['SUMMARY', 'KEY POINTS', 'ACTION ITEMS']) {
-        expect(find.text(label), findsOneWidget);
-      }
+      expect(find.text('SUMMARY'), findsOneWidget);
       expect(find.textContaining('Q2 closed strong'), findsOneWidget);
+      // The bold headings and the bullets are drawn, not shown as `**...**` and `* ...`.
+      expect(find.text('Key points'), findsOneWidget);
+      expect(find.text('Action items'), findsOneWidget);
       expect(find.textContaining('Revenue up 18% QoQ'), findsOneWidget);
-      expect(find.textContaining('Reserve 20% engineering capacity'), findsOneWidget);
       expect(find.textContaining('Sales team to co-present'), findsOneWidget);
+      expect(find.textContaining('**'), findsNothing);
+      expect(find.text('•'), findsNWidgets(7));
     });
 
     testWidgets('shows the details panel', (tester) async {

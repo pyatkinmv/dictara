@@ -24,9 +24,9 @@ class NotIntegratedException implements Exception {
 
 /// The real data source: the gateway over HTTP.
 ///
-/// Being connected screen by screen (`docs/local-backend-integration.md`): so far only the transcription
-/// list and the tag names work. The gateway pages, searches, filters and sorts the list itself. Everything
-/// else throws [NotIntegratedException].
+/// Being connected screen by screen (`docs/local-backend-integration.md`): so far the transcription list,
+/// the tag names and the detail page (text, summary, rename, download) work. Everything else throws
+/// [NotIntegratedException].
 class HttpTranscriptionRepository implements TranscriptionRepository {
   HttpTranscriptionRepository(this._client);
 
@@ -75,11 +75,35 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
     ];
   }
 
+  /// `GET /transcriptions/{id}`. The gateway answers 404 for an id that does not exist or is not the user's;
+  /// a transcription that is not done yet has no transcript to show, which the detail page treats the same.
   @override
-  Future<TranscriptionDetail?> get(String id) => _notYet('Opening a transcription', 3);
+  Future<TranscriptionDetail?> get(String id) async {
+    final Object? body;
+    try {
+      body = await _client.getJson('/transcriptions/${Uri.encodeComponent(id)}');
+    } on GatewayException catch (e) {
+      if (e.statusCode == 404) return null;
+      rethrow;
+    }
+    if (body is! Map<String, dynamic>) throw const GatewayException('Expected a transcription');
+    final detail = _detailFromJson(body);
+    return detail.item.status == TranscriptionStatus.done ? detail : null;
+  }
 
   @override
-  Future<void> rename(String id, String title) => _notYet('Renaming', 3);
+  Future<String?> transcriptText(String id) async {
+    try {
+      return await _client.getText('/transcript?jobId=${Uri.encodeQueryComponent(id)}');
+    } on GatewayException catch (e) {
+      if (e.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> rename(String id, String title) =>
+      _client.patchJson('/jobs/${Uri.encodeComponent(id)}/title', {'title': title});
 
   @override
   Future<Transcription> upload(UploadRequest request) => _notYet('Uploading', 7);
@@ -103,8 +127,10 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
   @override
   Future<int> deleteTag(String label) => _notYet('Deleting a tag', 4);
 
+  /// The detail page asks for the library to offer it in the Speaker Picker; until it is connected there is
+  /// none (the gateway has no speaker names yet), so the picker offers nothing.
   @override
-  Future<List<Speaker>> speakers() => _notYet('The speaker library', 5);
+  Future<List<Speaker>> speakers() async => const [];
 
   @override
   Future<List<SpeakerEntry>> speakerLibrary() => _notYet('The speaker library', 5);
@@ -162,6 +188,47 @@ Transcription _transcriptionFromJson(Map<String, dynamic> json) {
         if (label is String && label.isNotEmpty) Tag(label, colorForLabel(label)),
     ],
   );
+}
+
+/// The gateway's `GET /transcriptions/{id}`. Fields that are not known are left out of the JSON.
+TranscriptionDetail _detailFromJson(Map<String, dynamic> json) {
+  final segments = [
+    for (final s in (json['segments'] as List<dynamic>? ?? const []))
+      Segment(
+        start: _secondsFromJson((s as Map<String, dynamic>)['start']) ?? Duration.zero,
+        speakerSlot: _slotFromLabel(s['speaker'] as String?),
+        text: s['text'] as String? ?? '',
+      ),
+  ];
+  final fileName = json['file_name'] as String;
+  final title = (json['title'] as String?)?.trim();
+  return TranscriptionDetail(
+    item: Transcription(
+      id: json['job_id'] as String,
+      title: title == null || title.isEmpty ? fileName : title,
+      uploadedAt: DateTime.parse(json['created_at'] as String).toLocal(),
+      status: _statusFromJson(json['status'] as String?),
+      duration: _secondsFromJson(json['audio_duration_s']),
+      speakerCount: {for (final s in segments) if (s.speakerSlot != null) s.speakerSlot}.length,
+      tags: [
+        for (final label in (json['tags'] as List<dynamic>? ?? const []))
+          if (label is String && label.isNotEmpty) Tag(label, colorForLabel(label)),
+      ],
+    ),
+    segments: segments,
+    summary: json['summary'] as String?,
+    originalFilename: fileName,
+    fileSizeBytes: (json['file_size_bytes'] as num?)?.toInt() ?? 0,
+    language: (json['language'] as String?)?.toUpperCase(),
+    wordCount: (json['word_count'] as num?)?.toInt(),
+  );
+}
+
+/// The diarizer names its voices `SPEAKER_00`, `SPEAKER_01`, ...; the page counts slots from 1.
+/// Null for a segment without a speaker (no diarization) or with a label of another shape.
+int? _slotFromLabel(String? label) {
+  final digits = label == null ? null : RegExp(r'(\d+)$').firstMatch(label)?.group(1);
+  return digits == null ? null : int.parse(digits) + 1;
 }
 
 /// Seconds (a JSON number, possibly fractional) as a [Duration]; null when absent.

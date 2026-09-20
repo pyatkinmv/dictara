@@ -47,6 +47,9 @@ class TranscribeController(
         const val DEFAULT_PAGE_SIZE = 30
         const val MAX_PAGE_SIZE = 500
 
+        /** The length of `transcripts.title`. */
+        const val MAX_TITLE_LENGTH = 200
+
         private val IMAGE_SIGNATURES = listOf(
             byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte())          to "JPEG",
             byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47)                      to "PNG",
@@ -304,6 +307,21 @@ class TranscribeController(
         return TranscriptionPage(result.items.map(::summary), pageNumber, pageSize, result.hasNext)
     }
 
+    /**
+     * One transcription with everything the detail page shows: file facts, tags, the summary (Markdown or
+     * null) and the segments. 404 when it does not exist or belongs to someone else, so ids of other users
+     * cannot be probed. `GET /jobs/{id}` stays as it is for the old client.
+     */
+    @GetMapping("/transcriptions/{id}")
+    fun getTranscription(@PathVariable id: String, servletRequest: HttpServletRequest): SubmissionService.TranscriptionDetail {
+        val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
+            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
+        val submissionId = runCatching { UUID.fromString(id) }.getOrNull()
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Transcription not found")
+        return submissionService.getDetail(userId, submissionId)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Transcription not found")
+    }
+
     @GetMapping("/transcript")
     fun downloadTranscript(@RequestParam jobId: UUID): ResponseEntity<ByteArray> {
         val text = transcriptRepo.findBySubmissionId(jobId)
@@ -350,7 +368,11 @@ class TranscribeController(
         }
         val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
             ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
-        val title = body["title"]
+        val title = body["title"]?.trim()
+        // The column is VARCHAR(200): say so instead of failing in the database.
+        if (title != null && title.length > MAX_TITLE_LENGTH) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Title must be at most $MAX_TITLE_LENGTH characters")
+        }
         submissionService.updateTitle(id, userId, title)
     }
 

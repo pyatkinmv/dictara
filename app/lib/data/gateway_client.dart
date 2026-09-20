@@ -29,10 +29,25 @@ class GatewayClient {
   final Duration timeout;
 
   /// GET [path] (e.g. `/transcriptions`) and decode the JSON body.
-  Future<Object?> getJson(String path) async {
+  Future<Object?> getJson(String path) async => _decode(await _send(() => _http.get(Uri.parse('$baseUrl$path'))));
+
+  /// GET [path] and return the body as text (UTF-8, whatever the server says the charset is).
+  Future<String> getText(String path) async =>
+      utf8.decode((await _send(() => _http.get(Uri.parse('$baseUrl$path')))).bodyBytes);
+
+  /// PATCH [path] with [body] as JSON; the answer is not read (the gateway sends 204).
+  Future<void> patchJson(String path, Object body) async {
+    await _send(() => _http.patch(
+          Uri.parse('$baseUrl$path'),
+          headers: const {'Content-Type': 'application/json'},
+          body: jsonEncode(body),
+        ));
+  }
+
+  Future<http.Response> _send(Future<http.Response> Function() request) async {
     final http.Response response;
     try {
-      response = await _http.get(Uri.parse('$baseUrl$path')).timeout(timeout);
+      response = await request().timeout(timeout);
     } on Exception catch (e) {
       // No connection, a refused proxy target, a timeout: all "could not reach it".
       throw GatewayException('Could not reach the server: $e');
@@ -40,6 +55,10 @@ class GatewayClient {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw GatewayException(_errorMessage(response), statusCode: response.statusCode);
     }
+    return response;
+  }
+
+  static Object? _decode(http.Response response) {
     if (response.body.isEmpty) return null;
     try {
       return jsonDecode(utf8.decode(response.bodyBytes));
