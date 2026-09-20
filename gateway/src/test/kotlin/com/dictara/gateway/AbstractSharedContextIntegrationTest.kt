@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import java.util.UUID
 
 /**
  * Base class for integration tests that share [SharedTestInfrastructure] (one PostgreSQL container
@@ -20,6 +21,29 @@ abstract class AbstractSharedContextIntegrationTest {
     protected lateinit var jdbcTemplate: JdbcTemplate
 
     protected val wireMock get() = SharedTestInfrastructure.wireMock
+
+    /**
+     * Stores a transcript the way the gateway does: [segments] (a JSON array of `{start, end, text, speaker}`)
+     * both as the JSON cell and as one row per phrase. A null or non-array [segments] gives no phrases.
+     */
+    protected fun insertTranscript(transcriptId: UUID, submissionId: UUID, segments: String?, title: String? = null, detectedLanguage: String? = null) {
+        // TODO(drop-json-segments): once transcripts.segments is dropped, only the rows remain.
+        jdbcTemplate.update(
+            "INSERT INTO transcripts(id, submission_id, segments, title, detected_language) VALUES (?, ?, ?::jsonb, ?, ?)",
+            transcriptId, submissionId, segments, title, detectedLanguage,
+        )
+        jdbcTemplate.update(
+            """
+            INSERT INTO transcript_segments (transcript_id, idx, start_s, end_s, text, voice)
+            SELECT t.id, (e.ord - 1)::int, (e.val ->> 'start')::double precision, (e.val ->> 'end')::double precision,
+                   e.val ->> 'text', e.val ->> 'speaker'
+            FROM transcripts t, jsonb_array_elements(CASE WHEN jsonb_typeof(t.segments) = 'array' THEN t.segments ELSE '[]'::jsonb END)
+                     WITH ORDINALITY AS e(val, ord)
+            WHERE t.id = ?
+            """.trimIndent(),
+            transcriptId,
+        )
+    }
 
     companion object {
         @DynamicPropertySource

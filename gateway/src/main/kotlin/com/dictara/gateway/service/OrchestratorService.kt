@@ -9,9 +9,6 @@ import com.dictara.gateway.model.SummaryMode
 import com.dictara.gateway.port.SummarizerPort
 import com.dictara.gateway.repository.AudioMetaRepository
 import com.dictara.gateway.util.TranscriptFormatter
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -33,7 +30,6 @@ class OrchestratorService(
     // Single-threaded: serializes all dispatch decisions so only one claim runs at a time
     private val dispatchExecutor = Executors.newSingleThreadExecutor()
     private val liveProgress = ConcurrentHashMap<UUID, ProgressInfo>()
-    private val mapper = ObjectMapper().registerKotlinModule()
 
     /** Called by controller after creating a pending submission. */
     fun signalPending() {
@@ -109,14 +105,13 @@ class OrchestratorService(
             log.info("Submission $submissionId submitted to transcriber (externalJobId=$transcriberJobId)")
 
             val snapshot = pollTranscriber(submissionId, transcriberJobId)
-            val segmentsNode = mapper.valueToTree<JsonNode>(snapshot.segments ?: emptyList<Any>())
             val formattedText = TranscriptFormatter.format(snapshot.segments ?: emptyList())
 
             stateService.saveTranscriptAndCompleteAttempt(
                 submissionId = submissionId,
                 audioId = submission.audioId,
                 attemptId = attempt.id!!,
-                segments = segmentsNode,
+                segments = snapshot.segments ?: emptyList(),
                 audioDurationS = snapshot.audioDurationS,
                 detectedLanguage = snapshot.detectedLanguage,
             )
@@ -151,7 +146,6 @@ class OrchestratorService(
         val submissionId = attempt.submissionId
         try {
             val snapshot = pollTranscriber(submissionId, attempt.externalJobId!!)
-            val segmentsNode = mapper.valueToTree<JsonNode>(snapshot.segments ?: emptyList<Any>())
             val formattedText = TranscriptFormatter.format(snapshot.segments ?: emptyList())
             val freshSubmission = stateService.loadSubmission(submissionId)
 
@@ -159,7 +153,7 @@ class OrchestratorService(
                 submissionId = submissionId,
                 audioId = freshSubmission.audioId,
                 attemptId = attempt.id!!,
-                segments = segmentsNode,
+                segments = snapshot.segments ?: emptyList(),
                 audioDurationS = snapshot.audioDurationS,
                 detectedLanguage = snapshot.detectedLanguage,
             )

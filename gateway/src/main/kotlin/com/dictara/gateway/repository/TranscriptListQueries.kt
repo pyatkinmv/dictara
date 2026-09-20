@@ -21,9 +21,7 @@ class TranscriptListQueries(private val jdbc: NamedParameterJdbcTemplate) {
             SELECT t.submission_id,
                    t.id,
                    t.title,
-                   CASE WHEN jsonb_typeof(t.segments) = 'array'
-                        THEN (SELECT count(DISTINCT e ->> 'speaker') FROM jsonb_array_elements(t.segments) e)
-                        ELSE 0 END AS speaker_count
+                   (SELECT count(DISTINCT s.voice) FROM transcript_segments s WHERE s.transcript_id = t.id) AS speaker_count
             FROM transcripts t
             WHERE t.submission_id IN (:ids)
             """.trimIndent(),

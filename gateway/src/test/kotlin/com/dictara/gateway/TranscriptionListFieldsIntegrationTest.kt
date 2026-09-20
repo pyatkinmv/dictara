@@ -63,7 +63,7 @@ class TranscriptionListFieldsIntegrationTest : AbstractSharedContextIntegrationT
             id, userId, audioId, status, createdAt,
         )
         if (transcript) {
-            jdbcTemplate.update("INSERT INTO transcripts(id, submission_id, segments) VALUES (?, ?, ?::jsonb)", UUID.randomUUID(), id, segments)
+            insertTranscript(UUID.randomUUID(), id, segments)
         }
         return id
     }

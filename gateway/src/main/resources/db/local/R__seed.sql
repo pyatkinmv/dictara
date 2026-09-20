@@ -84,6 +84,22 @@ WHERE i.status = 'done'
 ON CONFLICT (id) DO UPDATE SET
     segments = EXCLUDED.segments, detected_language = EXCLUDED.detected_language, title = EXCLUDED.title;
 
+-- The same phrases as rows: this is what the gateway reads (transcript_segments, one row per phrase).
+-- The JSON cell above is kept only because the gateway still writes it too.
+-- TODO(drop-json-segments): when transcripts.segments is dropped, insert the phrases here directly.
+DELETE FROM transcript_segments s
+USING seed_items i
+WHERE s.transcript_id = ('00000000-0000-4000-8000-0000000c00' || lpad(i.n::text, 2, '0'))::uuid;
+
+INSERT INTO transcript_segments (transcript_id, idx, start_s, end_s, text, voice)
+SELECT t.id, (e.ord - 1)::int, (e.val ->> 'start')::double precision, (e.val ->> 'end')::double precision,
+       e.val ->> 'text', e.val ->> 'speaker'
+FROM seed_items i
+JOIN transcripts t ON t.id = ('00000000-0000-4000-8000-0000000c00' || lpad(i.n::text, 2, '0'))::uuid
+CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(t.segments) = 'array' THEN t.segments ELSE '[]'::jsonb END)
+     WITH ORDINALITY AS e(val, ord)
+WHERE i.status = 'done';
+
 -- ── Summaries, as the summarizer writes them: Markdown text ──────────────────────────────────────────────
 -- Not for the voice memo (n = 4): it shows how the Overview looks without a summary. The interview (n = 2)
 -- uses "•" bullets instead of Markdown lists, which is another shape a model answers in.

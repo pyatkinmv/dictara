@@ -37,6 +37,7 @@ class TranscribeController(
     private val stageAttemptRepo: StageAttemptRepository,
     private val tagRepo: TagRepository,
     private val telegramDeliveryRepo: TelegramDeliveryRepository,
+    private val segmentQueries: TranscriptSegmentQueries,
     private val audioStorage: AudioStorage,
 ) {
     companion object {
@@ -176,8 +177,8 @@ class TranscribeController(
         val summary = summaryRepo.findBySubmissionId(id)
         val liveProgress = orchestrator.getLiveProgress(id)
 
-        val segmentsNode = transcript?.segments
-        val formattedText = TranscriptFormatter.format(segmentsNode)
+        val phrases = transcript?.id?.let { segmentQueries.findByTranscriptId(it) }
+        val formattedText = TranscriptFormatter.format(phrases ?: emptyList())
 
         val transcriptionAttempts = stageAttemptRepo.findBySubmissionIdAndStageOrderByAttemptNumDesc(id, "transcription")
         val latestFailedAttempt = transcriptionAttempts.firstOrNull { it.status == "failed" }
@@ -191,13 +192,8 @@ class TranscribeController(
             (Instant.now().toEpochMilli() - latestAttempt.startedAt!!.toEpochMilli()) / 1000.0
         } else null
 
-        val segments = segmentsNode?.map { seg ->
-            SegmentResponse(
-                start = seg["start"].asDouble(),
-                end = seg["end"].asDouble(),
-                text = seg["text"].asText(),
-                speaker = seg["speaker"]?.takeIf { !it.isNull }?.asText(),
-            )
+        val segments = phrases?.map { seg ->
+            SegmentResponse(start = seg.start, end = seg.end, text = seg.text, speaker = seg.speaker)
         }
 
         val tags = transcript?.let { tagRepo.findByTranscriptId(it.id!!) }?.map { it.name } ?: emptyList()
@@ -327,7 +323,7 @@ class TranscribeController(
     @GetMapping("/transcript")
     fun downloadTranscript(@RequestParam jobId: UUID): ResponseEntity<ByteArray> {
         val text = transcriptRepo.findBySubmissionId(jobId)
-            ?.let { TranscriptFormatter.format(it.segments) }
+            ?.let { TranscriptFormatter.format(segmentQueries.findByTranscriptId(it.id!!)) }
             ?.takeIf { it.isNotEmpty() }
             ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok()

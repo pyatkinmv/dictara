@@ -56,10 +56,7 @@ class TranscriptionDetailIntegrationTest : AbstractSharedContextIntegrationTest(
             id, owner, audioId, status,
         )
         if (segments != null) {
-            jdbcTemplate.update(
-                "INSERT INTO transcripts(id, submission_id, segments, detected_language, title) VALUES (?, ?, ?::jsonb, ?, ?)",
-                UUID.randomUUID(), id, segments, language, title,
-            )
+            insertTranscript(UUID.randomUUID(), id, segments, title = title, detectedLanguage = language)
         }
         if (summary != null) jdbcTemplate.update("INSERT INTO summaries(submission_id, text) VALUES (?, ?)", id, summary)
         return id

@@ -30,6 +30,7 @@ class SubmissionService(
     private val planService: PlanService,
     private val transcriptListQueries: TranscriptListQueries,
     private val submissionListQuery: SubmissionListQuery,
+    private val segmentQueries: TranscriptSegmentQueries,
 ) {
     data class CreateResult(val submissionId: UUID, val dedup: Boolean)
 
@@ -191,14 +192,9 @@ class SubmissionService(
         val submission = submissionRepo.findById(submissionId).orElse(null)?.takeIf { it.userId == userId } ?: return null
         val audio = audioMetaRepo.findById(submission.audioId).orElse(null)
         val transcript = transcriptRepo.findBySubmissionId(submissionId)
-        val segments = transcript?.segments?.map { seg ->
-            DetailSegment(
-                start = seg["start"].asDouble(),
-                end = seg["end"].asDouble(),
-                text = seg["text"].asText(),
-                speaker = seg["speaker"]?.takeIf { !it.isNull }?.asText(),
-            )
-        } ?: emptyList()
+        val segments = transcript?.id?.let { segmentQueries.findByTranscriptId(it) }
+            ?.map { DetailSegment(start = it.start, end = it.end, text = it.text, speaker = it.speaker) }
+            ?: emptyList()
         val fileName = audio?.originalName ?: "unknown"
         return TranscriptionDetail(
             jobId = submissionId,
@@ -227,7 +223,7 @@ class SubmissionService(
                 submissionId = id,
                 createdAt = s.createdAt,
                 transcriptText = transcriptRepo.findBySubmissionId(id)
-                    ?.let { TranscriptFormatter.format(it.segments) },
+                    ?.let { TranscriptFormatter.format(segmentQueries.findByTranscriptId(it.id!!)) },
                 summaryText = summaryRepo.findBySubmissionId(id)?.text,
                 originalName = audio?.originalName,
                 storageUri = audio?.storageUri,

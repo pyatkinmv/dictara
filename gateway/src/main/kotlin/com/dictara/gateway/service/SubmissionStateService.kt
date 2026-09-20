@@ -2,7 +2,10 @@ package com.dictara.gateway.service
 
 import com.dictara.gateway.entity.*
 import com.dictara.gateway.repository.*
+import com.dictara.gateway.model.Segment
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -15,7 +18,11 @@ class SubmissionStateService(
     private val transcriptRepo: TranscriptRepository,
     private val summaryRepo: SummaryRepository,
     private val audioMetaRepo: AudioMetaRepository,
+    private val segmentQueries: TranscriptSegmentQueries,
 ) {
+    // Plain, unconfigured: the JSON kept in transcripts.segments must stay exactly what it always was.
+    private val jsonMapper = ObjectMapper().registerKotlinModule()
+
     /** Claims the next pending submission (oldest by createdAt), marks it processing, and returns it.
      *  Returns null if no pending submissions exist or another job is already processing.
      *  The partial unique index on status='processing' enforces at most one at a time. */
@@ -65,15 +72,19 @@ class SubmissionStateService(
         submissionId: UUID,
         audioId: UUID,
         attemptId: UUID,
-        segments: JsonNode,
+        segments: List<Segment>,
         audioDurationS: Double?,
         detectedLanguage: String?,
     ) {
-        transcriptRepo.save(TranscriptEntity(
+        val transcript = transcriptRepo.save(TranscriptEntity(
             submissionId = submissionId,
-            segments = segments,
+            // TODO(drop-json-segments): the phrases are stored as rows (below) and, for one more release, also as
+            // this JSON, so that the previous version of the gateway can still read transcripts made by this one
+            // (rollback). Once that release is out for good, drop transcripts.segments and this line.
+            segments = jsonMapper.valueToTree<JsonNode>(segments),
             detectedLanguage = detectedLanguage,
         ))
+        segmentQueries.insertAll(transcript.id!!, segments)
         audioMetaRepo.updateDurationS(audioId, audioDurationS)
         val attempt = stageAttemptRepo.findById(attemptId).orElseThrow()
         attempt.status = "done"
