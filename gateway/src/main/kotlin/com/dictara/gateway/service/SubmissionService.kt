@@ -30,6 +30,7 @@ class SubmissionService(
     private val summaryRepo: SummaryRepository,
     private val orchestrator: OrchestratorService,
     private val planService: PlanService,
+    private val transcriptListQueries: TranscriptListQueries,
 ) {
     data class CreateResult(val submissionId: UUID, val dedup: Boolean)
 
@@ -40,6 +41,14 @@ class SubmissionService(
         val createdAt: String,
         val status: String,
         val tags: List<String>,
+        /** Length of the audio; known once the transcriber has finished. */
+        val audioDurationS: Double? = null,
+        /** Distinct speaker labels in the transcript; null while there is no transcript. */
+        val speakerCount: Int? = null,
+        /** Percent of the audio transcribed so far; only while transcribing (see [processingProgress]). */
+        val processingPct: Int? = null,
+        /** `transcribing`, `diarizing` or `summarizing` while the job is being worked on. */
+        val processingPhase: String? = null,
     )
 
     /** A page of [SubmissionSummary]; [hasNext] tells whether another page follows. */
@@ -119,8 +128,9 @@ class SubmissionService(
         val submissionIds = submissions.mapNotNull { it.id }
         if (submissionIds.isEmpty()) return emptyList()
 
-        val transcriptBySubmissionId = transcriptRepo.findBySubmissionIdIn(submissionIds).associateBy { it.submissionId }
-        val transcriptIds = transcriptBySubmissionId.values.mapNotNull { it.id }
+        // Not the transcripts themselves: their segments can be huge and the list only needs a few facts.
+        val transcriptBySubmissionId = transcriptListQueries.findRows(submissionIds).associateBy { it.submissionId }
+        val transcriptIds = transcriptBySubmissionId.values.map { it.transcriptId }
 
         val tagsByTranscriptId: Map<UUID, List<String>> = if (transcriptIds.isEmpty()) {
             emptyMap()
@@ -131,15 +141,21 @@ class SubmissionService(
         }
 
         return submissions.map { s ->
-            val fileName = audioById[s.audioId]?.originalName ?: "unknown"
+            val audio = audioById[s.audioId]
+            val fileName = audio?.originalName ?: "unknown"
             val transcript = transcriptBySubmissionId[s.id]
+            val (phase, pct) = processingProgress(s.status, orchestrator.getLiveProgress(s.id!!))
             SubmissionSummary(
                 jobId = s.id!!,
                 fileName = fileName,
                 title = transcript?.title ?: fileName,
                 createdAt = s.createdAt.toString(),
                 status = s.status,
-                tags = (tagsByTranscriptId[transcript?.id] ?: emptyList()).sorted(),
+                tags = (tagsByTranscriptId[transcript?.transcriptId] ?: emptyList()).sorted(),
+                audioDurationS = audio?.durationS,
+                speakerCount = transcript?.speakerCount,
+                processingPct = pct,
+                processingPhase = phase,
             )
         }
     }
@@ -211,4 +227,27 @@ class SubmissionService(
         }
         telegramDeliveryRepo.scheduleRetry(jobId, retryAfterTs)
     }
+}
+
+/**
+ * What the list shows of a job that is being worked on: the phase and, while transcribing, how far it is.
+ *
+ * The percentage exists for transcription only. Diarization and summarizing are shown by name alone (the
+ * client fills the bar), so nothing is invented for phases whose share of the total time is unknown.
+ * Without live progress (the gateway restarted meanwhile, or the job has just been picked up) a job that
+ * is `processing` has no phase either.
+ */
+internal fun processingProgress(status: String, live: com.dictara.gateway.dto.ProgressInfo?): Pair<String?, Int?> = when (status) {
+    "summarizing" -> "summarizing" to null
+    "processing" -> when {
+        live == null -> null to null
+        live.phase == "diarizing" -> "diarizing" to null
+        else -> {
+            val total = live.totalS
+            val done = live.processedS
+            val pct = if (total != null && total > 0 && done != null) (done / total * 100).toInt().coerceIn(0, 100) else null
+            "transcribing" to pct
+        }
+    }
+    else -> null to null
 }

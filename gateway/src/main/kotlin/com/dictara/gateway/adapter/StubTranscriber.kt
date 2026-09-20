@@ -76,7 +76,7 @@ class StubTranscriber internal constructor(
                 val fraction = (elapsed - transcribeEnd) / diarizeSeconds
                 processing(
                     elapsed - pending,
-                    ProgressInfo("diarizing", processedS = total, totalS = total, diarizeProgress = fraction * 100),
+                    ProgressInfo("diarizing", processedS = total, totalS = total, diarizeProgress = fraction),
                 )
             }
             else -> TranscriberJobSnapshot(

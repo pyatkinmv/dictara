@@ -1,6 +1,8 @@
-/// "14 min", "1h 12min" — the duration style used in the list and header.
+/// "14 min", "1h 12min" — the duration style used in the list and header; "<1 min" for anything shorter
+/// than a minute (a file of 45 seconds is not "0 min").
 String formatDuration(Duration d) {
   final minutes = d.inMinutes;
+  if (minutes == 0 && d > Duration.zero) return '<1 min';
   if (minutes < 60) return '$minutes min';
   return '${minutes ~/ 60}h ${minutes % 60}min';
 }

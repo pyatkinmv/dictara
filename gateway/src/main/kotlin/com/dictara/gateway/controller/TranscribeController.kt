@@ -219,7 +219,22 @@ class TranscribeController(
         )
     }
 
-    data class TranscriptionSummary(val jobId: String, val fileName: String, val title: String, val createdAt: String, val status: String, val tags: List<String>)
+    data class TranscriptionSummary(
+        val jobId: String,
+        val fileName: String,
+        val title: String,
+        val createdAt: String,
+        val status: String,
+        val tags: List<String>,
+        /** Seconds of audio; absent until the transcriber has finished. */
+        val audioDurationS: Double? = null,
+        /** Distinct diarizer speakers in the transcript; absent while there is no transcript. */
+        val speakerCount: Int? = null,
+        /** How far transcribing is, in percent; only while transcribing. */
+        val processingPct: Int? = null,
+        /** `transcribing`, `diarizing` or `summarizing` while the job is worked on. */
+        val processingPhase: String? = null,
+    )
 
     /** The paged shape of the list: what `GET /transcriptions?page=&size=` returns. */
     data class TranscriptionPage(val items: List<TranscriptionSummary>, val page: Int, val size: Int, val hasNext: Boolean)
@@ -240,7 +255,10 @@ class TranscribeController(
         val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
             ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
         fun summary(it: SubmissionService.SubmissionSummary) =
-            TranscriptionSummary(it.jobId.toString(), it.fileName, it.title, it.createdAt, it.status, it.tags)
+            TranscriptionSummary(
+                it.jobId.toString(), it.fileName, it.title, it.createdAt, it.status, it.tags,
+                it.audioDurationS, it.speakerCount, it.processingPct, it.processingPhase,
+            )
 
         if (page == null && size == null) return submissionService.listForUser(userId).map(::summary)
 

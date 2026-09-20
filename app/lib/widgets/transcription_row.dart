@@ -121,10 +121,10 @@ class _Info extends StatelessWidget {
         ),
         if (item.status == TranscriptionStatus.processing) ...[
           const SizedBox(height: 5),
-          _Progress(pct: item.processingPct ?? 0),
+          _Progress(pct: _barPercent(item)),
           const SizedBox(height: 3),
           Text(
-            item.processingPct == null ? 'Processing…' : '${item.processingPct}% — transcribing…',
+            _progressLabel(item),
             style: TextStyle(fontSize: 11, height: 14 / 11, color: p.warn),
           ),
         ],
@@ -290,4 +290,27 @@ class _DownloadButtonState extends State<_DownloadButton> {
       ),
     );
   }
+}
+
+/// How full the bar is: the percent transcribed, and full once the later phases (which have no percentage)
+/// begin. Empty while nothing is known.
+int _barPercent(Transcription item) {
+  final pct = item.processingPct;
+  if (pct != null) return pct;
+  return switch (item.processingPhase) {
+    ProcessingPhase.diarizing || ProcessingPhase.summarizing => 100,
+    _ => 0,
+  };
+}
+
+/// What the line under the bar says: the phase, with the percent while transcribing.
+String _progressLabel(Transcription item) {
+  final pct = item.processingPct;
+  return switch (item.processingPhase) {
+    ProcessingPhase.diarizing => 'Diarizing…',
+    ProcessingPhase.summarizing => 'Summarizing…',
+    ProcessingPhase.transcribing => pct == null ? 'Transcribing…' : '$pct% — transcribing…',
+    // The source does not name the phase; a percentage can only be transcribing.
+    null => pct == null ? 'Processing…' : '$pct% — transcribing…',
+  };
 }

@@ -25,8 +25,8 @@ class NotIntegratedException implements Exception {
 /// The real data source: the gateway over HTTP.
 ///
 /// Being connected screen by screen (`docs/local-backend-integration.md`): so far only the transcription
-/// list works, and it is a stopgap: the gateway's list has neither duration, progress, nor speakers yet and
-/// cannot filter, so filtering and sorting happen here. Everything else throws [NotIntegratedException].
+/// list works. The gateway pages it and reports length, speakers and progress, but cannot filter or sort yet
+/// (integration iteration 2c), so those happen here. Everything else throws [NotIntegratedException].
 class HttpTranscriptionRepository implements TranscriptionRepository {
   HttpTranscriptionRepository(this._client);
 
@@ -152,7 +152,8 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
   Future<T> _notYet<T>(String what, int iteration) => Future.error(NotIntegratedException(what, iteration));
 }
 
-/// One entry of the gateway's `GET /transcriptions`.
+/// One entry of the gateway's `GET /transcriptions`. Length, speakers and progress are optional there: they
+/// appear as the transcription gets far enough.
 Transcription _transcriptionFromJson(Map<String, dynamic> json) {
   final title = (json['title'] as String?)?.trim();
   return Transcription(
@@ -160,12 +161,27 @@ Transcription _transcriptionFromJson(Map<String, dynamic> json) {
     title: title == null || title.isEmpty ? json['file_name'] as String : title,
     uploadedAt: DateTime.parse(json['created_at'] as String).toLocal(),
     status: _statusFromJson(json['status'] as String?),
+    duration: _secondsFromJson(json['audio_duration_s']),
+    speakerCount: (json['speaker_count'] as num?)?.toInt() ?? 0,
+    processingPct: (json['processing_pct'] as num?)?.toInt(),
+    processingPhase: _phaseFromJson(json['processing_phase'] as String?),
     tags: [
       for (final label in (json['tags'] as List<dynamic>? ?? const []))
         if (label is String && label.isNotEmpty) Tag(label, colorForLabel(label)),
     ],
   );
 }
+
+/// Seconds (a JSON number, possibly fractional) as a [Duration]; null when absent.
+Duration? _secondsFromJson(Object? seconds) =>
+    seconds is num ? Duration(milliseconds: (seconds * 1000).round()) : null;
+
+ProcessingPhase? _phaseFromJson(String? phase) => switch (phase) {
+      'transcribing' => ProcessingPhase.transcribing,
+      'diarizing' => ProcessingPhase.diarizing,
+      'summarizing' => ProcessingPhase.summarizing,
+      _ => null,
+    };
 
 /// The gateway's statuses are `pending`, `processing`, `summarizing`, `done` and `failed`; the list shows
 /// the summary step as part of processing.

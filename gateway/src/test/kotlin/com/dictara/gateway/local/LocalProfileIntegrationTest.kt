@@ -97,6 +97,45 @@ class LocalProfileIntegrationTest {
     }
 
     @Test
+    fun `the seed puts the design's transcriptions into the list, with lengths, speakers and tags`() {
+        val list = get("/transcriptions?page=0&size=50")["items"]
+        val byName = list.associateBy { it["file_name"].asText() }
+
+        val quarterly = byName["quarterly_review_2025-06-22.m4a"]!!
+        assertThat(quarterly["title"].asText()).isEqualTo("Quarterly Review Meeting")
+        assertThat(quarterly["status"].asText()).isEqualTo("done")
+        assertThat(quarterly["audio_duration_s"].asDouble()).isEqualTo(862.0)
+        assertThat(quarterly["speaker_count"].asInt()).isEqualTo(3)
+        assertThat(quarterly["tags"].map { it.asText() }).containsExactly("meeting", "quarterly")
+
+        assertThat(byName["interview_anna_k.mp3"]!!["speaker_count"].asInt()).isEqualTo(2)
+        assertThat(byName["interview_anna_k.mp3"]!!["tags"].map { it.asText() }).containsExactly("hiring", "interview")
+        assertThat(byName["voice_memo_2025-06-20.m4a"]!!["speaker_count"].asInt()).isZero()
+        assertThat(byName["standup_2025-06-19.mp3"]!!["audio_duration_s"].asDouble()).isEqualTo(480.0)
+        // No title of its own: shown under the file name.
+        assertThat(byName["product_sync_2025_06_23.mp4"]!!["title"].asText()).isEqualTo("product_sync_2025_06_23.mp4")
+        assertThat(byName["product_sync_2025_06_23.mp4"]!!["tags"].size()).isZero()
+        // One failure, with nothing but the file behind it.
+        val failed = byName["broken_recording.mp3"]!!
+        assertThat(failed["status"].asText()).isEqualTo("failed")
+        assertThat(failed.has("audio_duration_s")).isFalse()
+        assertThat(failed.has("speaker_count")).isFalse()
+    }
+
+    @Test
+    fun `the seed can be applied again without changing anything`() {
+        fun counts() = listOf("users", "audio_meta", "submissions", "transcripts", "tags", "transcript_tags").map {
+            jdbc.queryForObject("SELECT count(*) FROM $it", Long::class.java)
+        }
+        val before = counts()
+
+        val seed = org.springframework.core.io.ClassPathResource("db/local/R__seed.sql").inputStream.readBytes().decodeToString()
+        jdbc.execute("BEGIN; $seed COMMIT;")
+
+        assertThat(counts()).isEqualTo(before)
+    }
+
+    @Test
     fun `the local tables exist and the health endpoint answers`() {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM local_audio_objects", Long::class.java)).isNotNull()
         assertThat(get("/health")["status"].asText()).isEqualTo("ok")

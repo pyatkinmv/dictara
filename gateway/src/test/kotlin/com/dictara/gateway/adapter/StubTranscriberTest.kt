@@ -48,7 +48,7 @@ class StubTranscriberTest {
         assertThat(diarizing.progress!!.diarizeProgress).isEqualTo(0.0)
 
         advance(2.5)
-        assertThat(stub.getJob(id).progress!!.diarizeProgress).isEqualTo(50.0)
+        assertThat(stub.getJob(id).progress!!.diarizeProgress).isEqualTo(0.5) // a fraction, like the real transcriber
 
         advance(2.5)
         val done = stub.getJob(id)

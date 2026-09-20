@@ -72,6 +72,7 @@ MockClient _gateway(List<Map<String, dynamic>> all, {List<Uri>? requests}) => Mo
 
 void main() {
   _pagingTests();
+  _fieldTests();
 
   group('GatewayClient', () {
     test('asks the given path under /api and decodes JSON', () async {
@@ -372,6 +373,68 @@ void _pagingTests() {
 
       final oldest = await repo.list(const TranscriptionQuery(sort: TranscriptionSort.oldest), size: 5);
       expect(oldest.items.first.id, 'id-69');
+    });
+  });
+}
+
+void _fieldTests() {
+  group('HttpTranscriptionRepository list fields', () {
+    Map<String, dynamic> entry(Map<String, dynamic> extra) => {
+          'job_id': 'x',
+          'file_name': 'a.mp3',
+          'title': 'a',
+          'created_at': '2026-01-01T00:00:00Z',
+          'status': 'done',
+          'tags': <String>[],
+          ...extra,
+        };
+
+    Future<Transcription> one(Map<String, dynamic> extra) async =>
+        (await _repo(_gateway([entry(extra)])).list(const TranscriptionQuery())).items.single;
+
+    test('the audio length in seconds becomes a duration', () async {
+      expect((await one({'audio_duration_s': 862.0})).duration, const Duration(minutes: 14, seconds: 22));
+      expect((await one({'audio_duration_s': 12})).duration, const Duration(seconds: 12)); // an integer in JSON
+      expect((await one({'audio_duration_s': 0.4996})).duration, const Duration(milliseconds: 500));
+    });
+
+    test('without the fields there is no duration, no speakers and no progress', () async {
+      final item = await one({});
+
+      expect(item.duration, isNull);
+      expect(item.speakerCount, 0);
+      expect(item.processingPct, isNull);
+      expect(item.processingPhase, isNull);
+    });
+
+    test('the number of speakers is read', () async {
+      expect((await one({'speaker_count': 3})).speakerCount, 3);
+      expect((await one({'speaker_count': 0})).speakerCount, 0);
+    });
+
+    test('progress and its phase are read', () async {
+      final item = await one({'status': 'processing', 'processing_pct': 41, 'processing_phase': 'transcribing'});
+
+      expect(item.processingPct, 41);
+      expect(item.processingPhase, ProcessingPhase.transcribing);
+    });
+
+    test('each phase is known, and an unknown one is ignored', () async {
+      expect((await one({'processing_phase': 'diarizing'})).processingPhase, ProcessingPhase.diarizing);
+      expect((await one({'processing_phase': 'summarizing'})).processingPhase, ProcessingPhase.summarizing);
+      expect((await one({'processing_phase': 'polishing'})).processingPhase, isNull);
+    });
+
+    test('the longest sort now has lengths to go by', () async {
+      final repo = _repo(_gateway([
+        entry({'job_id': 'a', 'title': 'short', 'audio_duration_s': 60.0}),
+        entry({'job_id': 'b', 'title': 'no length'}),
+        entry({'job_id': 'c', 'title': 'long', 'audio_duration_s': 3600.0}),
+      ]));
+
+      final page = await repo.list(const TranscriptionQuery(sort: TranscriptionSort.longest));
+
+      expect(page.items.map((i) => i.title), ['long', 'short', 'no length']);
     });
   });
 }

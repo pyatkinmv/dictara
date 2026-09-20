@@ -102,14 +102,15 @@ class TranscriptionListPagingIntegrationTest : AbstractSharedContextIntegrationT
     }
 
     @Test
-    fun `the plain array keeps its fields`() {
+    fun `the plain array keeps the fields the old client reads`() {
         addSubmission("call.mp3", 0, title = "Weekly call", tags = listOf("meeting", "team"))
 
         val item = ok("/transcriptions")[0]
 
-        assertThat(item.fieldNames().asSequence().toList()).containsExactlyInAnyOrder(
-            "job_id", "file_name", "title", "created_at", "status", "tags",
-        )
+        // New fields may be added next to these; these must stay, with these types.
+        assertThat(item.fieldNames().asSequence().toList()).contains("job_id", "file_name", "title", "created_at", "status", "tags")
+        assertThat(item["job_id"].isTextual).isTrue()
+        assertThat(item["tags"].isArray).isTrue()
         assertThat(item["title"].asText()).isEqualTo("Weekly call")
         assertThat(item["tags"].map { it.asText() }).containsExactly("meeting", "team")
         assertThat(item["status"].asText()).isEqualTo("done")

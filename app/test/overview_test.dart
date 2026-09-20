@@ -19,6 +19,9 @@ void main() {
       expect(formatTimestamp(const Duration(hours: 1, minutes: 2, seconds: 3)), '1:02:03');
       expect(formatDuration(const Duration(minutes: 14, seconds: 22)), '14 min');
       expect(formatDuration(const Duration(minutes: 72)), '1h 12min');
+      expect(formatDuration(const Duration(seconds: 45)), '<1 min');
+      expect(formatDuration(const Duration(minutes: 1)), '1 min');
+      expect(formatDuration(Duration.zero), '0 min');
     });
 
     test('counts and file sizes', () {
