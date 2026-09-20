@@ -9,6 +9,7 @@ import '../theme/app_palette.dart';
 import '../widgets/form_marks.dart';
 import '../widgets/mini_tag.dart';
 import '../widgets/popover.dart';
+import '../widgets/status_badge.dart';
 import '../widgets/transcription_row.dart';
 
 /// The home screen: search, filter and sort bar above the list of transcriptions.

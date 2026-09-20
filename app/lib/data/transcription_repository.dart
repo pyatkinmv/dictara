@@ -1,5 +1,6 @@
 import '../models/tag.dart';
 import '../models/transcription.dart';
+import '../models/transcription_detail.dart';
 
 enum TranscriptionSort { newest, oldest, longest, name }
 
@@ -43,6 +44,13 @@ class TranscriptionQuery {
 /// gateway grows the endpoints listed in `docs/api-gaps.md`.
 abstract class TranscriptionRepository {
   Future<List<Transcription>> list(TranscriptionQuery query);
+
+  /// A finished transcription with its transcript; null if there is no such
+  /// transcription or it is not done yet.
+  Future<TranscriptionDetail?> get(int id);
+
+  /// Renames a transcription (`PATCH /jobs/{id}/title`).
+  Future<void> rename(int id, String title);
 
   /// The tag library, in display order.
   Future<List<Tag>> tags();

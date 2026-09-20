@@ -25,4 +25,17 @@ class Transcription {
   final int? processingPct;
   final List<Tag> tags;
   final int speakerCount;
+
+  Transcription copyWith({String? title}) {
+    return Transcription(
+      id: id,
+      title: title ?? this.title,
+      duration: duration,
+      uploadedAt: uploadedAt,
+      status: status,
+      processingPct: processingPct,
+      tags: tags,
+      speakerCount: speakerCount,
+    );
+  }
 }

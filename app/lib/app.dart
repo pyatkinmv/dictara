@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'data/fake_transcription_repository.dart';
 import 'data/transcription_repository.dart';
 import 'router.dart';
+import 'state/transcription_detail_controller.dart';
 import 'state/transcription_list_controller.dart';
 import 'theme/app_palette.dart';
 import 'theme/app_theme.dart';
@@ -44,6 +45,13 @@ class _DictaraAppState extends State<DictaraApp> {
         Provider<TranscriptionRepository>.value(value: _repository),
         ChangeNotifierProvider(
           create: (context) => TranscriptionListController(context.read<TranscriptionRepository>()),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => TranscriptionDetailController(
+            context.read<TranscriptionRepository>(),
+            // A rename must show up in the list too.
+            onChanged: context.read<TranscriptionListController>().reload,
+          ),
         ),
       ],
       child: MaterialApp.router(

@@ -148,12 +148,13 @@ void main() {
 
       await tester.tap(find.text('Podcast Episode #47'));
       await settle(tester);
-      expect(find.text('Transcription 3 — coming soon'), findsNothing);
+      // Still on the list.
       expect(find.byType(TranscriptionRow), findsWidgets);
 
       await tester.tap(find.text('Quarterly Review Meeting'));
       await settle(tester);
-      expect(find.text('Transcription 0 — coming soon'), findsOneWidget);
+      expect(find.byType(TranscriptionRow), findsNothing);
+      expect(find.text('Overview'), findsOneWidget); // the detail page's tab
     });
 
     testWidgets('filters survive leaving and returning to the page', (tester) async {

@@ -34,6 +34,9 @@ class TranscriptionListController extends ChangeNotifier {
   /// True until the first result arrives.
   bool get loading => _loading;
 
+  /// Re-runs the current query, e.g. after something changed a transcription.
+  Future<void> reload() => _load();
+
   void setSearch(String value) => _apply(_query.copyWith(search: value));
 
   void setSort(TranscriptionSort sort) => _apply(_query.copyWith(sort: sort));

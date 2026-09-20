@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
+import 'pages/detail/transcription_detail_page.dart';
 import 'pages/placeholder_page.dart';
 import 'pages/transcriptions_page.dart';
 import 'shell/app_shell.dart';
@@ -25,10 +26,9 @@ GoRouter createRouter({String initialLocation = '/transcriptions'}) {
             routes: [
               GoRoute(
                 path: ':id',
-                // The detail screen arrives in iteration 3.
                 pageBuilder: (context, state) => page(
                   state,
-                  PlaceholderPage(label: 'Transcription ${state.pathParameters['id']}'),
+                  TranscriptionDetailPage(id: int.tryParse(state.pathParameters['id'] ?? '')),
                 ),
               ),
             ],

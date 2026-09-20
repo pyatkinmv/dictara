@@ -21,7 +21,9 @@ class Sidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final active = destinationFor(location);
+    // Only a section's own page highlights its item: the design clears the
+    // highlight while a transcription is open (`openDetail`).
+    final active = navDestinations.where((d) => d.path == location).firstOrNull;
     final last = navDestinations.length - 1;
 
     return Container(

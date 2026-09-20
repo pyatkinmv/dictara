@@ -5,32 +5,7 @@ import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
 import '../util/format.dart';
 import 'mini_tag.dart';
-
-extension TranscriptionStatusStyle on TranscriptionStatus {
-  IconData get icon => switch (this) {
-        TranscriptionStatus.done => Icons.check_circle_rounded,
-        TranscriptionStatus.processing => Icons.autorenew_rounded,
-        TranscriptionStatus.pending => Icons.schedule_rounded,
-      };
-
-  String get label => switch (this) {
-        TranscriptionStatus.done => 'Done',
-        TranscriptionStatus.processing => 'Processing',
-        TranscriptionStatus.pending => 'Pending',
-      };
-
-  Color foreground(AppPalette p) => switch (this) {
-        TranscriptionStatus.done => p.ok,
-        TranscriptionStatus.processing => p.warn,
-        TranscriptionStatus.pending => p.text3,
-      };
-
-  Color background(AppPalette p) => switch (this) {
-        TranscriptionStatus.done => p.okBg,
-        TranscriptionStatus.processing => p.warnBg,
-        TranscriptionStatus.pending => p.background,
-      };
-}
+import 'status_badge.dart';
 
 /// One row of the transcriptions list (`.row` in the design).
 class TranscriptionRow extends StatefulWidget {
@@ -266,17 +241,7 @@ class _Trailing extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(
-            color: item.status.background(p),
-            borderRadius: BorderRadius.circular(100),
-          ),
-          child: Text(
-            item.status.label,
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: item.status.foreground(p)),
-          ),
-        ),
+        StatusBadge(item.status),
         if (item.status == TranscriptionStatus.done) ...[
           const SizedBox(width: 5),
           AnimatedOpacity(
