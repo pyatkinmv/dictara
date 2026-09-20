@@ -335,7 +335,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   int _order(Transcription item) => int.parse(item.id);
 
   @override
-  Future<List<Transcription>> list(TranscriptionQuery query) async {
+  Future<TranscriptionPage> list(TranscriptionQuery query, {int page = 0, int size = transcriptionPageSize}) async {
     _advanceJobs();
     final items = filterTranscriptions(_items, query);
 
@@ -349,7 +349,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
       case TranscriptionSort.name:
         items.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
     }
-    return items;
+    return sliceTranscriptions(items, page, size);
   }
 
   @override

@@ -6,6 +6,7 @@ import '../data/transcription_repository.dart';
 import '../models/transcription.dart';
 import '../state/transcription_list_controller.dart';
 import '../theme/app_palette.dart';
+import '../widgets/button_spinner.dart';
 import '../widgets/form_marks.dart';
 import '../widgets/mini_tag.dart';
 import '../widgets/popover.dart';
@@ -77,6 +78,13 @@ class _TranscriptionsPageState extends State<TranscriptionsPage> {
               separatorBuilder: (_, _) => const SizedBox(height: 7),
               itemBuilder: (context, i) {
                 final item = list.items[i];
+                // Nearing the end of what is loaded: fetch the next page (endless scrolling). After the
+                // frame, because this runs while the list is being built.
+                if (i >= list.items.length - _loadMoreAhead) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (context.mounted) context.read<TranscriptionListController>().loadMore();
+                  });
+                }
                 return TranscriptionRow(
                   item: item,
                   // Only finished transcriptions have a detail page.
@@ -89,7 +97,47 @@ class _TranscriptionsPageState extends State<TranscriptionsPage> {
               },
             ),
           ),
+        if (list.loadingMore || list.loadMoreFailed)
+          SliverToBoxAdapter(
+            child: _ListFooter(
+              failed: list.loadMoreFailed,
+              onRetry: () => context.read<TranscriptionListController>().loadMore(retry: true),
+            ),
+          ),
       ],
+    );
+  }
+}
+
+/// How many rows before the end the next page starts loading.
+const _loadMoreAhead = 5;
+
+/// Under the list while the next page loads, or when loading it failed.
+class _ListFooter extends StatelessWidget {
+  const _ListFooter({required this.failed, required this.onRetry});
+
+  final bool failed;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 22),
+      child: Center(
+        child: failed
+            ? MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: onRetry,
+                  child: Text(
+                    "Couldn't load more. Try again",
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: p.accent),
+                  ),
+                ),
+              )
+            : ButtonSpinner(color: p.accent, size: 18),
+      ),
     );
   }
 }

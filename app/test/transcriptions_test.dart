@@ -27,7 +27,7 @@ void main() {
     final repo = FakeTranscriptionRepository();
 
     Future<List<String>> titles(TranscriptionQuery q) async =>
-        [for (final t in await repo.list(q)) t.title];
+        [for (final t in (await repo.list(q)).items) t.title];
 
     test('returns everything newest first by default', () async {
       expect(await titles(const TranscriptionQuery()), _newestFirst);

@@ -8,6 +8,8 @@ import com.dictara.gateway.util.TranscriptFormatter
 import com.dictara.gateway.plan.PlanService
 import com.dictara.gateway.repository.*
 import com.dictara.gateway.storage.UploadResult
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -39,6 +41,9 @@ class SubmissionService(
         val status: String,
         val tags: List<String>,
     )
+
+    /** A page of [SubmissionSummary]; [hasNext] tells whether another page follows. */
+    data class SubmissionPage(val items: List<SubmissionSummary>, val hasNext: Boolean)
 
     data class ExportData(
         val submissionId: UUID,
@@ -96,8 +101,20 @@ class SubmissionService(
     }
 
     @Transactional(readOnly = true)
-    fun listForUser(userId: UUID): List<SubmissionSummary> {
-        val submissions = submissionRepo.findByUserIdOrderByCreatedAtDesc(userId)
+    fun listForUser(userId: UUID): List<SubmissionSummary> =
+        summarize(submissionRepo.findByUserIdOrderByCreatedAtDescIdDesc(userId))
+
+    /** One page of the same list, newest first (`GET /transcriptions?page=&size=`), [page] counting from 0. */
+    @Transactional(readOnly = true)
+    fun listPageForUser(userId: UUID, page: Int, size: Int): SubmissionPage {
+        val slice = submissionRepo.findByUserId(
+            userId, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt", "id")),
+        )
+        return SubmissionPage(summarize(slice.content), slice.hasNext())
+    }
+
+    /** The list entries for [submissions]; their files, transcripts and tags are fetched in a few batched queries. */
+    private fun summarize(submissions: List<SubmissionEntity>): List<SubmissionSummary> {
         val audioById = audioMetaRepo.findAllById(submissions.map { it.audioId }).associateBy { it.id }
         val submissionIds = submissions.mapNotNull { it.id }
         if (submissionIds.isEmpty()) return emptyList()

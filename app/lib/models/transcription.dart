@@ -41,3 +41,12 @@ class Transcription {
     );
   }
 }
+
+/// One page of the transcriptions list: [items] in list order and whether
+/// another page follows them.
+class TranscriptionPage {
+  const TranscriptionPage(this.items, {required this.hasNext});
+
+  final List<Transcription> items;
+  final bool hasNext;
+}

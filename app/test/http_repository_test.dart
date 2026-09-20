@@ -11,7 +11,7 @@ import 'package:dictara_web/models/transcription.dart';
 import 'package:dictara_web/models/upload.dart';
 
 /// What `GET /transcriptions` of the gateway returns (`snake_case`, newest first).
-const _listJson = [
+const List<Map<String, dynamic>> _listJson = [
   {
     'job_id': '3f1c2f0e-0000-4000-8000-000000000003',
     'file_name': 'standup.mp3',
@@ -55,7 +55,24 @@ http.Response _json(Object body, {int status = 200}) => http.Response(
 HttpTranscriptionRepository _repo(MockClient client) =>
     HttpTranscriptionRepository(GatewayClient(httpClient: client));
 
+/// A gateway that serves [all] as the plain array, or as pages when asked with page/size.
+MockClient _gateway(List<Map<String, dynamic>> all, {List<Uri>? requests}) => MockClient((request) async {
+  requests?.add(request.url);
+  final query = request.url.queryParameters;
+  if (!query.containsKey('page') && !query.containsKey('size')) return _json(all);
+  final page = int.parse(query['page'] ?? '0');
+  final size = int.parse(query['size'] ?? '30');
+  return _json({
+    'items': all.skip(page * size).take(size).toList(),
+    'page': page,
+    'size': size,
+    'has_next': (page + 1) * size < all.length,
+  });
+});
+
 void main() {
+  _pagingTests();
+
   group('GatewayClient', () {
     test('asks the given path under /api and decodes JSON', () async {
       Uri? asked;
@@ -148,10 +165,10 @@ void main() {
   });
 
   group('HttpTranscriptionRepository.list', () {
-    final repo = _repo(MockClient((request) async => _json(_listJson)));
+    final repo = _repo(_gateway(_listJson));
 
     test('maps the gateway fields to the model', () async {
-      final items = await repo.list(const TranscriptionQuery());
+      final items = (await repo.list(const TranscriptionQuery())).items;
 
       final first = items.first;
       expect(first.id, '3f1c2f0e-0000-4000-8000-000000000003');
@@ -166,7 +183,7 @@ void main() {
     });
 
     test('statuses are mapped, summarizing counts as processing', () async {
-      final byId = {for (final i in await repo.list(const TranscriptionQuery())) i.title: i.status};
+      final byId = {for (final i in (await repo.list(const TranscriptionQuery())).items) i.title: i.status};
 
       expect(byId['Daily Standup'], TranscriptionStatus.done);
       expect(byId['lecture.wav'], TranscriptionStatus.processing); // was "summarizing"
@@ -174,36 +191,34 @@ void main() {
     });
 
     test('a blank title falls back to the file name', () async {
-      final items = await repo.list(const TranscriptionQuery());
+      final items = (await repo.list(const TranscriptionQuery())).items;
       expect(items.map((i) => i.title), contains('queued.mp3'));
     });
 
     test('an unknown status is treated as pending', () async {
       final odd = _repo(
-        MockClient(
-          (request) async => _json([
-            {
-              'job_id': 'x',
-              'file_name': 'a.mp3',
-              'title': 'a',
-              'created_at': '2026-01-01T00:00:00Z',
-              'status': 'something-new',
-              'tags': <String>[],
-            },
-          ]),
-        ),
+        _gateway([
+          {
+            'job_id': 'x',
+            'file_name': 'a.mp3',
+            'title': 'a',
+            'created_at': '2026-01-01T00:00:00Z',
+            'status': 'something-new',
+            'tags': <String>[],
+          },
+        ]),
       );
-      expect((await odd.list(const TranscriptionQuery())).single.status, TranscriptionStatus.pending);
+      expect((await odd.list(const TranscriptionQuery())).items.single.status, TranscriptionStatus.pending);
     });
 
     test('an empty list is fine', () async {
-      final empty = _repo(MockClient((request) async => _json([])));
-      expect(await empty.list(const TranscriptionQuery()), isEmpty);
+      final empty = _repo(_gateway([]));
+      expect((await empty.list(const TranscriptionQuery())).items, isEmpty);
     });
 
     test('newest first by default, and the other sort orders work', () async {
       Future<List<String>> titles(TranscriptionSort sort) async =>
-          [for (final i in await repo.list(TranscriptionQuery(sort: sort))) i.title];
+          [for (final i in (await repo.list(TranscriptionQuery(sort: sort))).items) i.title];
 
       expect(await titles(TranscriptionSort.newest), ['Daily Standup', 'lecture.wav', 'Voice memo', 'queued.mp3']);
       expect(await titles(TranscriptionSort.oldest), ['queued.mp3', 'Voice memo', 'lecture.wav', 'Daily Standup']);
@@ -211,7 +226,7 @@ void main() {
     });
 
     test('search, status and tag filters apply', () async {
-      Future<List<String>> titles(TranscriptionQuery q) async => [for (final i in await repo.list(q)) i.title];
+      Future<List<String>> titles(TranscriptionQuery q) async => [for (final i in (await repo.list(q)).items) i.title];
 
       expect(await titles(const TranscriptionQuery(search: 'VOICE')), ['Voice memo']);
       expect(await titles(const TranscriptionQuery(statuses: {TranscriptionStatus.failed})), ['Voice memo']);
@@ -274,6 +289,89 @@ void main() {
         const NotIntegratedException('Renaming', 3).toString(),
         'Renaming is not connected to the gateway yet (integration iteration 3)',
       );
+    });
+  });
+}
+
+/// `count` transcriptions in the shape of the gateway's list, newest first.
+List<Map<String, dynamic>> _many(int count) => [
+  for (var i = 0; i < count; i++)
+    {
+      'job_id': 'id-$i',
+      'file_name': 'file$i.mp3',
+      'title': 'File ${i.toString().padLeft(3, '0')}',
+      'created_at': DateTime.utc(2026, 1, 1).subtract(Duration(minutes: i)).toIso8601String(),
+      'status': 'done',
+      'tags': i.isEven ? ['even'] : <String>[],
+    },
+];
+
+void _pagingTests() {
+  group('HttpTranscriptionRepository paging', () {
+    test('the default list is asked for from the gateway one page at a time', () async {
+      final requests = <Uri>[];
+      final repo = _repo(_gateway(_many(70), requests: requests));
+
+      final first = await repo.list(const TranscriptionQuery());
+
+      expect(requests.single.toString(), '/api/transcriptions?page=0&size=30');
+      expect(first.items.length, 30);
+      expect(first.items.first.id, 'id-0');
+      expect(first.hasNext, isTrue);
+    });
+
+    test('page and size are passed on, and the last page says there is no more', () async {
+      final requests = <Uri>[];
+      final repo = _repo(_gateway(_many(70), requests: requests));
+
+      final last = await repo.list(const TranscriptionQuery(), page: 2, size: 30);
+
+      expect(requests.single.queryParameters, {'page': '2', 'size': '30'});
+      expect(last.items.map((i) => i.id), [for (var i = 60; i < 70; i++) 'id-$i']);
+      expect(last.hasNext, isFalse);
+    });
+
+    test('a refresh asks for page 0 with a bigger size', () async {
+      final requests = <Uri>[];
+      final repo = _repo(_gateway(_many(70), requests: requests));
+
+      final refreshed = await repo.list(const TranscriptionQuery(), size: 60);
+
+      expect(requests.single.queryParameters, {'page': '0', 'size': '60'});
+      expect(refreshed.items.length, 60);
+      expect(refreshed.hasNext, isTrue);
+    });
+
+    test('an answer without items is an error', () async {
+      final repo = _repo(MockClient((request) async => _json({'page': 0})));
+      await expectLater(repo.list(const TranscriptionQuery()), throwsA(isA<GatewayException>()));
+    });
+
+    test('a search is answered from the whole list, cut into pages here', () async {
+      final requests = <Uri>[];
+      final repo = _repo(_gateway(_many(70), requests: requests));
+
+      final page = await repo.list(const TranscriptionQuery(search: 'file 0'), size: 25);
+
+      // "File 000".."File 069" contain "file 0" for every number: 70 hits, 25 per page.
+      expect(requests.single.toString(), '/api/transcriptions'); // the unpaged array
+      expect(page.items.length, 25);
+      expect(page.hasNext, isTrue);
+      final third = await repo.list(const TranscriptionQuery(search: 'file 0'), page: 2, size: 25);
+      expect(third.items.length, 20);
+      expect(third.hasNext, isFalse);
+    });
+
+    test('filters and other sort orders page in the same way', () async {
+      final repo = _repo(_gateway(_many(70)));
+
+      final tagged = await repo.list(const TranscriptionQuery(tags: {'even'}), size: 20);
+      expect(tagged.items.length, 20);
+      expect(tagged.items.every((i) => i.tags.any((t) => t.label == 'even')), isTrue);
+      expect(tagged.hasNext, isTrue); // 35 tagged
+
+      final oldest = await repo.list(const TranscriptionQuery(sort: TranscriptionSort.oldest), size: 5);
+      expect(oldest.items.first.id, 'id-69');
     });
   });
 }

@@ -8,6 +8,12 @@ import '../models/upload.dart';
 
 enum TranscriptionSort { newest, oldest, longest, name }
 
+/// How many transcriptions the list loads at a time.
+const transcriptionPageSize = 30;
+
+/// The most the gateway serves in one page (`GET /transcriptions?size=`).
+const transcriptionMaxPageSize = 500;
+
 /// Server-side filtering/sorting of the list, shaped after `GET /transcriptions`
 /// in `docs/api-gaps.md` (§3.1): `sort`, `status`, `tag_ids`, `q`.
 class TranscriptionQuery {
@@ -47,7 +53,10 @@ class TranscriptionQuery {
 /// Where screens get their data. The mock implementation is used until the
 /// gateway grows the endpoints listed in `docs/api-gaps.md`.
 abstract class TranscriptionRepository {
-  Future<List<Transcription>> list(TranscriptionQuery query);
+  /// One page of the list for [query]: [size] items starting at item `page * size`
+  /// (`GET /transcriptions?page=&size=`). To refresh what is already on screen ask for
+  /// page 0 with a size that covers it.
+  Future<TranscriptionPage> list(TranscriptionQuery query, {int page = 0, int size = transcriptionPageSize});
 
   /// A finished transcription with its transcript; null if there is no such
   /// transcription or it is not done yet.
@@ -151,4 +160,13 @@ List<Transcription> filterTranscriptions(Iterable<Transcription> items, Transcri
           (q.isEmpty || i.title.toLowerCase().contains(q)))
         i,
   ];
+}
+
+/// The [page]th page of [size] items of an already filtered and sorted [items];
+/// for sources that cannot page by themselves.
+TranscriptionPage sliceTranscriptions(List<Transcription> items, int page, int size) {
+  final start = page * size;
+  if (start >= items.length) return const TranscriptionPage([], hasNext: false);
+  final end = start + size;
+  return TranscriptionPage(items.sublist(start, end < items.length ? end : items.length), hasNext: end < items.length);
 }

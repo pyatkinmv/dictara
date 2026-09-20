@@ -76,7 +76,7 @@ void main() {
           item.duration,
           const Duration(minutes: 22),
         ); // about a minute per megabyte
-        final list = await repo.list(const TranscriptionQuery());
+        final list = (await repo.list(const TranscriptionQuery())).items;
         expect(list.first.id, '7');
         expect(list.length, 8);
         expect(await repo.get('7'), isNull); // not done yet
@@ -90,7 +90,7 @@ void main() {
 
       now = now.add(const Duration(hours: 1));
       expect(
-        (await repo.list(const TranscriptionQuery())).first.status,
+        (await repo.list(const TranscriptionQuery())).items.first.status,
         TranscriptionStatus.pending,
       );
     });
@@ -110,7 +110,7 @@ void main() {
 
       Future<Transcription> uploaded() async => (await repo.list(
         const TranscriptionQuery(),
-      )).firstWhere((i) => i.id == '7');
+      )).items.firstWhere((i) => i.id == '7');
 
       var item = await uploaded();
       expect(item.status, TranscriptionStatus.pending);

@@ -33,7 +33,18 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
   final GatewayClient _client;
 
   @override
-  Future<List<Transcription>> list(TranscriptionQuery query) async {
+  Future<TranscriptionPage> list(TranscriptionQuery query, {int page = 0, int size = transcriptionPageSize}) async {
+    if (_gatewayCanAnswer(query)) {
+      final body = await _client.getJson('/transcriptions?page=$page&size=$size');
+      if (body is! Map<String, dynamic> || body['items'] is! List) {
+        throw const GatewayException('Expected a page of transcriptions');
+      }
+      return TranscriptionPage(
+        [for (final item in body['items'] as List<dynamic>) _transcriptionFromJson(item as Map<String, dynamic>)],
+        hasNext: body['has_next'] == true,
+      );
+    }
+
     final items = filterTranscriptions(await _fetchAll(), query);
     switch (query.sort) {
       case TranscriptionSort.newest:
@@ -45,10 +56,15 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
       case TranscriptionSort.name:
         items.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
     }
-    return items;
+    return sliceTranscriptions(items, page, size);
   }
 
-  /// Every transcription of the user, newest first as the gateway sends them.
+  /// The gateway pages the plain list, newest first. It cannot search, filter or sort differently yet
+  /// (integration iteration 2c), so those queries are answered here from the whole list.
+  bool _gatewayCanAnswer(TranscriptionQuery query) =>
+      query.search.trim().isEmpty && query.statuses.isEmpty && query.tags.isEmpty && query.sort == TranscriptionSort.newest;
+
+  /// Every transcription of the user (the unpaged array), newest first as the gateway sends them.
   Future<List<Transcription>> _fetchAll() async {
     final body = await _client.getJson('/transcriptions');
     if (body is! List) throw const GatewayException('Expected a list of transcriptions');

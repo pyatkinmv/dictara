@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' show max, min;
 
 import 'package:flutter/foundation.dart';
 
@@ -13,19 +14,26 @@ class TranscriptionListController extends ChangeNotifier {
   /// [pollInterval]: while some transcription is still pending or processing,
   /// ask again this often, so progress moves without the user reloading. Null
   /// (the default) never polls.
-  TranscriptionListController(this._repository, {this.pollInterval}) {
+  ///
+  /// [pageSize] is how many transcriptions each request brings; the list grows a page at a time
+  /// (see [loadMore]).
+  TranscriptionListController(this._repository, {this.pollInterval, this.pageSize = transcriptionPageSize}) {
     _loadTags();
     _load();
   }
 
   final TranscriptionRepository _repository;
   final Duration? pollInterval;
+  final int pageSize;
   Timer? _poll;
 
   TranscriptionQuery _query = const TranscriptionQuery();
   List<Transcription> _items = const [];
   List<Tag> _tags = const [];
   bool _loading = true;
+  bool _hasMore = false;
+  bool _loadingMore = false;
+  bool _loadMoreFailed = false;
   int _requestId = 0;
   bool _disposed = false;
 
@@ -37,6 +45,15 @@ class TranscriptionListController extends ChangeNotifier {
 
   /// True until the first result arrives.
   bool get loading => _loading;
+
+  /// Whether more transcriptions can be loaded after the ones in [items].
+  bool get hasMore => _hasMore;
+
+  /// A next page is being fetched.
+  bool get loadingMore => _loadingMore;
+
+  /// The last attempt to fetch a next page failed; [loadMore] with `retry: true` tries again.
+  bool get loadMoreFailed => _loadMoreFailed;
 
   /// Re-runs the current query and refreshes the tag library, e.g. after
   /// something changed a transcription or created a tag.
@@ -56,7 +73,7 @@ class TranscriptionListController extends ChangeNotifier {
     await _repository.upload(request);
     _query = _query.copyWith(search: '', statuses: {}, tags: {});
     notifyListeners();
-    await _load();
+    await _load(reset: true);
   }
 
   Future<void> _loadTags() async {
@@ -85,18 +102,53 @@ class TranscriptionListController extends ChangeNotifier {
   void _apply(TranscriptionQuery query) {
     _query = query;
     notifyListeners(); // the controls reflect the new query right away
-    _load();
+    _load(reset: true);
   }
 
-  Future<void> _load() async {
+  /// Fetches the list again. A new query ([reset]) starts over with the first page; otherwise the
+  /// request covers everything loaded so far, so that a refresh (the poll, a rename) keeps what the
+  /// user has scrolled through and picks up new items and progress in one go.
+  Future<void> _load({bool reset = false}) async {
     final id = ++_requestId;
-    final items = await _repository.list(_query);
+    final pages = reset ? 1 : max(1, (_items.length + pageSize - 1) ~/ pageSize);
+    final size = min(pages * pageSize, transcriptionMaxPageSize);
+    final page = await _repository.list(_query, page: 0, size: size);
     // A newer query was issued while this one was in flight.
     if (_disposed || id != _requestId) return;
-    _items = items;
+    _items = page.items;
+    _hasMore = page.hasNext;
     _loading = false;
+    _loadingMore = false;
+    _loadMoreFailed = false;
     notifyListeners();
     _schedulePoll();
+  }
+
+  /// Fetches the page after the loaded items and appends it (the list scrolls endlessly). Does nothing
+  /// when there is no next page or one is on its way; after a failure it waits for [retry].
+  Future<void> loadMore({bool retry = false}) async {
+    if (!_hasMore || _loadingMore || _loading) return;
+    if (_loadMoreFailed && !retry) return;
+    final id = _requestId;
+    _loadingMore = true;
+    _loadMoreFailed = false;
+    notifyListeners();
+    try {
+      final page = await _repository.list(_query, page: _items.length ~/ pageSize, size: pageSize);
+      // A refresh or a new query replaced the list meanwhile; it owns the state now.
+      if (_disposed || id != _requestId) return;
+      // Pages are cut by position, so an upload in between can repeat the last item of the previous page.
+      final known = {for (final item in _items) item.id};
+      _items = [..._items, for (final item in page.items) if (!known.contains(item.id)) item];
+      _hasMore = page.hasNext;
+      _loadingMore = false;
+      notifyListeners();
+    } on Object {
+      if (_disposed || id != _requestId) return;
+      _loadingMore = false;
+      _loadMoreFailed = true;
+      notifyListeners();
+    }
   }
 
   void _schedulePoll() {
@@ -104,7 +156,7 @@ class TranscriptionListController extends ChangeNotifier {
     _poll = null;
     final interval = pollInterval;
     if (interval == null || !_items.any((i) => i.status != TranscriptionStatus.done)) return;
-    _poll = Timer(interval, _load);
+    _poll = Timer(interval, () => _load());
   }
 
   @override

@@ -40,6 +40,10 @@ class TranscribeController(
         val SUPPORTED_EXTENSIONS = setOf("mp3", "mp4", "m4a", "wav", "ogg", "oga", "opus", "flac", "webm", "mkv", "avi", "mov")
         private val MAX_UPLOAD_SIZE_BYTES = 400L * 1024 * 1024
 
+        /** Page size of the paged list when the client does not say; the largest it may ask for. */
+        const val DEFAULT_PAGE_SIZE = 30
+        const val MAX_PAGE_SIZE = 500
+
         private val IMAGE_SIGNATURES = listOf(
             byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte())          to "JPEG",
             byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47)                      to "PNG",
@@ -217,13 +221,37 @@ class TranscribeController(
 
     data class TranscriptionSummary(val jobId: String, val fileName: String, val title: String, val createdAt: String, val status: String, val tags: List<String>)
 
+    /** The paged shape of the list: what `GET /transcriptions?page=&size=` returns. */
+    data class TranscriptionPage(val items: List<TranscriptionSummary>, val page: Int, val size: Int, val hasNext: Boolean)
+
+    /**
+     * The user's transcriptions, newest first.
+     *
+     * Without `page`/`size` this is the plain array the production web client has always received. With
+     * either of them it is a [TranscriptionPage] (`page` counts from 0, `size` defaults to
+     * [DEFAULT_PAGE_SIZE]); new clients use that and the old shape can go once the old client is retired.
+     */
     @GetMapping("/transcriptions")
-    fun listTranscriptions(servletRequest: HttpServletRequest): List<TranscriptionSummary> {
+    fun listTranscriptions(
+        @RequestParam(required = false) page: Int?,
+        @RequestParam(required = false) size: Int?,
+        servletRequest: HttpServletRequest,
+    ): Any {
         val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
             ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
-        return submissionService.listForUser(userId).map {
+        fun summary(it: SubmissionService.SubmissionSummary) =
             TranscriptionSummary(it.jobId.toString(), it.fileName, it.title, it.createdAt, it.status, it.tags)
+
+        if (page == null && size == null) return submissionService.listForUser(userId).map(::summary)
+
+        val pageNumber = page ?: 0
+        val pageSize = size ?: DEFAULT_PAGE_SIZE
+        if (pageNumber < 0) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "page must be 0 or more")
+        if (pageSize !in 1..MAX_PAGE_SIZE) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "size must be between 1 and $MAX_PAGE_SIZE")
         }
+        val result = submissionService.listPageForUser(userId, pageNumber, pageSize)
+        return TranscriptionPage(result.items.map(::summary), pageNumber, pageSize, result.hasNext)
     }
 
     @GetMapping("/transcript")
