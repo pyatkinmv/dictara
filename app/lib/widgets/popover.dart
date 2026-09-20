@@ -15,6 +15,8 @@ class Popover extends StatefulWidget {
     this.gap = 6,
     this.matchTargetWidth = false,
     this.minWidth = 0,
+    this.estimatedSize,
+    this.useRootOverlay = false,
   });
 
   /// Builds the element that opens the popover; call `toggle` to open/close.
@@ -38,6 +40,17 @@ class Popover extends StatefulWidget {
   final bool matchTargetWidth;
   final double minWidth;
 
+  /// The panel's rough size. When set, the popover looks at the space around
+  /// the target as it opens: it flips above the target if there is no room
+  /// below, and lines up with the target's right edge if it would run off the
+  /// right side of the window.
+  final Size? estimatedSize;
+
+  /// Draw the panel in the app's root overlay, above everything (the design's
+  /// `position: fixed`), instead of the page's own overlay, which the router
+  /// nests inside the content area and which clips the panel to it.
+  final bool useRootOverlay;
+
   @override
   State<Popover> createState() => _PopoverState();
 }
@@ -47,14 +60,38 @@ class _PopoverState extends State<Popover> {
   final _link = LayerLink();
   final _tapGroup = Object();
 
-  void _toggle() => setState(_portal.toggle);
+  /// Placement chosen when the popover opened; null = as configured.
+  ({bool above, bool alignEnd})? _placement;
+
+  void _toggle() {
+    if (!_portal.isShowing) _placement = _choosePlacement();
+    setState(_portal.toggle);
+  }
 
   void _close() {
     if (_portal.isShowing) setState(_portal.hide);
   }
 
+  static const _windowMargin = 8.0;
+
+  ({bool above, bool alignEnd})? _choosePlacement() {
+    final size = widget.estimatedSize;
+    final box = context.findRenderObject();
+    if (size == null || box is! RenderBox || !box.hasSize) return null;
+
+    final target = box.localToGlobal(Offset.zero) & box.size;
+    final window = MediaQuery.sizeOf(context);
+    final fitsBelow = target.bottom + widget.gap + size.height <= window.height - _windowMargin;
+    final fitsAbove = target.top - widget.gap - size.height >= _windowMargin;
+    final above = widget.above ? (fitsAbove || !fitsBelow) : (!fitsBelow && fitsAbove);
+    final alignEnd = widget.alignEnd || target.left + size.width > window.width - _windowMargin;
+    return (above: above, alignEnd: alignEnd);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final above = _placement?.above ?? widget.above;
+    final alignEnd = _placement?.alignEnd ?? widget.alignEnd;
     return LayoutBuilder(
       builder: (context, constraints) {
         final targetWidth = constraints.maxWidth;
@@ -62,13 +99,16 @@ class _PopoverState extends State<Popover> {
           link: _link,
           child: OverlayPortal(
             controller: _portal,
+            overlayLocation: widget.useRootOverlay
+                ? OverlayChildLocation.rootOverlay
+                : OverlayChildLocation.nearestOverlay,
             overlayChildBuilder: (context) => Align(
               alignment: Alignment.topLeft,
               child: CompositedTransformFollower(
                 link: _link,
-                targetAnchor: Alignment(widget.alignEnd ? 1 : -1, widget.above ? -1 : 1),
-                followerAnchor: Alignment(widget.alignEnd ? 1 : -1, widget.above ? 1 : -1),
-                offset: Offset(0, widget.above ? -widget.gap : widget.gap),
+                targetAnchor: Alignment(alignEnd ? 1 : -1, above ? -1 : 1),
+                followerAnchor: Alignment(alignEnd ? 1 : -1, above ? 1 : -1),
+                offset: Offset(0, above ? -widget.gap : widget.gap),
                 child: TapRegion(
                   groupId: _tapGroup,
                   child: widget.matchTargetWidth
@@ -98,7 +138,13 @@ class _PopoverState extends State<Popover> {
 /// the overlay, which has no Material ancestor for `InkWell`, and the hover
 /// fills of its rows must paint above the white.
 class PopoverPanel extends StatelessWidget {
-  const PopoverPanel({super.key, required this.child, this.padding = const EdgeInsets.all(8)});
+  const PopoverPanel({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(8),
+    this.radius = appRadius,
+    this.shadow,
+  });
 
   final Widget child;
 
@@ -106,17 +152,21 @@ class PopoverPanel extends StatelessWidget {
   /// field, a rule) reach the edge.
   final EdgeInsets padding;
 
+  final double radius;
+
+  /// Overrides the default accent-tinted shadow.
+  final List<BoxShadow>? shadow;
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: p.surface,
-        borderRadius: BorderRadius.circular(appRadius),
+        borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: p.border),
-        boxShadow: [
-          BoxShadow(color: p.accent.withValues(alpha: .12), blurRadius: 20, offset: const Offset(0, 4)),
-        ],
+        boxShadow: shadow ??
+            [BoxShadow(color: p.accent.withValues(alpha: .12), blurRadius: 20, offset: const Offset(0, 4))],
       ),
       // Clip to the card's rounded corners, so content that reaches the edge
       // (a search field, a hover fill) does not poke out of them.
@@ -124,7 +174,7 @@ class PopoverPanel extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(1),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(appRadius - 1),
+          borderRadius: BorderRadius.circular(radius - 1),
           child: Material(
             color: Colors.transparent,
             child: Padding(

@@ -30,12 +30,12 @@ void main() {
       final tag = await repo.addTag(0, '  Budget ');
 
       expect(tag.label, 'budget');
-      expect(tag.color, tagPalette[6 % tagPalette.length]); // library had 6 tags
+      expect(tag.color, libraryPalette[6 % libraryPalette.length]); // library had 6 tags
       expect((await repo.tags()).map((t) => t.label), contains('budget'));
       expect((await repo.get(0))!.item.tags.map((t) => t.label), contains('budget'));
 
       // The next one gets the next color.
-      expect((await repo.addTag(0, 'second')).color, tagPalette[7 % tagPalette.length]);
+      expect((await repo.addTag(0, 'second')).color, libraryPalette[7 % libraryPalette.length]);
     });
 
     test('adding the same tag twice does not duplicate it', () async {

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../data/transcription_repository.dart';
+import '../models/speaker.dart';
 import '../models/tag.dart';
 import '../models/transcription_detail.dart';
 
@@ -16,6 +17,7 @@ class TranscriptionDetailController extends ChangeNotifier {
 
   TranscriptionDetail? _current;
   List<Tag> _library = const [];
+  List<Speaker> _speakers = const [];
   bool _notFound = false;
   int _requestId = 0;
   bool _disposed = false;
@@ -25,6 +27,9 @@ class TranscriptionDetailController extends ChangeNotifier {
 
   /// The tag library, for the "Add tag" dropdown.
   List<Tag> get library => _library;
+
+  /// The speaker library, for the Speaker Picker.
+  List<Speaker> get speakers => _speakers;
 
   /// The last requested id does not exist or is not done yet.
   bool get notFound => _notFound;
@@ -38,10 +43,12 @@ class TranscriptionDetailController extends ChangeNotifier {
     final requestId = ++_requestId;
     final detail = await _repository.get(id);
     final library = await _repository.tags();
+    final speakers = await _repository.speakers();
     // Another transcription was requested while this one was loading.
     if (_disposed || requestId != _requestId) return;
     _current = detail;
     _library = library;
+    _speakers = speakers;
     _notFound = detail == null;
     notifyListeners();
   }
@@ -92,6 +99,23 @@ class TranscriptionDetailController extends ChangeNotifier {
     await _repository.removeTag(current.item.id, label);
     if (_disposed) return;
     _onChanged?.call();
+  }
+
+  /// Attributes the given segments of the open transcription to the speaker
+  /// called [name], creating the speaker in the library if it is new.
+  Future<void> assignSpeaker(Set<int> segmentIndexes, String name) async {
+    final current = _current;
+    if (current == null || segmentIndexes.isEmpty || name.trim().isEmpty) return;
+
+    final speaker = await _repository.assignSpeaker(current.item.id, segmentIndexes, name);
+    final speakers = await _repository.speakers();
+    // The user moved on to another transcription meanwhile.
+    if (_disposed || _current?.item.id != current.item.id) return;
+    _speakers = speakers;
+    _current = _current!.copyWith(
+      segmentSpeakers: {..._current!.segmentSpeakers, for (final i in segmentIndexes) i: speaker},
+    );
+    notifyListeners();
   }
 
   @override

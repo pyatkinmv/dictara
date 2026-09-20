@@ -23,7 +23,7 @@ class Tag {
 
 /// Colors handed to new tags and speakers in turn (`docs/design.md`: the
 /// color at index `library.size % 10`).
-const tagPalette = <Color>[
+const libraryPalette = <Color>[
   Color(0xFF2563EB),
   Color(0xFF059669),
   Color(0xFF7C3AED),

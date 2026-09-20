@@ -14,9 +14,12 @@ class Segment {
 
 /// Consecutive segments by the same speaker, rendered as one block.
 class SpeakerRun {
-  const SpeakerRun({required this.speaker, required this.segments});
+  const SpeakerRun({required this.speaker, required this.firstIndex, required this.segments});
 
   final Speaker speaker;
+
+  /// Position of the first segment in the whole transcript.
+  final int firstIndex;
   final List<Segment> segments;
 }
 
@@ -40,6 +43,7 @@ class TranscriptionDetail {
     required this.originalFilename,
     required this.fileSizeBytes,
     this.speakers = const {},
+    this.segmentSpeakers = const {},
     this.summary,
     this.language,
     this.wordCount,
@@ -51,6 +55,12 @@ class TranscriptionDetail {
 
   /// Confirmed mapping of diarizer slots to named speakers.
   final Map<int, Speaker> speakers;
+
+  /// Speakers the user assigned to single segments by hand, by segment index.
+  /// They win over [speakers].
+  ///
+  /// How the gateway stores this is still open (`docs/api-gaps.md` §1.3).
+  final Map<int, Speaker> segmentSpeakers;
 
   /// Null until the summary has been generated (or when summarizing is off).
   final Summary? summary;
@@ -65,28 +75,39 @@ class TranscriptionDetail {
   /// Approximate; not stored by the gateway yet (`docs/api-gaps.md` §1.4).
   final int? wordCount;
 
+  /// The speaker of a diarizer slot (the confirmed mapping, else "Speaker N").
   Speaker speakerFor(int slot) => speakers[slot] ?? Speaker.unassigned(slot);
+
+  /// Who speaks segment [index]: a manual assignment, else its slot's speaker.
+  Speaker speakerOfSegment(int index) => segmentSpeakers[index] ?? speakerFor(segments[index].speakerSlot);
+
+  /// Indexes of the segments currently attributed to the speaker called [name].
+  Set<int> segmentsBySpeaker(String name) => {
+        for (var i = 0; i < segments.length; i++)
+          if (speakerOfSegment(i).name == name) i,
+      };
 
   /// Groups consecutive segments by effective speaker (compared by name, as
   /// in the design: two slots mapped to the same person merge into one block).
   List<SpeakerRun> get runs {
     final runs = <SpeakerRun>[];
-    for (final segment in segments) {
-      final speaker = speakerFor(segment.speakerSlot);
+    for (var i = 0; i < segments.length; i++) {
+      final speaker = speakerOfSegment(i);
       if (runs.isNotEmpty && runs.last.speaker.name == speaker.name) {
-        runs.last.segments.add(segment);
+        runs.last.segments.add(segments[i]);
       } else {
-        runs.add(SpeakerRun(speaker: speaker, segments: [segment]));
+        runs.add(SpeakerRun(speaker: speaker, firstIndex: i, segments: [segments[i]]));
       }
     }
     return runs;
   }
 
-  TranscriptionDetail copyWith({Transcription? item}) {
+  TranscriptionDetail copyWith({Transcription? item, Map<int, Speaker>? segmentSpeakers}) {
     return TranscriptionDetail(
       item: item ?? this.item,
       segments: segments,
       speakers: speakers,
+      segmentSpeakers: segmentSpeakers ?? this.segmentSpeakers,
       summary: summary,
       originalFilename: originalFilename,
       fileSizeBytes: fileSizeBytes,

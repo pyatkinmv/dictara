@@ -1,3 +1,4 @@
+import '../models/speaker.dart';
 import '../models/tag.dart';
 import '../models/transcription.dart';
 import '../models/transcription_detail.dart';
@@ -63,4 +64,17 @@ abstract class TranscriptionRepository {
 
   /// The tag library, in display order.
   Future<List<Tag>> tags();
+
+  /// The speaker library, in creation order.
+  Future<List<Speaker>> speakers();
+
+  /// Attributes the given segments of a transcription to the speaker called
+  /// [name] and returns that speaker. A name that is not in the library yet is
+  /// created first.
+  ///
+  /// The gateway has nothing for this yet: `docs/api-gaps.md` §2.5 sketches
+  /// `PUT /jobs/{id}/speakers/{slot}` with a scope of a whole slot or one
+  /// segment, and §1.3 leaves the storage open. This mock works per segment,
+  /// as the design does.
+  Future<Speaker> assignSpeaker(int id, Set<int> segmentIndexes, String name);
 }

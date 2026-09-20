@@ -179,6 +179,12 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   /// The tag library, in creation order. Mutable: tags can be created from a transcription.
   final List<Tag> _library = List.of(_seedTags);
 
+  /// The speaker library, in creation order. Mutable like the tag library.
+  final List<Speaker> _speakerLibrary = [_alexei, _maria, _james];
+
+  /// Speakers assigned by hand, per transcription id, then per segment index.
+  final Map<int, Map<int, Speaker>> _segmentSpeakers = {};
+
   @override
   Future<List<Transcription>> list(TranscriptionQuery query) async {
     final q = query.search.trim().toLowerCase();
@@ -210,6 +216,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
       item: _items[index],
       segments: _transcript,
       speakers: id == _itemWithSuggestions ? const {} : _confirmedSpeakers,
+      segmentSpeakers: Map.unmodifiable(_segmentSpeakers[id] ?? const {}),
       // The design shows the same summary and file details for every item.
       summary: _summary,
       originalFilename: 'product_sync_2025_06_23.mp4',
@@ -229,11 +236,30 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   Future<List<Tag>> tags() async => List.unmodifiable(_library);
 
   @override
+  Future<List<Speaker>> speakers() async => List.unmodifiable(_speakerLibrary);
+
+  @override
+  Future<Speaker> assignSpeaker(int id, Set<int> segmentIndexes, String name) async {
+    final wanted = name.trim();
+    // The library matches names case-insensitively; a new one keeps the case it was typed in.
+    var speaker = _speakerLibrary.where((s) => s.name.toLowerCase() == wanted.toLowerCase()).firstOrNull;
+    if (speaker == null) {
+      speaker = Speaker(wanted, libraryPalette[_speakerLibrary.length % libraryPalette.length]);
+      _speakerLibrary.add(speaker);
+    }
+    final assigned = _segmentSpeakers.putIfAbsent(id, () => {});
+    for (final index in segmentIndexes) {
+      assigned[index] = speaker;
+    }
+    return speaker;
+  }
+
+  @override
   Future<Tag> addTag(int id, String label) async {
     final wanted = label.trim().toLowerCase();
     var tag = _library.where((t) => t.label == wanted).firstOrNull;
     if (tag == null) {
-      tag = Tag(wanted, tagPalette[_library.length % tagPalette.length]);
+      tag = Tag(wanted, libraryPalette[_library.length % libraryPalette.length]);
       _library.add(tag);
     }
     final index = _items.indexWhere((i) => i.id == id);

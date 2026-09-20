@@ -27,16 +27,17 @@ class CheckMark extends StatelessWidget {
 
 /// Small radio dot, the single-choice counterpart of [CheckMark].
 class RadioMark extends StatelessWidget {
-  const RadioMark({super.key, required this.selected});
+  const RadioMark({super.key, required this.selected, this.size = 16});
 
   final bool selected;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     return Container(
-      width: 16,
-      height: 16,
+      width: size,
+      height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
@@ -44,7 +45,11 @@ class RadioMark extends StatelessWidget {
         border: Border.all(color: selected ? p.accent : p.text3, width: selected ? 1.6 : 1.2),
       ),
       child: selected
-          ? Container(width: 8, height: 8, decoration: BoxDecoration(color: p.accent, shape: BoxShape.circle))
+          ? Container(
+              width: size / 2,
+              height: size / 2,
+              decoration: BoxDecoration(color: p.accent, shape: BoxShape.circle),
+            )
           : null,
     );
   }

@@ -69,7 +69,11 @@ class _TranscriptionDetailPageState extends State<TranscriptionDetailPage> {
         _Tabs(active: _tab, onChanged: (tab) => setState(() => _tab = tab)),
         Expanded(
           child: switch (_tab) {
-            DetailTab.transcript => TranscriptView(detail: detail),
+            DetailTab.transcript => TranscriptView(
+              detail: detail,
+              library: controller.speakers,
+              onAssign: controller.assignSpeaker,
+            ),
             DetailTab.overview => OverviewView(detail: detail),
           },
         ),

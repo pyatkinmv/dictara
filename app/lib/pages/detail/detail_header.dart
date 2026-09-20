@@ -8,6 +8,7 @@ import '../../state/transcription_detail_controller.dart';
 import '../../theme/app_palette.dart';
 import '../../util/format.dart';
 import '../../widgets/status_badge.dart';
+import 'speakers_row.dart';
 import 'tags_row.dart';
 
 /// Sticky top part of the detail page: breadcrumb, editable title, meta row
@@ -48,7 +49,10 @@ class DetailHeader extends StatelessWidget {
                       padding: EdgeInsets.fromLTRB(6, 0, 6, 10),
                       child: DetailTagsRow(),
                     ),
-                    // The speakers row (iteration 6) goes here.
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(6, 0, 6, 6),
+                      child: DetailSpeakersRow(),
+                    ),
                   ],
                 ),
               ),
