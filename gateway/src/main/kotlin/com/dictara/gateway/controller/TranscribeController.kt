@@ -3,8 +3,11 @@ package com.dictara.gateway.controller
 import com.dictara.gateway.entity.*
 import com.dictara.gateway.repository.*
 import com.dictara.gateway.storage.AudioStorage
+import com.dictara.gateway.service.ListSort
+import com.dictara.gateway.service.ListStatuses
 import com.dictara.gateway.service.OrchestratorService
 import com.dictara.gateway.service.SubmissionService
+import com.dictara.gateway.service.TranscriptionListFilter
 import com.dictara.gateway.service.UserService
 import com.dictara.gateway.util.TranscriptFormatter
 import jakarta.servlet.http.HttpServletRequest
@@ -240,16 +243,28 @@ class TranscribeController(
     data class TranscriptionPage(val items: List<TranscriptionSummary>, val page: Int, val size: Int, val hasNext: Boolean)
 
     /**
-     * The user's transcriptions, newest first.
+     * The user's transcriptions, newest first unless `sort` says otherwise.
      *
      * Without `page`/`size` this is the plain array the production web client has always received. With
      * either of them it is a [TranscriptionPage] (`page` counts from 0, `size` defaults to
      * [DEFAULT_PAGE_SIZE]); new clients use that and the old shape can go once the old client is retired.
+     *
+     * The list can be narrowed and ordered, in either shape:
+     *  - `q`: text to find in the title shown in the list, ignoring case;
+     *  - `status`: any of `pending`, `processing` (which includes summarizing), `done`, `failed`; repeat
+     *    the parameter for several;
+     *  - `tag`: any of these tag names; repeat the parameter for several (names may contain commas, so a
+     *    comma is not a separator);
+     *  - `sort`: `newest` (default), `oldest`, `longest` or `name`.
+     * An unknown status or sort is a 400 rather than being ignored, so a typo does not quietly return the
+     * wrong list.
      */
     @GetMapping("/transcriptions")
     fun listTranscriptions(
         @RequestParam(required = false) page: Int?,
         @RequestParam(required = false) size: Int?,
+        @RequestParam(required = false) q: String?,
+        @RequestParam(required = false) sort: String?,
         servletRequest: HttpServletRequest,
     ): Any {
         val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
@@ -260,7 +275,24 @@ class TranscribeController(
                 it.audioDurationS, it.speakerCount, it.processingPct, it.processingPhase,
             )
 
-        if (page == null && size == null) return submissionService.listForUser(userId).map(::summary)
+        // Read straight from the request: binding a List would split "a,b" into two values.
+        val statuses = servletRequest.getParameterValues("status").orEmpty().onEach {
+            if (it !in ListStatuses.stored) {
+                throw ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Unknown status '$it'; expected one of ${ListStatuses.stored.keys.sorted()}",
+                )
+            }
+        }.toSet()
+        val filter = TranscriptionListFilter(
+            search = q,
+            statuses = statuses,
+            tags = servletRequest.getParameterValues("tag").orEmpty().filter { it.isNotEmpty() }.toSet(),
+            sort = if (sort == null) ListSort.NEWEST else ListSort.parse(sort) ?: throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST, "Unknown sort '$sort'; expected one of ${ListSort.entries.map { it.param }}",
+            ),
+        )
+
+        if (page == null && size == null) return submissionService.listForUser(userId, filter).map(::summary)
 
         val pageNumber = page ?: 0
         val pageSize = size ?: DEFAULT_PAGE_SIZE
@@ -268,7 +300,7 @@ class TranscribeController(
         if (pageSize !in 1..MAX_PAGE_SIZE) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "size must be between 1 and $MAX_PAGE_SIZE")
         }
-        val result = submissionService.listPageForUser(userId, pageNumber, pageSize)
+        val result = submissionService.listPageForUser(userId, filter, pageNumber, pageSize)
         return TranscriptionPage(result.items.map(::summary), pageNumber, pageSize, result.hasNext)
     }
 

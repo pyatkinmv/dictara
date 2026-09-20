@@ -59,6 +59,7 @@ List<String> _ids(TranscriptionListController c) => [for (final i in c.items) i.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(loadInter);
+  _searchDebounceTests();
 
   group('FakeTranscriptionRepository pages', () {
     test('a page is a slice of the sorted list and knows whether more follows', () async {
@@ -102,7 +103,7 @@ void main() {
 
   group('TranscriptionListController paging', () {
     Future<TranscriptionListController> controller(_ControlledRepo repo, {int pageSize = 10}) async {
-      final c = TranscriptionListController(repo, pageSize: pageSize);
+      final c = TranscriptionListController(repo, pageSize: pageSize, searchDebounce: Duration.zero);
       addTearDown(c.dispose);
       await pumpEventQueue();
       return c;
@@ -368,6 +369,130 @@ void main() {
       // u5 and u50..u57: nine, all on the first page.
       expect(list.items.length, 9);
       expect(list.hasMore, isFalse);
+    });
+  });
+}
+
+/// The search box: the list follows once typing pauses, not on every letter.
+void _searchDebounceTests() {
+  group('search debounce', () {
+    Future<(_ControlledRepo, TranscriptionListController)> start(WidgetTester tester, {Duration? debounce}) async {
+      final repo = await _repoWith(0);
+      final c = debounce == null
+          ? TranscriptionListController(repo)
+          : TranscriptionListController(repo, searchDebounce: debounce);
+      addTearDown(c.dispose);
+      await tester.pump(); // the first load
+      return (repo, c);
+    }
+
+    testWidgets('letters typed in a burst cause one request, after the pause', (tester) async {
+      final (repo, c) = await start(tester);
+      final before = repo.calls.length;
+
+      c.setSearch('r');
+      c.setSearch('re');
+      c.setSearch('rev');
+      expect(c.query.search, 'rev'); // the field has it at once
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(repo.calls.length, before, reason: 'still waiting for more typing');
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(repo.calls.length, before + 1);
+      expect(repo.calls.last, (page: 0, size: transcriptionPageSize));
+    });
+
+    testWidgets('every letter restarts the wait', (tester) async {
+      final (repo, c) = await start(tester);
+      final before = repo.calls.length;
+
+      c.setSearch('a');
+      await tester.pump(const Duration(milliseconds: 200));
+      c.setSearch('ab'); // just before the first would have fired
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(repo.calls.length, before);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(repo.calls.length, before + 1);
+    });
+
+    testWidgets('a pause between two bursts gives two requests', (tester) async {
+      final (repo, c) = await start(tester);
+      final before = repo.calls.length;
+
+      c.setSearch('a');
+      await tester.pump(const Duration(milliseconds: 300));
+      c.setSearch('ab');
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(repo.calls.length, before + 2);
+    });
+
+    testWidgets('a filter chosen while typing sends at once, with the search text', (tester) async {
+      final (repo, c) = await start(tester);
+      final before = repo.calls.length;
+
+      c.setSearch('rev');
+      c.toggleStatus(TranscriptionStatus.done);
+      await tester.pump();
+      expect(repo.calls.length, before + 1);
+      expect(c.query.search, 'rev');
+      expect(c.query.statuses, {TranscriptionStatus.done});
+
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(repo.calls.length, before + 1, reason: 'the waiting search request was replaced, not repeated');
+    });
+
+    testWidgets('a sort chosen while typing does the same', (tester) async {
+      final (repo, c) = await start(tester);
+      final before = repo.calls.length;
+
+      c.setSearch('rev');
+      c.setSort(TranscriptionSort.name);
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(repo.calls.length, before + 1);
+    });
+
+    testWidgets('nothing is sent after the controller is gone', (tester) async {
+      final repo = await _repoWith(0);
+      final c = TranscriptionListController(repo);
+      await tester.pump();
+      final before = repo.calls.length;
+
+      c.setSearch('rev');
+      c.dispose();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(repo.calls.length, before);
+    });
+
+    testWidgets('a zero debounce sends at once', (tester) async {
+      final (repo, c) = await start(tester, debounce: Duration.zero);
+      final before = repo.calls.length;
+
+      c.setSearch('rev');
+      await tester.pump();
+
+      expect(repo.calls.length, before + 1);
+    });
+
+    testWidgets('typing in the search box searches once, after the pause', (tester) async {
+      final repo = await _repoWith(0);
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(DictaraApp(repository: repo));
+      await settle(tester);
+      final before = repo.calls.length;
+
+      await tester.enterText(find.byType(TextField).first, 'standup');
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(repo.calls.length, before, reason: 'not yet');
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(repo.calls.length, before + 1);
+      expect(find.byType(TranscriptionRow), findsOneWidget); // the mock filters by title
     });
   });
 }

@@ -73,6 +73,7 @@ MockClient _gateway(List<Map<String, dynamic>> all, {List<Uri>? requests}) => Mo
 void main() {
   _pagingTests();
   _fieldTests();
+  _queryTests();
 
   group('GatewayClient', () {
     test('asks the given path under /api and decodes JSON', () async {
@@ -217,28 +218,12 @@ void main() {
       expect((await empty.list(const TranscriptionQuery())).items, isEmpty);
     });
 
-    test('newest first by default, and the other sort orders work', () async {
-      Future<List<String>> titles(TranscriptionSort sort) async =>
-          [for (final i in (await repo.list(TranscriptionQuery(sort: sort))).items) i.title];
-
-      expect(await titles(TranscriptionSort.newest), ['Daily Standup', 'lecture.wav', 'Voice memo', 'queued.mp3']);
-      expect(await titles(TranscriptionSort.oldest), ['queued.mp3', 'Voice memo', 'lecture.wav', 'Daily Standup']);
-      expect(await titles(TranscriptionSort.name), ['Daily Standup', 'lecture.wav', 'queued.mp3', 'Voice memo']);
+    test('the entries keep the order the gateway gave them', () async {
+      final items = (await repo.list(const TranscriptionQuery())).items;
+      expect(items.map((i) => i.title), ['Daily Standup', 'lecture.wav', 'Voice memo', 'queued.mp3']);
     });
 
-    test('search, status and tag filters apply', () async {
-      Future<List<String>> titles(TranscriptionQuery q) async => [for (final i in (await repo.list(q)).items) i.title];
-
-      expect(await titles(const TranscriptionQuery(search: 'VOICE')), ['Voice memo']);
-      expect(await titles(const TranscriptionQuery(statuses: {TranscriptionStatus.failed})), ['Voice memo']);
-      expect(await titles(const TranscriptionQuery(tags: {'meeting'})), ['Daily Standup', 'Voice memo']);
-      expect(
-        await titles(const TranscriptionQuery(tags: {'meeting'}, statuses: {TranscriptionStatus.done})),
-        ['Daily Standup'],
-      );
-    });
-
-    test('an answer that is not a list is an error', () async {
+    test('an answer that is not a page is an error', () async {
       final broken = _repo(MockClient((request) async => _json({'oops': true})));
       await expectLater(broken.list(const TranscriptionQuery()), throwsA(isA<GatewayException>()));
     });
@@ -253,9 +238,27 @@ void main() {
   });
 
   group('HttpTranscriptionRepository.tags', () {
-    test('are the tags in use, once each, in order of appearance', () async {
-      final repo = _repo(MockClient((request) async => _json(_listJson)));
-      expect((await repo.tags()).map((t) => t.label), ['meeting', 'standup']);
+    test('are the library, asked for from /tags, in the order the gateway sends them', () async {
+      final requests = <Uri>[];
+      final repo = _repo(MockClient((request) async {
+        requests.add(request.url);
+        return _json([
+          {'id': 'a', 'label': 'meeting'},
+          {'id': 'b', 'label': 'standup'},
+          {'id': 'c', 'label': 'unused'},
+        ]);
+      }));
+
+      final tags = await repo.tags();
+
+      expect(requests.single.toString(), '/api/tags');
+      expect(tags.map((t) => t.label), ['meeting', 'standup', 'unused']); // unused ones too
+      expect(tags.first.color, colorForLabel('meeting'));
+    });
+
+    test('an answer that is not a list is an error', () async {
+      final repo = _repo(MockClient((request) async => _json({'oops': true})));
+      await expectLater(repo.tags(), throwsA(isA<GatewayException>()));
     });
 
     test('a tag always gets the same color, whatever the case', () {
@@ -348,32 +351,6 @@ void _pagingTests() {
       await expectLater(repo.list(const TranscriptionQuery()), throwsA(isA<GatewayException>()));
     });
 
-    test('a search is answered from the whole list, cut into pages here', () async {
-      final requests = <Uri>[];
-      final repo = _repo(_gateway(_many(70), requests: requests));
-
-      final page = await repo.list(const TranscriptionQuery(search: 'file 0'), size: 25);
-
-      // "File 000".."File 069" contain "file 0" for every number: 70 hits, 25 per page.
-      expect(requests.single.toString(), '/api/transcriptions'); // the unpaged array
-      expect(page.items.length, 25);
-      expect(page.hasNext, isTrue);
-      final third = await repo.list(const TranscriptionQuery(search: 'file 0'), page: 2, size: 25);
-      expect(third.items.length, 20);
-      expect(third.hasNext, isFalse);
-    });
-
-    test('filters and other sort orders page in the same way', () async {
-      final repo = _repo(_gateway(_many(70)));
-
-      final tagged = await repo.list(const TranscriptionQuery(tags: {'even'}), size: 20);
-      expect(tagged.items.length, 20);
-      expect(tagged.items.every((i) => i.tags.any((t) => t.label == 'even')), isTrue);
-      expect(tagged.hasNext, isTrue); // 35 tagged
-
-      final oldest = await repo.list(const TranscriptionQuery(sort: TranscriptionSort.oldest), size: 5);
-      expect(oldest.items.first.id, 'id-69');
-    });
   });
 }
 
@@ -424,17 +401,97 @@ void _fieldTests() {
       expect((await one({'processing_phase': 'summarizing'})).processingPhase, ProcessingPhase.summarizing);
       expect((await one({'processing_phase': 'polishing'})).processingPhase, isNull);
     });
+  });
+}
 
-    test('the longest sort now has lengths to go by', () async {
-      final repo = _repo(_gateway([
-        entry({'job_id': 'a', 'title': 'short', 'audio_duration_s': 60.0}),
-        entry({'job_id': 'b', 'title': 'no length'}),
-        entry({'job_id': 'c', 'title': 'long', 'audio_duration_s': 3600.0}),
-      ]));
+void _queryTests() {
+  group('HttpTranscriptionRepository list query', () {
+    /// The URL a query is sent as.
+    Future<Uri> urlFor(TranscriptionQuery query, {int page = 0, int size = 30}) async {
+      final requests = <Uri>[];
+      await _repo(_gateway(_many(3), requests: requests)).list(query, page: page, size: size);
+      return requests.single;
+    }
 
-      final page = await repo.list(const TranscriptionQuery(sort: TranscriptionSort.longest));
+    test('a plain query sends only the page', () async {
+      expect((await urlFor(const TranscriptionQuery())).toString(), '/api/transcriptions?page=0&size=30');
+    });
 
-      expect(page.items.map((i) => i.title), ['long', 'short', 'no length']);
+    test('the search text is sent, trimmed', () async {
+      expect((await urlFor(const TranscriptionQuery(search: '  review  '))).queryParameters['q'], 'review');
+    });
+
+    test('a blank search is not sent', () async {
+      expect((await urlFor(const TranscriptionQuery(search: '   '))).queryParameters.containsKey('q'), isFalse);
+    });
+
+    test('search text with special characters arrives intact', () async {
+      for (final text in ['100% & more', 'a+b', 'Разговор с клиентом', "it's", 'x=y?z#w', 'semi;colon']) {
+        final url = await urlFor(TranscriptionQuery(search: text));
+        expect(url.queryParameters['q'], text, reason: text);
+      }
+    });
+
+    test('statuses are sent by their names, once each, in a fixed order', () async {
+      final url = await urlFor(
+        const TranscriptionQuery(statuses: {TranscriptionStatus.failed, TranscriptionStatus.done}),
+      );
+
+      expect(url.queryParametersAll['status'], ['done', 'failed']);
+    });
+
+    test('every status has the name the gateway knows', () async {
+      final url = await urlFor(TranscriptionQuery(statuses: TranscriptionStatus.values.toSet()));
+      expect(url.queryParametersAll['status'], ['done', 'processing', 'pending', 'failed']);
+    });
+
+    test('tags are sent as repeated parameters, sorted, and a comma stays in the name', () async {
+      final url = await urlFor(const TranscriptionQuery(tags: {'standup', 'q3,planning', 'meeting'}));
+
+      expect(url.queryParametersAll['tag'], ['meeting', 'q3,planning', 'standup']);
+      expect(url.toString(), contains('tag=q3%2Cplanning'));
+    });
+
+    test('the default sort is not sent, the others are', () async {
+      expect((await urlFor(const TranscriptionQuery())).queryParameters.containsKey('sort'), isFalse);
+      expect(
+        (await urlFor(const TranscriptionQuery(sort: TranscriptionSort.newest))).queryParameters.containsKey('sort'),
+        isFalse,
+      );
+      for (final sort in [TranscriptionSort.oldest, TranscriptionSort.longest, TranscriptionSort.name]) {
+        expect((await urlFor(TranscriptionQuery(sort: sort))).queryParameters['sort'], sort.name);
+      }
+    });
+
+    test('everything together, with the page', () async {
+      final url = await urlFor(
+        const TranscriptionQuery(
+          search: 'team',
+          statuses: {TranscriptionStatus.done},
+          tags: {'standup'},
+          sort: TranscriptionSort.longest,
+        ),
+        page: 2,
+        size: 60,
+      );
+
+      expect(url.path, '/api/transcriptions');
+      expect(url.queryParametersAll, {
+        'page': ['2'],
+        'size': ['60'],
+        'q': ['team'],
+        'status': ['done'],
+        'tag': ['standup'],
+        'sort': ['longest'],
+      });
+    });
+
+    test('the gateway answer is used as it comes: no local filtering or sorting', () async {
+      final repo = _repo(_gateway(_many(5)));
+
+      final page = await repo.list(const TranscriptionQuery(sort: TranscriptionSort.name, search: 'x'));
+
+      expect(page.items.map((i) => i.id), ['id-0', 'id-1', 'id-2', 'id-3', 'id-4']);
     });
   });
 }

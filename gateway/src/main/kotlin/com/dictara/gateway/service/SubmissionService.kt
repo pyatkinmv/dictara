@@ -8,8 +8,6 @@ import com.dictara.gateway.util.TranscriptFormatter
 import com.dictara.gateway.plan.PlanService
 import com.dictara.gateway.repository.*
 import com.dictara.gateway.storage.UploadResult
-import org.springframework.data.domain.PageRequest
-import org.springframework.data.domain.Sort
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -31,6 +29,7 @@ class SubmissionService(
     private val orchestrator: OrchestratorService,
     private val planService: PlanService,
     private val transcriptListQueries: TranscriptListQueries,
+    private val submissionListQuery: SubmissionListQuery,
 ) {
     data class CreateResult(val submissionId: UUID, val dedup: Boolean)
 
@@ -109,17 +108,22 @@ class SubmissionService(
         return CreateResult(submission.id!!, dedup = false)
     }
 
+    /** The whole list of the user that matches [filter], in the order [filter] asks for (newest first by default). */
     @Transactional(readOnly = true)
-    fun listForUser(userId: UUID): List<SubmissionSummary> =
-        summarize(submissionRepo.findByUserIdOrderByCreatedAtDescIdDesc(userId))
+    fun listForUser(userId: UUID, filter: TranscriptionListFilter = TranscriptionListFilter()): List<SubmissionSummary> =
+        summarize(inOrder(submissionListQuery.findIds(userId, filter).ids))
 
-    /** One page of the same list, newest first (`GET /transcriptions?page=&size=`), [page] counting from 0. */
+    /** One page of that list (`GET /transcriptions?page=&size=`), [page] counting from 0. */
     @Transactional(readOnly = true)
-    fun listPageForUser(userId: UUID, page: Int, size: Int): SubmissionPage {
-        val slice = submissionRepo.findByUserId(
-            userId, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt", "id")),
-        )
-        return SubmissionPage(summarize(slice.content), slice.hasNext())
+    fun listPageForUser(userId: UUID, filter: TranscriptionListFilter, page: Int, size: Int): SubmissionPage {
+        val found = submissionListQuery.findIds(userId, filter, page, size)
+        return SubmissionPage(summarize(inOrder(found.ids)), found.hasNext)
+    }
+
+    /** The submissions with these ids, in the order of [ids] (the database returns them in any order). */
+    private fun inOrder(ids: List<UUID>): List<SubmissionEntity> {
+        val byId = submissionRepo.findAllById(ids).associateBy { it.id }
+        return ids.mapNotNull { byId[it] }
     }
 
     /** The list entries for [submissions]; their files, transcripts and tags are fetched in a few batched queries. */

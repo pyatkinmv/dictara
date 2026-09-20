@@ -85,15 +85,16 @@ ON CONFLICT (id) DO UPDATE SET
     segments = EXCLUDED.segments, detected_language = EXCLUDED.detected_language, title = EXCLUDED.title;
 
 -- ── Tags with the descriptions of the design's Tags page, and which transcriptions carry them ────────────
-INSERT INTO tags (id, user_id, name, description)
+-- created_at fixes the order the library lists them in (the design's order), which the default now() would not.
+INSERT INTO tags (id, user_id, name, description, created_at)
 VALUES
-    ('00000000-0000-4000-8000-0000000d0001', '00000000-0000-4000-8000-000000000001', 'meeting',   'Regular team meetings, standups, and group discussions.'),
-    ('00000000-0000-4000-8000-0000000d0002', '00000000-0000-4000-8000-000000000001', 'quarterly', 'End-of-quarter review sessions covering performance and roadmap.'),
-    ('00000000-0000-4000-8000-0000000d0003', '00000000-0000-4000-8000-000000000001', 'interview', 'Candidate interviews for open positions.'),
-    ('00000000-0000-4000-8000-0000000d0004', '00000000-0000-4000-8000-000000000001', 'hiring',    'Recruitment-related recordings including screens and debriefs.'),
-    ('00000000-0000-4000-8000-0000000d0005', '00000000-0000-4000-8000-000000000001', 'ideas',     'Brainstorming sessions and exploratory discussions.'),
-    ('00000000-0000-4000-8000-0000000d0006', '00000000-0000-4000-8000-000000000001', 'standup',   'Daily standup recordings. Short format, multiple speakers.')
-ON CONFLICT (user_id, name) DO UPDATE SET description = EXCLUDED.description;
+    ('00000000-0000-4000-8000-0000000d0001', '00000000-0000-4000-8000-000000000001', 'meeting',   'Regular team meetings, standups, and group discussions.', '2025-06-01 09:00:01+00'),
+    ('00000000-0000-4000-8000-0000000d0002', '00000000-0000-4000-8000-000000000001', 'quarterly', 'End-of-quarter review sessions covering performance and roadmap.', '2025-06-01 09:00:02+00'),
+    ('00000000-0000-4000-8000-0000000d0003', '00000000-0000-4000-8000-000000000001', 'interview', 'Candidate interviews for open positions.', '2025-06-01 09:00:03+00'),
+    ('00000000-0000-4000-8000-0000000d0004', '00000000-0000-4000-8000-000000000001', 'hiring',    'Recruitment-related recordings including screens and debriefs.', '2025-06-01 09:00:04+00'),
+    ('00000000-0000-4000-8000-0000000d0005', '00000000-0000-4000-8000-000000000001', 'ideas',     'Brainstorming sessions and exploratory discussions.', '2025-06-01 09:00:05+00'),
+    ('00000000-0000-4000-8000-0000000d0006', '00000000-0000-4000-8000-000000000001', 'standup',   'Daily standup recordings. Short format, multiple speakers.', '2025-06-01 09:00:06+00')
+ON CONFLICT (user_id, name) DO UPDATE SET description = EXCLUDED.description, created_at = EXCLUDED.created_at;
 
 -- The tag is looked up by name: a tag of the same name made by hand keeps its own id.
 INSERT INTO transcript_tags (transcript_id, tag_id)

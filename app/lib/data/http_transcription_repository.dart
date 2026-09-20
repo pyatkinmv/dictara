@@ -25,8 +25,8 @@ class NotIntegratedException implements Exception {
 /// The real data source: the gateway over HTTP.
 ///
 /// Being connected screen by screen (`docs/local-backend-integration.md`): so far only the transcription
-/// list works. The gateway pages it and reports length, speakers and progress, but cannot filter or sort yet
-/// (integration iteration 2c), so those happen here. Everything else throws [NotIntegratedException].
+/// list and the tag names work. The gateway pages, searches, filters and sorts the list itself. Everything
+/// else throws [NotIntegratedException].
 class HttpTranscriptionRepository implements TranscriptionRepository {
   HttpTranscriptionRepository(this._client);
 
@@ -34,53 +34,45 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
 
   @override
   Future<TranscriptionPage> list(TranscriptionQuery query, {int page = 0, int size = transcriptionPageSize}) async {
-    if (_gatewayCanAnswer(query)) {
-      final body = await _client.getJson('/transcriptions?page=$page&size=$size');
-      if (body is! Map<String, dynamic> || body['items'] is! List) {
-        throw const GatewayException('Expected a page of transcriptions');
-      }
-      return TranscriptionPage(
-        [for (final item in body['items'] as List<dynamic>) _transcriptionFromJson(item as Map<String, dynamic>)],
-        hasNext: body['has_next'] == true,
-      );
+    final body = await _client.getJson(_listPath(query, page, size));
+    if (body is! Map<String, dynamic> || body['items'] is! List) {
+      throw const GatewayException('Expected a page of transcriptions');
     }
-
-    final items = filterTranscriptions(await _fetchAll(), query);
-    switch (query.sort) {
-      case TranscriptionSort.newest:
-        items.sort((a, b) => b.uploadedAt.compareTo(a.uploadedAt));
-      case TranscriptionSort.oldest:
-        items.sort((a, b) => a.uploadedAt.compareTo(b.uploadedAt));
-      case TranscriptionSort.longest:
-        items.sort((a, b) => (b.duration ?? Duration.zero).compareTo(a.duration ?? Duration.zero));
-      case TranscriptionSort.name:
-        items.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
-    }
-    return sliceTranscriptions(items, page, size);
+    return TranscriptionPage(
+      [for (final item in body['items'] as List<dynamic>) _transcriptionFromJson(item as Map<String, dynamic>)],
+      hasNext: body['has_next'] == true,
+    );
   }
 
-  /// The gateway pages the plain list, newest first. It cannot search, filter or sort differently yet
-  /// (integration iteration 2c), so those queries are answered here from the whole list.
-  bool _gatewayCanAnswer(TranscriptionQuery query) =>
-      query.search.trim().isEmpty && query.statuses.isEmpty && query.tags.isEmpty && query.sort == TranscriptionSort.newest;
-
-  /// Every transcription of the user (the unpaged array), newest first as the gateway sends them.
-  Future<List<Transcription>> _fetchAll() async {
-    final body = await _client.getJson('/transcriptions');
-    if (body is! List) throw const GatewayException('Expected a list of transcriptions');
-    return [for (final item in body) _transcriptionFromJson(item as Map<String, dynamic>)];
+  /// `/transcriptions?page=0&size=30&q=…&status=…&tag=…&sort=…`: only what narrows the list or changes its
+  /// order is sent, and lists are sent as repeated parameters (a tag name may contain a comma).
+  static String _listPath(TranscriptionQuery query, int page, int size) {
+    final search = query.search.trim();
+    final tags = query.tags.toList()..sort();
+    return Uri(
+      path: '/transcriptions',
+      queryParameters: {
+        'page': '$page',
+        'size': '$size',
+        if (search.isNotEmpty) 'q': search,
+        // The enum names are the gateway's own: done, processing, pending, failed.
+        if (query.statuses.isNotEmpty)
+          'status': [for (final s in TranscriptionStatus.values) if (query.statuses.contains(s)) s.name],
+        if (tags.isNotEmpty) 'tag': tags,
+        if (query.sort != TranscriptionSort.newest) 'sort': query.sort.name,
+      },
+    ).toString();
   }
 
-  /// The library, until it has an endpoint of its own: the tags in use, in order of appearance.
+  /// The tag library (for the filter). Only the names so far; the Tags screen brings the rest.
   @override
   Future<List<Tag>> tags() async {
-    final seen = <String, Tag>{};
-    for (final item in await _fetchAll()) {
-      for (final tag in item.tags) {
-        seen.putIfAbsent(tag.label, () => tag);
-      }
-    }
-    return seen.values.toList();
+    final body = await _client.getJson('/tags');
+    if (body is! List) throw const GatewayException('Expected a list of tags');
+    return [
+      for (final entry in body)
+        Tag((entry as Map<String, dynamic>)['label'] as String, colorForLabel(entry['label'] as String)),
+    ];
   }
 
   @override

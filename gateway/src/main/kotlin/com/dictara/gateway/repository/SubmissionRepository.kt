@@ -1,20 +1,12 @@
 package com.dictara.gateway.repository
 
 import com.dictara.gateway.entity.SubmissionEntity
-import org.springframework.data.domain.Pageable
-import org.springframework.data.domain.Slice
 import org.springframework.data.jdbc.repository.query.Query
 import org.springframework.data.repository.CrudRepository
 import java.time.Instant
 import java.util.UUID
 
 interface SubmissionRepository : CrudRepository<SubmissionEntity, UUID> {
-
-    /** Newest first; entries created at the same moment are ordered by id, the same as in [findByUserId] pages. */
-    fun findByUserIdOrderByCreatedAtDescIdDesc(userId: UUID): List<SubmissionEntity>
-
-    /** One page of a user's submissions; a [Slice] only knows whether another page follows, so no COUNT query runs. */
-    fun findByUserId(userId: UUID, pageable: Pageable): Slice<SubmissionEntity>
 
     fun findByUserIdAndStatusOrderByCreatedAtAsc(userId: UUID, status: String): List<SubmissionEntity>
 

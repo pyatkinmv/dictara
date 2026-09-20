@@ -17,7 +17,15 @@ class TranscriptionListController extends ChangeNotifier {
   ///
   /// [pageSize] is how many transcriptions each request brings; the list grows a page at a time
   /// (see [loadMore]).
-  TranscriptionListController(this._repository, {this.pollInterval, this.pageSize = transcriptionPageSize}) {
+  ///
+  /// [searchDebounce]: the search is done by the server, so a request is not sent for every letter typed
+  /// but once the typing pauses this long (zero: at once).
+  TranscriptionListController(
+    this._repository, {
+    this.pollInterval,
+    this.pageSize = transcriptionPageSize,
+    this.searchDebounce = const Duration(milliseconds: 250),
+  }) {
     _loadTags();
     _load();
   }
@@ -25,7 +33,9 @@ class TranscriptionListController extends ChangeNotifier {
   final TranscriptionRepository _repository;
   final Duration? pollInterval;
   final int pageSize;
+  final Duration searchDebounce;
   Timer? _poll;
+  Timer? _searchTimer;
 
   TranscriptionQuery _query = const TranscriptionQuery();
   List<Transcription> _items = const [];
@@ -83,7 +93,17 @@ class TranscriptionListController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setSearch(String value) => _apply(_query.copyWith(search: value));
+  /// The text in the search field changed. The field shows it right away; the list follows after a pause.
+  void setSearch(String value) {
+    _query = _query.copyWith(search: value);
+    notifyListeners();
+    _searchTimer?.cancel();
+    if (searchDebounce == Duration.zero) {
+      _load(reset: true);
+    } else {
+      _searchTimer = Timer(searchDebounce, () => _load(reset: true));
+    }
+  }
 
   void setSort(TranscriptionSort sort) => _apply(_query.copyWith(sort: sort));
 
@@ -100,6 +120,7 @@ class TranscriptionListController extends ChangeNotifier {
   }
 
   void _apply(TranscriptionQuery query) {
+    _searchTimer?.cancel(); // this request carries the search text as well
     _query = query;
     notifyListeners(); // the controls reflect the new query right away
     _load(reset: true);
@@ -163,6 +184,7 @@ class TranscriptionListController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _poll?.cancel();
+    _searchTimer?.cancel();
     super.dispose();
   }
 }
