@@ -1,0 +1,63 @@
+package com.dictara.gateway.storage
+
+import org.slf4j.LoggerFactory
+import org.springframework.context.annotation.Profile
+import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.stereotype.Component
+import java.io.ByteArrayInputStream
+import java.io.InputStream
+import java.security.MessageDigest
+import java.time.LocalDate
+import java.util.UUID
+
+/**
+ * Audio storage for local development: the bytes live in the `local_audio_objects` table of the
+ * development database, so no bucket or Google credentials are needed and resetting the database
+ * resets the audio too. References look like `db://audio/<date>/<id>/<file name>`.
+ *
+ * The table comes from `db/local/R__local_audio.sql`, which only the `local` profile puts on Flyway's
+ * path. Production uses [GcsAudioStorage].
+ */
+@Profile("local")
+@Component
+class LocalDbAudioStorage(private val jdbc: JdbcTemplate) : AudioStorage {
+
+    private val log = LoggerFactory.getLogger(javaClass)
+
+    override fun upload(
+        audioMetaId: UUID, fileName: String, inputStream: InputStream, sizeBytes: Long, contentType: String,
+    ): UploadResult {
+        // Whole file in memory: fine for development, the size limit is 400 MB.
+        val bytes = inputStream.readBytes()
+        val hash = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+        val uri = "db://audio/${LocalDate.now()}/$audioMetaId/$fileName"
+        put(uri, bytes)
+        log.info("Stored audio at {} ({} bytes, sha256={})", uri, bytes.size, hash)
+        return UploadResult(AudioRef(uri), hash)
+    }
+
+    override fun download(ref: AudioRef): InputStream? {
+        val data = jdbc.query("SELECT data FROM local_audio_objects WHERE uri = ?", { rs, _ -> rs.getBytes(1) }, ref.uri)
+            .firstOrNull()
+        return data?.let { ByteArrayInputStream(it) }
+    }
+
+    override fun listObjects(): List<StorageObject> =
+        jdbc.query("SELECT uri, created_at FROM local_audio_objects WHERE uri LIKE 'db://audio/%' ORDER BY created_at") { rs, _ ->
+            StorageObject(rs.getString(1), rs.getTimestamp(2).toInstant())
+        }
+
+    override fun delete(ref: AudioRef) {
+        jdbc.update("DELETE FROM local_audio_objects WHERE uri = ?", ref.uri)
+    }
+
+    override fun uploadBytes(objectName: String, bytes: ByteArray) = put("db://$objectName", bytes)
+
+    private fun put(uri: String, bytes: ByteArray) {
+        jdbc.update(
+            """INSERT INTO local_audio_objects (uri, data) VALUES (?, ?)
+               ON CONFLICT (uri) DO UPDATE SET data = EXCLUDED.data""",
+            uri, bytes,
+        )
+    }
+}

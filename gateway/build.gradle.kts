@@ -31,6 +31,8 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    // Restarts the app when classes are rebuilt during `bootRun`; not part of the production jar.
+    developmentOnly("org.springframework.boot:spring-boot-devtools")
     implementation("io.micrometer:micrometer-registry-prometheus")
     implementation("com.google.auth:google-auth-library-oauth2-http:1.23.0")
     implementation("com.google.cloud:google-cloud-storage:2.+")

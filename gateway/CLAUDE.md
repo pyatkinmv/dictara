@@ -96,6 +96,12 @@ Every run is recorded in the `job_runs` table (`status`: `running` → `complete
 docker compose build gateway && docker compose up -d gateway
 ```
 
+## Local development (profile `local`)
+
+`scripts\dev.ps1` starts Postgres (`docker-compose.dev.yml`, database `dictara_dev`) and the gateway with the `local` profile; `scripts\dev-reset.ps1` recreates the database. Under this profile a stub transcriber (`adapter/StubTranscriber.kt`) replaces `TranscriberClient`, audio is kept in the database (`storage/LocalDbAudioStorage.kt`, table from `db/local/`), requests without a token belong to a seeded dev user (`filter/LocalDevAuthFilter.kt`), and the scheduled backup/cleanup jobs do not run.
+
+`config/LocalProfileGuard.kt` makes the profile refuse to start unless the database is `dictara_dev` on localhost and `GCS_UPLOADS_BUCKET` is unset — keep it that way, the cleanup job would otherwise delete real audio. Everything local is off by default (`@Profile("local")` / `!local`, `db/local` is not on Flyway's default path). Details: [docs/local-backend-integration.md](../docs/local-backend-integration.md).
+
 ## Running integration tests locally
 
 In CI, tests use Testcontainers (spins up a throwaway postgres). Locally, Testcontainers doesn't work (Docker Desktop API version mismatch), so tests connect to a real postgres container instead.

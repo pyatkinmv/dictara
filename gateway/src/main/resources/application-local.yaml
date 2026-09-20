@@ -1,0 +1,27 @@
+# Local development profile: `./gradlew bootRun --args="--spring.profiles.active=local"`
+# (see docs/local-backend-integration.md). Together with the beans marked @Profile("local") and the
+# guard in LocalProfileGuard this gives a gateway that needs only Postgres: a stub transcriber, audio
+# kept in the database, no scheduled jobs that touch storage, and no login.
+
+spring:
+  datasource:
+    # Only localhost and the dictara_dev database are accepted (LocalProfileGuard).
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/dictara_dev}
+  flyway:
+    # db/local: the table for LocalDbAudioStorage and the seed data. Never on the production path.
+    locations: classpath:db/migration,classpath:db/local
+
+dictara:
+  transcriber:
+    # The stub answers instantly, so polling every 5 s would only slow the client down.
+    poll-interval-ms: 1000
+  local:
+    stub:
+      pending-seconds: 2
+      transcribe-seconds: 10
+      diarize-seconds: 5
+
+jwt:
+  # The default in application.yaml is too short for JJWT. Tokens signed with this key are worthless outside
+  # a local run; production sets JWT_SECRET.
+  secret: ${JWT_SECRET:local-dev-secret-not-for-production-0123456789abcdef}

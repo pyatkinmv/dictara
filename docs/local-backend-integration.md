@@ -4,7 +4,7 @@
 
 Предыдущий этап — редизайн интерфейса на моках — описан в [redesign-plan.md](redesign-plan.md) (итерации 0–10, готово, документ оставлен как история). Расхождения дизайна и текущего gateway: [api-gaps.md](api-gaps.md). Домен и экраны: [design.md](design.md).
 
-**Статус: план согласован, реализация не начата.** Всё ниже — решения и факты, установленные на этапе обсуждения (см. раздел «Что решено, а что нет»).
+**Статус: итерация 0 (локальное окружение) выполнена, дальше итерация 1.** Чеклист — в разделе 7; решения и факты, установленные на этапе обсуждения, — в остальных разделах (сводка: «Что решено, а что нет»).
 
 ## Содержание
 
@@ -261,19 +261,19 @@ server:
 
 Работаем итерациями, как в редизайне: одна итерация — один коммит, после каждой отмечаем пункты здесь и обновляем `api-gaps.md`. Срезы из раздела 6 разбиты на итерации 2–8. В каждой итерации-срезе один и тот же цикл: **gateway** (миграция + эндпоинт + интеграционный тест) → **Flutter** (метод `HttpTranscriptionRepository`) → **сид** (данные для экрана) → **проверка в браузере** против `local` → **документы**.
 
-- [ ] **0. Локальное окружение** (ничего не пишет в прод)
-  - [ ] `docker-compose.dev.yml` (проект `dictara-dev`, Postgres 16, БД `dictara_dev`, `127.0.0.1:5432`, свой volume, `restart: unless-stopped`)
-  - [ ] Скрипты `scripts/dev.ps1` (поднять Postgres, дождаться, запустить gateway в `local`) и сброса dev-БД
-  - [ ] `application-local.yaml`: Flyway locations `db/migration` + `db/local`; расписания выключены
-  - [ ] Guards профиля `local`: БД только `localhost`/`127.0.0.1` и `dictara_dev`; не стартует с заданным `GCS_UPLOADS_BUCKET`
-  - [ ] `TranscriberPort`: интерфейс, `TranscriberClient` как реализация по умолчанию, заглушка (`@Profile("local")`, 5–6 сценариев, прогресс от времени)
-  - [ ] `LocalDbAudioStorage` (`@Profile("local")`, ссылки `db://…`, все 5 операций) + `db/local/R__local_audio.sql`
-  - [ ] `@Profile("!local")` на `DatabaseBackupService` и `StorageMaintenanceService`
-  - [ ] Локальный фильтр авторизации (dev-пользователь, 4.6)
-  - [ ] `spring-boot-devtools` в `developmentOnly`
-  - [ ] Начальный `db/local/R__seed.sql` (dev-пользователь, минимум данных под итерацию 2), идемпотентный (`ON CONFLICT DO NOTHING`)
-  - [ ] Тесты: заглушка transcriber, `LocalDbAudioStorage`, guards; существующие тесты gateway зелёные
-  - [ ] **Критерий готовности:** `dev.ps1` поднимает окружение; `GET /health` отвечает; загрузка файла через `POST /transcribe` доходит до `done` на заглушке; `GET /transcriptions` без токена возвращает записи dev-пользователя
+- [x] **0. Локальное окружение** (ничего не пишет в прод)
+  - [x] `docker-compose.dev.yml` (проект `dictara-dev`, Postgres 16, БД `dictara_dev`, `127.0.0.1:5432`, свой volume, `restart: unless-stopped`)
+  - [x] Скрипты `scripts/dev.ps1` (поднять Postgres, дождаться, запустить gateway в `local`) и сброса dev-БД
+  - [x] `application-local.yaml`: Flyway locations `db/migration` + `db/local`; расписания выключены
+  - [x] Guards профиля `local`: БД только `localhost`/`127.0.0.1` и `dictara_dev`; не стартует с заданным `GCS_UPLOADS_BUCKET`
+  - [x] `TranscriberPort`: интерфейс, `TranscriberClient` как реализация по умолчанию, заглушка (`@Profile("local")`, 5–6 сценариев, прогресс от времени)
+  - [x] `LocalDbAudioStorage` (`@Profile("local")`, ссылки `db://…`, все 5 операций) + `db/local/R__local_audio.sql`
+  - [x] `@Profile("!local")` на `DatabaseBackupService` и `StorageMaintenanceService`
+  - [x] Локальный фильтр авторизации (dev-пользователь, 4.6)
+  - [x] `spring-boot-devtools` в `developmentOnly`
+  - [x] Начальный `db/local/R__seed.sql`: пока только dev-пользователь (тарифный план `unlimited`), идемпотентный (`ON CONFLICT DO NOTHING`); данные записей, тегов и спикеров появятся в итерациях 2–5
+  - [x] Тесты: заглушка transcriber, `LocalDbAudioStorage`, guards; существующие тесты gateway зелёные
+  - [x] **Критерий готовности:** `dev.ps1` поднимает окружение; `GET /health` отвечает; загрузка файла через `POST /transcribe` доходит до `done` на заглушке; `GET /transcriptions` без токена возвращает записи dev-пользователя
 - [ ] **1. Flutter: подключение к gateway**
   - [ ] `app/web_dev_config.yaml` с прокси `/api/*` → `localhost:8080` (проверить синтаксис `replace` на настоящем запросе)
   - [ ] Скелет `HttpTranscriptionRepository`, разбор JSON (`snake_case`)
@@ -318,6 +318,43 @@ server:
   - [ ] Решить способ выкатки UI (beta-адрес / big-bang / feature flag)
   - [ ] Убрать переключатель `BACKEND`; `FakeTranscriptionRepository` вынести в `test/` (4.7)
   - [ ] Удалить мёртвый старый код клиента (`transcribe_page.dart`, `history_section.dart`, `AuthService`, старые модели); обновить `app/CLAUDE.md` и `gateway/CLAUDE.md` (устаревший раздел про тесты)
+
+### Итерация 0: что важно знать
+
+**Как запустить.** Нужны Docker и Gradle 8.7 в `PATH` (версия как в CI).
+
+```powershell
+scripts\dev.ps1            # Postgres в Docker + gateway (gradle bootRun, профиль local), :8080
+scripts\dev.ps1 -DbOnly    # только Postgres, gateway запускаете из IntelliJ с профилем local
+scripts\dev-reset.ps1      # выбросить dev-БД и создать пустую (gateway должен быть остановлен)
+```
+
+Ctrl+C останавливает gateway; Postgres остаётся поднятым (`restart: unless-stopped`). Профиль `local` — `SPRING_PROFILES_ACTIVE=local` или `--spring.profiles.active=local`.
+
+**Что сделано (`gateway/`, `docker-compose.dev.yml`, `scripts/`):**
+
+- `port/TranscriberPort.kt`: интерфейс и модели `TranscribeParams`/`TranscriberJobSnapshot` (переехали из `client/`); `OrchestratorService` зависит от порта. `TranscriberClient` реализует порт и помечен `@Profile("!local")`.
+- `adapter/StubTranscriber.kt`: 6 сценариев (квартальный обзор на 3 спикера, собеседование, синк, лекция, голосовая заметка, разговор на русском); прогресс считается от времени с момента отправки (по умолчанию 2 с `pending`, 10 с `transcribing`, 5 с `diarizing`, настраивается `dictara.local.stub.*`); без диаризации спикеров в сегментах нет; `num_speakers` ограничивает число меток.
+- `storage/LocalDbAudioStorage.kt` + `db/local/R__local_audio.sql`: байты в таблице `local_audio_objects`, ссылки `db://audio/<дата>/<id>/<имя>`.
+- `GcsAudioStorage`, `DatabaseBackupService`, `StorageMaintenanceService` — `@Profile("!local")`.
+- `filter/LocalDevAuthFilter.kt`: без токена запрос идёт от dev-пользователя `00000000-0000-4000-8000-000000000001` (создаётся `R__seed.sql`, план `unlimited`, чтобы не упираться в лимит бесплатного плана).
+- `config/LocalProfileGuard.kt` (`EnvironmentPostProcessor`, зарегистрирован в `META-INF/spring.factories`): при профиле `local` отказывается стартовать, если хост БД не `localhost`/`127.0.0.1`, имя БД не `dictara_dev` или задан `GCS_UPLOADS_BUCKET`. Проверка сделана постпроцессором окружения, а не бином, намеренно: бин создаётся уже после Flyway, то есть миграции и сид успели бы выполниться на чужой БД. Обойти проверку нельзя.
+- `application-local.yaml`: БД `dictara_dev`, Flyway `db/migration` + `db/local`, опрос transcriber раз в секунду, dev-секрет JWT, тайминги заглушки.
+- `build.gradle.kts`: `spring-boot-devtools` в `developmentOnly`.
+
+**Проверено.**
+
+- Тесты gateway: 105 из 105 (было 75; добавлено 30: `LocalProfileGuardTest` 10, `StubTranscriberTest` 8, `LocalDbAudioStorageTest` 7, `LocalProfileIntegrationTest` 5). Интеграционный тест поднимает весь контекст с профилем `local` на своём Postgres с БД `dictara_dev`: seed, загрузка через `POST /transcribe` до `done` на заглушке, дедупликация, аудио в БД, `GET /transcriptions` без токена.
+- Вручную: `scripts\dev.ps1` поднимает окружение; `GET /health` отвечает; загрузка файла проходит `processing` (фазы `transcribing` и `diarizing` с процентами) → `done`; `GET /transcriptions` без токена возвращает загруженную запись.
+- Guard проверен запуском: с `SPRING_DATASOURCE_URL=…/dictara` и заданным `GCS_UPLOADS_BUCKET` gateway не стартует и объясняет обе причины.
+
+**Что выяснилось по ходу.**
+
+- В `application.yaml` секрет JWT по умолчанию (`changeme-set-in-env`, 19 символов) короче требуемых JJWT 32: без переменной `JWT_SECRET` gateway не стартует. Тесты этого не замечали (у них свой `jwt.secret`). Для `local` в `application-local.yaml` задан dev-секрет.
+- Gradle-обёртка `gateway/gradlew` указывает на Gradle 9.6.0, а проект собирается на 8.7 (CI, Dockerfile). Поэтому скрипты используют `gradle` из `PATH`. Приведение обёртки к 8.7 или явное решение — отдельная задача.
+- Windows PowerShell 5.1 превращает вывод в stderr нативных команд (у `docker` там прогресс) в ошибки, если включён `$ErrorActionPreference = 'Stop'`: в скриптах он не включён, успех проверяется по `$LASTEXITCODE`.
+- Спикеры в результате заглушки — `SPEAKER_00`, `SPEAKER_01`…, как у настоящего transcriber (модель `Segment.speaker`).
+- Devtools подключён, но автоперезапуск при пересборке отдельно не проверялся.
 
 ## 8. Что решено, а что нет
 

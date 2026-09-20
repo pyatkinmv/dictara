@@ -1,6 +1,9 @@
 package com.dictara.gateway.client
 
 import com.dictara.gateway.config.DictaraProperties
+import com.dictara.gateway.port.TranscribeParams
+import com.dictara.gateway.port.TranscriberJobSnapshot
+import com.dictara.gateway.port.TranscriberPort
 import com.dictara.gateway.dto.ProgressInfo
 import com.dictara.gateway.model.Segment
 import com.fasterxml.jackson.databind.JsonNode
@@ -14,34 +17,17 @@ import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Component
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
-data class TranscribeParams(
-    val model: String,
-    val language: String,
-    val diarize: Boolean,
-    val numSpeakers: Int?,
-    val originalFileName: String,
-)
-
-data class TranscriberJobSnapshot(
-    val status: String,
-    val progress: ProgressInfo?,
-    val segments: List<Segment>?,
-    val audioDurationS: Double?,
-    val detectedLanguage: String?,
-    val durationS: Double?,
-    val elapsedS: Double?,
-    val error: String?,
-    val retryable: Boolean = true,
-)
-
 private val MODEL_ALIASES = mapOf("fast" to "small", "accurate" to "turbo")
 
+/** The real transcriber over HTTP. Not used under the `local` profile, which has a stub instead. */
+@Profile("!local")
 @Component
-class TranscriberClient(private val props: DictaraProperties) {
+class TranscriberClient(private val props: DictaraProperties) : TranscriberPort {
 
     private val idTokenCredentials: IdTokenCredentials? =
         if (props.transcriber.url.startsWith("https://")) {
@@ -100,7 +86,7 @@ class TranscriberClient(private val props: DictaraProperties) {
      *  from GCS via [storageUri], so the request body stays empty regardless of file size.
      *  See [submit] for the legacy multipart path used as a local-dev fallback when no
      *  GCS bucket is configured. */
-    fun submitByReference(storageUri: String, params: TranscribeParams): String {
+    override fun submitByReference(storageUri: String, params: TranscribeParams): String {
         val modelName = MODEL_ALIASES[params.model] ?: params.model
         val url = buildString {
             append("${props.transcriber.url}/transcribe?model=$modelName&diarize=${params.diarize}")
@@ -115,7 +101,7 @@ class TranscriberClient(private val props: DictaraProperties) {
         return mapper.readTree(responseBody)["job_id"].asText()
     }
 
-    fun getJob(jobId: String): TranscriberJobSnapshot {
+    override fun getJob(jobId: String): TranscriberJobSnapshot {
         val response = http.newCall(
             Request.Builder().url("${props.transcriber.url}/jobs/$jobId").get().build()
         ).execute()

@@ -4,12 +4,14 @@ import com.dictara.gateway.storage.AudioStorage
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.context.annotation.Profile
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import java.io.ByteArrayOutputStream
 import java.time.LocalDate
 import java.util.zip.GZIPOutputStream
 
+@Profile("!local")
 @Service
 class DatabaseBackupService(
     private val audioStorage: AudioStorage,

@@ -7,6 +7,7 @@ data class DictaraProperties(
     val transcriber: TranscriberProps = TranscriberProps(),
     val summarizer: SummarizerProps = SummarizerProps(),
     val storage: StorageProps = StorageProps(),
+    val local: LocalProps = LocalProps(),
 ) {
     data class TranscriberProps(
         val url: String = "http://localhost:8000",
@@ -30,5 +31,17 @@ data class DictaraProperties(
 
     data class GcsProps(
         val bucket: String = "",
+    )
+
+    /** Settings that only matter under the `local` profile. */
+    data class LocalProps(
+        val stub: StubProps = StubProps(),
+    )
+
+    /** How long the stub transcriber keeps a job in each state. */
+    data class StubProps(
+        val pendingSeconds: Double = 2.0,
+        val transcribeSeconds: Double = 10.0,
+        val diarizeSeconds: Double = 5.0,
     )
 }

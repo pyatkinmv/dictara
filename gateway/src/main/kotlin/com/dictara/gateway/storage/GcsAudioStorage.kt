@@ -6,6 +6,7 @@ import com.google.cloud.storage.BlobInfo
 import com.google.cloud.storage.Storage
 import com.google.cloud.storage.StorageOptions
 import org.slf4j.LoggerFactory
+import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Component
 import java.io.InputStream
 import java.nio.channels.Channels
@@ -21,6 +22,7 @@ import java.util.UUID
  *
  *  Uploaded objects are NOT deleted by the application — the bucket has a 90-day
  *  lifecycle rule that expires them automatically. */
+@Profile("!local")
 @Component
 class GcsAudioStorage(props: DictaraProperties) : AudioStorage {
 

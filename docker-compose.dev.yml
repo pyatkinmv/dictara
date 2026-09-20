@@ -1,0 +1,32 @@
+# Local development database. Not part of the production stack (see docker-compose.yml) and deliberately
+# not named docker-compose.override.yml, which Compose would merge into every `docker compose` call.
+#
+#   docker compose -f docker-compose.dev.yml up -d --wait      (or: scripts/dev.ps1)
+#
+# Only Postgres runs here; the gateway runs on the host with the `local` profile (docs/local-backend-integration.md).
+# The credentials match the defaults in gateway/src/main/resources/application.yaml, and the gateway's `local`
+# profile refuses any database other than `dictara_dev` on localhost.
+
+name: dictara-dev
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: dictara-dev-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: dictara_dev
+      POSTGRES_USER: dictara
+      POSTGRES_PASSWORD: dictara_dev
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - dictara-dev-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dictara -d dictara_dev"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  dictara-dev-pgdata:

@@ -1,7 +1,7 @@
 package com.dictara.gateway.service
 
-import com.dictara.gateway.client.TranscribeParams
-import com.dictara.gateway.client.TranscriberClient
+import com.dictara.gateway.port.TranscribeParams
+import com.dictara.gateway.port.TranscriberPort
 import com.dictara.gateway.dto.ProgressInfo
 import com.dictara.gateway.entity.StageAttemptEntity
 import com.dictara.gateway.entity.SubmissionEntity
@@ -21,7 +21,7 @@ import java.util.concurrent.Executors
 
 @Service
 class OrchestratorService(
-    private val transcriberClient: TranscriberClient,
+    private val transcriberClient: TranscriberPort,
     private val summarizer: SummarizerPort,
     private val props: com.dictara.gateway.config.DictaraProperties,
     private val stateService: SubmissionStateService,
@@ -238,7 +238,7 @@ class OrchestratorService(
 
     // ── Helpers ─────────────────────────────────────────────────────────────
 
-    private fun pollTranscriber(submissionId: UUID, transcriberJobId: String): com.dictara.gateway.client.TranscriberJobSnapshot {
+    private fun pollTranscriber(submissionId: UUID, transcriberJobId: String): com.dictara.gateway.port.TranscriberJobSnapshot {
         val deadlineMs = System.currentTimeMillis() + props.transcriber.timeoutHours * 60 * 60 * 1000L
         while (System.currentTimeMillis() < deadlineMs) {
             Thread.sleep(props.transcriber.pollIntervalMs)
