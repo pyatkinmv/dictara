@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../models/transcription.dart';
 import '../pages/upload/upload_dialog.dart';
 import '../services/file_chooser.dart';
 import '../state/transcription_detail_controller.dart';
@@ -18,14 +19,20 @@ class AppShell extends StatelessWidget {
   final String location;
   final Widget child;
 
-  /// The topbar's Upload button: pick a file and options, send it, and show
-  /// the list, where the new transcription appears.
+  /// The topbar's Upload button: pick a file and options and send it (the dialog shows how far it is), then
+  /// show the list, where the new transcription appears. A file the user has uploaded before with the same
+  /// options is not sent again: if that transcription is ready its page opens, otherwise the list shows it.
   Future<void> _upload(BuildContext context) async {
     final list = context.read<TranscriptionListController>();
-    final request = await showUploadDialog(context, chooser: context.read<FileChooser>());
-    if (request == null) return;
-    await list.upload(request);
-    if (context.mounted) context.go('/transcriptions');
+    final outcome = await showUploadDialog(
+      context,
+      chooser: context.read<FileChooser>(),
+      upload: (request, onProgress, cancellation) =>
+          list.upload(request, onProgress: onProgress, cancellation: cancellation),
+    );
+    if (outcome == null || !context.mounted) return;
+    final ready = outcome.duplicate && outcome.item.status == TranscriptionStatus.done;
+    context.go(ready ? '/transcriptions/${outcome.item.id}' : '/transcriptions');
   }
 
   @override

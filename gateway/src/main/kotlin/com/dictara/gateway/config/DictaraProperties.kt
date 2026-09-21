@@ -43,5 +43,7 @@ data class DictaraProperties(
         val pendingSeconds: Double = 2.0,
         val transcribeSeconds: Double = 10.0,
         val diarizeSeconds: Double = 5.0,
+        /** How long the stub summarizer takes, so that the summarizing state can be seen. */
+        val summarizeSeconds: Double = 3.0,
     )
 }

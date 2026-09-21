@@ -10,6 +10,7 @@ import 'package:dictara_web/data/http_transcription_repository.dart';
 import 'package:dictara_web/data/transcription_repository.dart';
 import 'package:dictara_web/models/transcription.dart';
 import 'package:dictara_web/models/upload.dart';
+import 'package:dictara_web/services/multipart_uploader.dart';
 
 /// A tag as the gateway describes it in the list and in the detail.
 Map<String, String> _tag(String label, {String color = '#2563EB'}) => {'id': 'id-$label', 'label': label, 'color': color};
@@ -732,14 +733,166 @@ void main() {
 
   });
 
+  group('upload', () {
+    const memo = ChosenFile(name: 'team_call.mp3', sizeBytes: 5 * 1024 * 1024);
+
+    /// Answers an upload with [status] and [body]; remembers what was sent.
+    (HttpTranscriptionRepository, _FakeUploader) repoWith(UploadReply reply) {
+      final uploader = _FakeUploader(reply);
+      return (HttpTranscriptionRepository(GatewayClient(uploader: uploader)), uploader);
+    }
+
+    final accepted = UploadReply(
+      202,
+      jsonEncode({
+        'duplicate': false,
+        'item': {
+          'job_id': 'new-1',
+          'file_name': 'team_call.mp3',
+          'title': 'team_call.mp3',
+          'created_at': '2026-09-22T10:00:00Z',
+          'status': 'pending',
+          'tags': <String>[],
+        },
+      }),
+    );
+
+    test('the file and the options of the dialog go to POST /transcriptions as a form', () async {
+      final (repo, uploader) = repoWith(accepted);
+
+      final outcome = await repo.upload(const UploadRequest(file: memo));
+
+      expect(uploader.url, '/api/transcriptions');
+      expect(uploader.file, memo);
+      // Defaults of the dialog: auto language, auto summary, voices told apart, however many there are.
+      expect(uploader.fields, {'language': 'auto', 'summary': 'auto', 'diarize': 'true', 'model': 'accurate'});
+      expect(outcome.item.id, 'new-1');
+      expect(outcome.item.status, TranscriptionStatus.pending);
+      expect(outcome.duplicate, isFalse);
+    });
+
+    test('each option is sent in the gateway\'s words', () async {
+      final (repo, uploader) = repoWith(accepted);
+
+      await repo.upload(const UploadRequest(
+        file: memo,
+        language: UploadLanguage.russian,
+        summary: SummaryMode.concise,
+        speakers: SpeakerCount.three,
+      ));
+
+      expect(uploader.fields, {
+        'language': 'ru',
+        'summary': 'concise',
+        'diarize': 'true',
+        'num_speakers': '3',
+        'model': 'accurate',
+      });
+    });
+
+    test('every summary mode has the gateways name', () async {
+      final sent = <String>[];
+      for (final mode in SummaryMode.values) {
+        final (repo, uploader) = repoWith(accepted);
+        await repo.upload(UploadRequest(file: memo, summary: mode));
+        sent.add(uploader.fields['summary']!);
+      }
+      expect(sent, ['off', 'auto', 'brief', 'concise', 'full']);
+    });
+
+    test('speakers: Off skips the diarization, Auto lets it decide, 4+ asks for four', () async {
+      Future<Map<String, String>> sentFor(SpeakerCount speakers) async {
+        final (repo, uploader) = repoWith(accepted);
+        await repo.upload(UploadRequest(file: memo, speakers: speakers));
+        return uploader.fields;
+      }
+
+      expect((await sentFor(SpeakerCount.off))['diarize'], 'false');
+      expect((await sentFor(SpeakerCount.off)).containsKey('num_speakers'), isFalse);
+      expect((await sentFor(SpeakerCount.auto))['diarize'], 'true');
+      expect((await sentFor(SpeakerCount.auto)).containsKey('num_speakers'), isFalse);
+      expect((await sentFor(SpeakerCount.one))['num_speakers'], '1');
+      expect((await sentFor(SpeakerCount.fourPlus))['num_speakers'], '4');
+    });
+
+    test('a file the gateway already had comes back as a duplicate, with the existing entry', () async {
+      final (repo, _) = repoWith(UploadReply(
+        202,
+        jsonEncode({
+          'duplicate': true,
+          'item': {
+            'job_id': 'old-7',
+            'file_name': 'team_call.mp3',
+            'title': 'Weekly call',
+            'created_at': '2026-09-01T10:00:00Z',
+            'status': 'done',
+            'tags': <String>[],
+          },
+        }),
+      ));
+
+      final outcome = await repo.upload(const UploadRequest(file: memo));
+
+      expect(outcome.duplicate, isTrue);
+      expect(outcome.item.id, 'old-7');
+      expect(outcome.item.title, 'Weekly call');
+      expect(outcome.item.status, TranscriptionStatus.done);
+    });
+
+    test('progress and cancelling are passed on to the uploader', () async {
+      final (repo, uploader) = repoWith(accepted);
+      final progress = <double>[];
+      final cancellation = UploadCancellation();
+
+      await repo.upload(const UploadRequest(file: memo), onProgress: progress.add, cancellation: cancellation);
+
+      expect(progress, [0.25, 1.0]); // what the fake uploader reports
+      expect(uploader.cancellation, same(cancellation));
+    });
+
+    test('a refusal carries the gateways message and status, so it can be shown as it is', () async {
+      final (repo, _) = repoWith(UploadReply(429, jsonEncode({'message': 'Monthly transcription limit reached (10/month). Resets on 1 October.'})));
+
+      await expectLater(
+        repo.upload(const UploadRequest(file: memo)),
+        throwsA(isA<GatewayException>()
+            .having((e) => e.statusCode, 'statusCode', 429)
+            .having((e) => e.message, 'message', startsWith('Monthly transcription limit reached'))),
+      );
+    });
+
+    test('a refusal without a JSON message falls back to the status', () async {
+      final (repo, _) = repoWith(const UploadReply(413, '<html>Request Entity Too Large</html>'));
+
+      await expectLater(
+        repo.upload(const UploadRequest(file: memo)),
+        throwsA(isA<GatewayException>().having((e) => e.message, 'message', 'HTTP 413')),
+      );
+    });
+
+    test('a broken connection or a cancelled upload is a GatewayException without a status', () async {
+      final uploader = _FakeUploader(accepted)..interrupt = 'Could not reach the server';
+      final repo = HttpTranscriptionRepository(GatewayClient(uploader: uploader));
+
+      await expectLater(
+        repo.upload(const UploadRequest(file: memo)),
+        throwsA(isA<GatewayException>()
+            .having((e) => e.statusCode, 'statusCode', isNull)
+            .having((e) => e.message, 'message', 'Could not reach the server')),
+      );
+    });
+
+    test('an answer that is not the new entry is an error', () async {
+      final (repo, _) = repoWith(UploadReply(202, jsonEncode({'oops': true})));
+
+      await expectLater(repo.upload(const UploadRequest(file: memo)), throwsA(isA<GatewayException>()));
+    });
+  });
+
   group('not connected yet', () {
     final repo = _repo(MockClient((request) async => _json([])));
 
     test('other calls say which iteration connects them', () async {
-      await expectLater(
-        repo.upload(const UploadRequest(file: ChosenFile(name: 'a.mp3', sizeBytes: 1))),
-        throwsA(isA<NotIntegratedException>().having((e) => e.iteration, 'iteration', 7)),
-      );
       await expectLater(repo.acceptAllSuggestions('1'), throwsA(isA<NotIntegratedException>()));
     });
 
@@ -949,4 +1102,37 @@ void _queryTests() {
       expect(page.items.map((i) => i.id), ['id-0', 'id-1', 'id-2', 'id-3', 'id-4']);
     });
   });
+}
+
+/// A stand-in for the browser's uploader: answers with [reply], remembers what it was given.
+class _FakeUploader implements MultipartUploader {
+  _FakeUploader(this.reply);
+
+  final UploadReply reply;
+
+  /// When set, the request never gets an answer.
+  String? interrupt;
+
+  String? url;
+  Map<String, String> fields = const {};
+  ChosenFile? file;
+  UploadCancellation? cancellation;
+
+  @override
+  Future<UploadReply> post(
+    String url, {
+    required Map<String, String> fields,
+    required ChosenFile file,
+    void Function(double fraction)? onProgress,
+    UploadCancellation? cancellation,
+  }) async {
+    this.url = url;
+    this.fields = fields;
+    this.file = file;
+    this.cancellation = cancellation;
+    onProgress?.call(0.25);
+    onProgress?.call(1);
+    if (interrupt != null) throw UploadInterrupted(interrupt!);
+    return reply;
+  }
 }

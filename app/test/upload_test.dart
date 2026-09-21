@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dictara_web/app.dart';
 import 'package:dictara_web/data/fake_transcription_repository.dart';
+import 'package:dictara_web/data/gateway_client.dart';
 import 'package:dictara_web/data/transcription_repository.dart';
 import 'package:dictara_web/models/transcription.dart';
 import 'package:dictara_web/models/upload.dart';
@@ -66,7 +69,7 @@ void main() {
         final now = DateTime(2025, 7, 1, 9, 30);
         final repo = FakeTranscriptionRepository(clock: () => now);
 
-        final item = await repo.upload(const UploadRequest(file: _memo));
+        final item = (await repo.upload(const UploadRequest(file: _memo))).item;
 
         expect(item.id, '7');
         expect(item.title, 'team_call.mp3');
@@ -155,14 +158,14 @@ void main() {
       'small files last at least a minute and huge ones at most three hours',
       () async {
         final repo = FakeTranscriptionRepository();
-        final tiny = await repo.upload(
+        final tiny = (await repo.upload(
           const UploadRequest(file: ChosenFile(name: 'a.mp3', sizeBytes: 10)),
-        );
-        final huge = await repo.upload(
+        )).item;
+        final huge = (await repo.upload(
           const UploadRequest(
             file: ChosenFile(name: 'b.mp3', sizeBytes: 400 * _mb),
           ),
-        );
+        )).item;
 
         expect(tiny.duration, const Duration(minutes: 1));
         expect(huge.duration, const Duration(hours: 3));
@@ -412,7 +415,7 @@ void main() {
       }
 
       await choose('Auto-detect', 'Russian'); // language
-      await choose('Auto', 'Short'); // summary
+      await choose('Auto', 'Brief'); // summary
       await choose(
         'Auto-detect',
         '4+',
@@ -423,8 +426,141 @@ void main() {
       final request = repo.requests.single;
       expect(request.file, _memo);
       expect(request.language, UploadLanguage.russian);
-      expect(request.summary, SummaryMode.short);
+      expect(request.summary, SummaryMode.brief);
       expect(request.speakers, SpeakerCount.fourPlus);
+    });
+  });
+
+  group('Upload dialog: sending, refusals, duplicates', () {
+    Future<void> open(WidgetTester tester, _ScriptedRepository repo) async {
+      useDesktopSize(tester);
+      await tester.pumpWidget(DictaraApp(initialLocation: '/transcriptions', repository: repo, fileChooser: FakeFileChooser(_memo)));
+      await settle(tester);
+      await tester.tap(find.text('Upload'));
+      await settle(tester);
+      await tester.tap(find.text('Drop file here or click to browse'));
+      await settle(tester);
+    }
+
+    Future<void> send(WidgetTester tester) async {
+      await tester.tap(find.text('Upload').last);
+      await tester.pump();
+    }
+
+    testWidgets('the options offer Off for speakers, and the gateway\'s summary modes in its order', (tester) async {
+      await open(tester, _ScriptedRepository());
+
+      await tester.tap(find.text('Auto').first); // summary
+      await settle(tester);
+      for (final mode in ['Off', 'Auto', 'Brief', 'Concise', 'Full']) {
+        expect(find.text(mode), findsWidgets, reason: mode);
+      }
+      expect(find.text('Short'), findsNothing);
+      expect(find.text('None'), findsNothing);
+      await tester.tap(find.text('Concise').last);
+      await settle(tester);
+
+      await tester.tap(find.text('Auto-detect').last); // speakers
+      await settle(tester);
+      expect(find.text('Off'), findsWidgets);
+    });
+
+    testWidgets('while the file goes out the dialog shows how far it is and cannot be sent twice', (tester) async {
+      final repo = _ScriptedRepository()..gate = Completer<UploadOutcome>();
+      await open(tester, repo);
+
+      await send(tester);
+      repo.report(0.4);
+      await tester.pump();
+
+      expect(find.text('Uploading… 40%'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      await tester.tap(find.textContaining('Uploading'));
+      await tester.pump();
+      expect(repo.calls, 1); // the button does nothing meanwhile
+
+      repo.report(1);
+      repo.gate!.complete(UploadOutcome(_created));
+      await settle(tester);
+
+      expect(find.text('Upload audio'), findsNothing); // the dialog is gone
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+    });
+
+    testWidgets('a refusal is shown in red in the dialog, which stays so that the user can try again', (tester) async {
+      const message = 'Monthly transcription limit reached (10/month). Resets on 1 October.';
+      final repo = _ScriptedRepository()..failWith = const GatewayException(message, statusCode: 429);
+      await open(tester, repo);
+
+      await send(tester);
+      await settle(tester);
+
+      expect(find.text('Upload audio'), findsOneWidget);
+      expect(find.text(message), findsOneWidget);
+      expect(find.text('Upload'), findsNWidgets(2)); // the button is back (topbar + dialog)
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+
+      repo.failWith = null; // the next try goes through
+      await send(tester);
+      await settle(tester);
+
+      expect(repo.calls, 2);
+      expect(find.text('Upload audio'), findsNothing);
+    });
+
+    testWidgets('choosing another file clears the refusal', (tester) async {
+      final repo = _ScriptedRepository()..failWith = const GatewayException('Nope', statusCode: 400);
+      await open(tester, repo);
+      await send(tester);
+      await settle(tester);
+      expect(find.text('Nope'), findsOneWidget);
+
+      await tester.tap(find.text('team_call.mp3')); // the zone, which shows the chosen file
+      await settle(tester);
+
+      expect(find.text('Nope'), findsNothing);
+    });
+
+    testWidgets('cancelling while the file goes out stops the upload and closes the dialog', (tester) async {
+      final repo = _ScriptedRepository()..gate = Completer<UploadOutcome>();
+      await open(tester, repo);
+      await send(tester);
+      repo.report(0.2);
+      await tester.pump();
+
+      await tester.tap(find.text('Cancel'));
+      await settle(tester);
+
+      expect(find.text('Upload audio'), findsNothing);
+      expect(repo.cancellation!.cancelled, isTrue);
+      // The stopped request ends with an error nobody is waiting for any more; nothing breaks.
+      repo.gate!.completeError(const GatewayException('The upload was cancelled'));
+      await settle(tester);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a duplicate of a finished transcription opens its page', (tester) async {
+      final repo = _ScriptedRepository()..outcome = const _Existing('0');
+      await open(tester, repo);
+
+      await send(tester);
+      await settle(tester);
+
+      expect(find.text('Transcript'), findsOneWidget); // the tabs of the detail page
+      expect(find.text('Overview'), findsOneWidget);
+      expect(find.text('Upload audio'), findsNothing);
+    });
+
+    testWidgets('a duplicate that is not ready yet shows the list, where it is already going', (tester) async {
+      final repo = _ScriptedRepository()..outcome = const _Existing('1'); // Economics Lecture: processing
+      await open(tester, repo);
+
+      await send(tester);
+      await settle(tester);
+
+      expect(find.text('Upload audio'), findsNothing);
+      expect(find.text('Economics Lecture — Part 2'), findsOneWidget);
+      expect(find.text('Overview'), findsNothing); // not a detail page
     });
   });
 
@@ -523,8 +659,65 @@ class _RecordingRepository extends FakeTranscriptionRepository {
   final List<UploadRequest> requests = [];
 
   @override
-  Future<Transcription> upload(UploadRequest request) {
+  Future<UploadOutcome> upload(
+    UploadRequest request, {
+    void Function(double fraction)? onProgress,
+    UploadCancellation? cancellation,
+  }) {
     requests.add(request);
-    return super.upload(request);
+    return super.upload(request, onProgress: onProgress, cancellation: cancellation);
+  }
+}
+
+/// The item the gateway would create for [_memo].
+final _created = Transcription(
+  id: '99',
+  title: 'team_call.mp3',
+  uploadedAt: DateTime(2026, 9, 22, 10),
+  status: TranscriptionStatus.pending,
+);
+
+/// "The gateway already had this file": the outcome is the existing entry with this id.
+class _Existing {
+  const _Existing(this.id);
+
+  final String id;
+}
+
+/// A repository whose upload can be held back, made to fail, or answered with an existing entry.
+class _ScriptedRepository extends FakeTranscriptionRepository {
+  /// While set, the upload waits for it.
+  Completer<UploadOutcome>? gate;
+
+  /// When set, the upload fails with it.
+  Object? failWith;
+
+  /// When set, the upload answers with this existing entry as a duplicate.
+  _Existing? outcome;
+
+  int calls = 0;
+  UploadCancellation? cancellation;
+  void Function(double)? _onProgress;
+
+  /// Tells the dialog that this much of the file has gone out.
+  void report(double fraction) => _onProgress?.call(fraction);
+
+  @override
+  Future<UploadOutcome> upload(
+    UploadRequest request, {
+    void Function(double fraction)? onProgress,
+    UploadCancellation? cancellation,
+  }) async {
+    calls++;
+    _onProgress = onProgress;
+    this.cancellation = cancellation;
+    if (failWith != null) throw failWith!;
+    if (gate != null) return gate!.future;
+    final existing = outcome;
+    if (existing != null) {
+      final item = (await list(const TranscriptionQuery())).items.firstWhere((i) => i.id == existing.id);
+      return UploadOutcome(item, duplicate: true);
+    }
+    return super.upload(request, onProgress: onProgress, cancellation: cancellation);
   }
 }

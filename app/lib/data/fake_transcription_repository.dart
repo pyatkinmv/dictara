@@ -264,7 +264,12 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   }
 
   @override
-  Future<Transcription> upload(UploadRequest request) async {
+  Future<UploadOutcome> upload(
+    UploadRequest request, {
+    void Function(double fraction)? onProgress,
+    UploadCancellation? cancellation,
+  }) async {
+    onProgress?.call(0.5);
     await _wait();
     final id = '${_items.fold(-1, (max, i) => _order(i) > max ? _order(i) : max) + 1}';
     // No real audio to measure: about a minute per megabyte, at least one.
@@ -278,7 +283,8 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
     );
     _items.add(item);
     _jobs[id] = _Job(_clock(), request.speakers.expected ?? 2);
-    return item;
+    onProgress?.call(1);
+    return UploadOutcome(item);
   }
 
   Future<void> _wait() async {

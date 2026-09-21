@@ -1,3 +1,4 @@
+import 'package:cross_file/cross_file.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dictara_web/models/upload.dart';
@@ -40,6 +41,9 @@ class FakeFileChooser implements FileChooser {
     calls++;
     return next;
   }
+
+  @override
+  Future<ChosenFile> fromDropped(XFile file) async => ChosenFile(name: file.name, sizeBytes: await file.length());
 }
 
 /// Remembers what would have been downloaded, without a browser.

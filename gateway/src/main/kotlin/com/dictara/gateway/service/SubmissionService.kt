@@ -148,6 +148,10 @@ class SubmissionService(
         return SubmissionPage(summarize(inOrder(found.ids)), found.hasNext)
     }
 
+    /** One entry of the list, as the list would show it now (a freshly accepted upload, or the one it duplicates). */
+    @Transactional(readOnly = true)
+    fun listItem(submissionId: UUID): SubmissionSummary? = summarize(inOrder(listOf(submissionId))).singleOrNull()
+
     /** The submissions with these ids, in the order of [ids] (the database returns them in any order). */
     private fun inOrder(ids: List<UUID>): List<SubmissionEntity> {
         val byId = submissionRepo.findAllById(ids).associateBy { it.id }

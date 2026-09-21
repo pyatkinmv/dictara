@@ -5,8 +5,10 @@ import com.dictara.gateway.adapter.NoopSummarizer
 import com.dictara.gateway.port.SummarizerPort
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Profile
 
 @Configuration
+@Profile("!local") // the local profile has its own summarizer (StubSummarizer): there is no Gemini key
 class SummarizerConfig(private val props: DictaraProperties) {
 
     @Bean

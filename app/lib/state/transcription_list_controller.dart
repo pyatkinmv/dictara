@@ -79,11 +79,16 @@ class TranscriptionListController extends ChangeNotifier {
 
   /// Sends a file for transcription. The list then shows everything again, so
   /// that the new item is not hidden by a search or filter left over.
-  Future<void> upload(UploadRequest request) async {
-    await _repository.upload(request);
+  Future<UploadOutcome> upload(
+    UploadRequest request, {
+    void Function(double fraction)? onProgress,
+    UploadCancellation? cancellation,
+  }) async {
+    final outcome = await _repository.upload(request, onProgress: onProgress, cancellation: cancellation);
     _query = _query.copyWith(search: '', statuses: {}, tags: {});
     notifyListeners();
     await _load(reset: true);
+    return outcome;
   }
 
   Future<void> _loadTags() async {

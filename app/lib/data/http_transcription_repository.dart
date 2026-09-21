@@ -164,8 +164,36 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
   Future<void> rename(String id, String title) =>
       _client.patchJson('/jobs/${Uri.encodeComponent(id)}/title', {'title': title});
 
+  /// The model every upload asks for. The dialog has no choice of it yet: which models a user may use should depend
+  /// on their plan (see docs/local-backend-integration.md), and that is not built.
+  static const _uploadModel = 'accurate';
+
+  /// `POST /transcriptions`: the file and the options of the dialog as one multipart form.
   @override
-  Future<Transcription> upload(UploadRequest request) => _notYet('Uploading', 7);
+  Future<UploadOutcome> upload(
+    UploadRequest request, {
+    void Function(double fraction)? onProgress,
+    UploadCancellation? cancellation,
+  }) async {
+    final speakers = request.speakers;
+    final body = await _client.postFile(
+      '/transcriptions',
+      fields: {
+        'language': request.language.code,
+        'summary': request.summary.name, // the names are the gateway's modes: off, auto, brief, concise, full
+        'diarize': '${speakers.diarize}',
+        if (speakers.diarize && speakers.expected != null) 'num_speakers': '${speakers.expected}',
+        'model': _uploadModel,
+      },
+      file: request.file,
+      onProgress: onProgress,
+      cancellation: cancellation,
+    );
+    if (body is! Map<String, dynamic> || body['item'] is! Map<String, dynamic>) {
+      throw const GatewayException('Expected the new transcription');
+    }
+    return UploadOutcome(_transcriptionFromJson(body['item'] as Map<String, dynamic>), duplicate: body['duplicate'] == true);
+  }
 
 
   /// The speaker library, for the Speaker Picker of the detail page. (Choosing one there is connected in

@@ -43,7 +43,7 @@ class TranscribeController(
     companion object {
         private val log = LoggerFactory.getLogger(TranscribeController::class.java)
         val SUPPORTED_EXTENSIONS = setOf("mp3", "mp4", "m4a", "wav", "ogg", "oga", "opus", "flac", "webm", "mkv", "avi", "mov")
-        private val MAX_UPLOAD_SIZE_BYTES = 400L * 1024 * 1024
+        const val MAX_UPLOAD_SIZE_BYTES = 400L * 1024 * 1024
 
         /** Page size of the paged list when the client does not say; the largest it may ask for. */
         const val DEFAULT_PAGE_SIZE = 30
@@ -73,6 +73,29 @@ class TranscribeController(
                 }
             }
             return null
+        }
+
+        /**
+         * Refuses a file the gateway will not take: too large, not one of [SUPPORTED_EXTENSIONS], or a picture
+         * with an audio extension. Shared by every endpoint that takes an upload, so they cannot drift apart.
+         */
+        fun validateUpload(file: MultipartFile) {
+            if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+                throw ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "File is too large. Maximum allowed size is 400 MB.")
+            }
+            val ext = file.originalFilename?.substringAfterLast('.', "")?.lowercase() ?: ""
+            if (ext !in SUPPORTED_EXTENSIONS) {
+                log.warn("Rejected upload: unsupported extension '.$ext' (file=${file.originalFilename})")
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Unsupported format: .$ext. Supported: ${SUPPORTED_EXTENSIONS.sorted().joinToString(", ")}")
+            }
+            val header = file.inputStream.readNBytes(16)
+            val imageFormat = detectImageFormat(header)
+            if (imageFormat != null) {
+                log.warn("Rejected upload: file appears to be a $imageFormat image (file=${file.originalFilename})")
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "File appears to be a $imageFormat image, not an audio/video file.")
+            }
         }
     }
 
@@ -114,22 +137,7 @@ class TranscribeController(
         @RequestHeader(name = "X-Telegram-Message-Id", required = false) telegramMessageId: Long?,
         servletRequest: HttpServletRequest,
     ): SubmitResponse {
-        if (file.size > MAX_UPLOAD_SIZE_BYTES) {
-            throw ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "File is too large. Maximum allowed size is 400 MB.")
-        }
-        val ext = file.originalFilename?.substringAfterLast('.', "")?.lowercase() ?: ""
-        if (ext !in SUPPORTED_EXTENSIONS) {
-            log.warn("Rejected upload: unsupported extension '.$ext' (file=${file.originalFilename})")
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "Unsupported format: .$ext. Supported: ${SUPPORTED_EXTENSIONS.sorted().joinToString(", ")}")
-        }
-        val header = file.inputStream.readNBytes(16)
-        val imageFormat = detectImageFormat(header)
-        if (imageFormat != null) {
-            log.warn("Rejected upload: file appears to be a $imageFormat image (file=${file.originalFilename})")
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "File appears to be a $imageFormat image, not an audio/video file.")
-        }
+        validateUpload(file)
 
         val authenticatedUserId = servletRequest.getAttribute("authenticatedUserId") as UUID?
         fun dec(v: String?) = v?.let { URLDecoder.decode(it, "UTF-8") }

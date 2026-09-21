@@ -66,10 +66,15 @@ abstract class TranscriptionRepository {
   /// there is none.
   Future<String?> transcriptText(String id);
 
-  /// Sends a file for transcription (`POST /transcriptions`) and returns the new
-  /// item, which starts out `pending`. The server settings of the dialog
-  /// (language, summary, speakers) travel with it.
-  Future<Transcription> upload(UploadRequest request);
+  /// Sends a file for transcription (`POST /transcriptions`) and returns the entry it became, which starts out
+  /// `pending`, or, when the user has uploaded this file with these options before, the existing one
+  /// ([UploadOutcome.duplicate]): nothing is transcribed twice. The options of the dialog travel with it.
+  /// [onProgress] gets the share of the file that has gone out; [cancellation] stops the upload.
+  Future<UploadOutcome> upload(
+    UploadRequest request, {
+    void Function(double fraction)? onProgress,
+    UploadCancellation? cancellation,
+  });
 
   /// Renames a transcription (`PATCH /jobs/{id}/title`).
   Future<void> rename(String id, String title);

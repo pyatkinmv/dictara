@@ -32,6 +32,7 @@ import org.testcontainers.containers.PostgreSQLContainer
         "dictara.local.stub.pending-seconds=0",
         "dictara.local.stub.transcribe-seconds=1",
         "dictara.local.stub.diarize-seconds=1",
+        "dictara.local.stub.summarize-seconds=0.2",
         "dictara.transcriber.poll-interval-ms=100",
     ],
 )
@@ -180,6 +181,40 @@ class LocalProfileIntegrationTest {
         assertThat(uris).anyMatch { it.startsWith("db://audio/") && it.endsWith("/weekly_call.mp3") }
         val owner = jdbc.queryForObject("SELECT user_id::text FROM submissions WHERE id = ?::uuid", String::class.java, jobId)
         assertThat(owner).isEqualTo("00000000-0000-4000-8000-000000000001")
+    }
+
+    @Test
+    fun `an upload from the web client goes through the stubs to done, with a Markdown summary`() {
+        val file = object : ByteArrayResource(ByteArray(64) { (it * 13 + 1).toByte() }) {
+            override fun getFilename() = "web_upload.mp3"
+        }
+        val body = LinkedMultiValueMap<String, Any>().apply { add("file", file) }
+        val headers = HttpHeaders().apply { contentType = MediaType.MULTIPART_FORM_DATA }
+
+        val response = rest.postForEntity("/transcriptions?summary=full&diarize=true&num_speakers=2", HttpEntity(body, headers), String::class.java)
+
+        assertThat(response.statusCode).isEqualTo(HttpStatus.ACCEPTED)
+        val jobId = json.readTree(response.body)["item"]["job_id"].asText()
+        waitUntilDone(jobId)
+        val detail = get("/transcriptions/$jobId")
+        assertThat(detail["status"].asText()).isEqualTo("done")
+        assertThat(detail["summary"].asText()).contains("stub summary").contains("**Key points**")
+        assertThat(detail["segments"].map { it["speaker"].asText() }.toSet()).hasSizeBetween(1, 2) // at most the two voices asked for
+    }
+
+    @Test
+    fun `summary off produces no summary`() {
+        val file = object : ByteArrayResource(ByteArray(64) { (it * 17 + 9).toByte() }) {
+            override fun getFilename() = "no_summary.mp3"
+        }
+        val body = LinkedMultiValueMap<String, Any>().apply { add("file", file) }
+        val headers = HttpHeaders().apply { contentType = MediaType.MULTIPART_FORM_DATA }
+
+        val response = rest.postForEntity("/transcriptions?summary=off", HttpEntity(body, headers), String::class.java)
+
+        val jobId = json.readTree(response.body)["item"]["job_id"].asText()
+        waitUntilDone(jobId)
+        assertThat(get("/transcriptions/$jobId").has("summary")).isFalse()
     }
 
     @Test
