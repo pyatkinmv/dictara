@@ -6,6 +6,7 @@ import com.dictara.gateway.dto.ProgressInfo
 import com.dictara.gateway.entity.StageAttemptEntity
 import com.dictara.gateway.entity.SubmissionEntity
 import com.dictara.gateway.model.SummaryMode
+import com.dictara.gateway.port.AnalysisInput
 import com.dictara.gateway.port.SummarizerPort
 import com.dictara.gateway.repository.AudioMetaRepository
 import com.dictara.gateway.util.TranscriptFormatter
@@ -23,6 +24,7 @@ class OrchestratorService(
     private val props: com.dictara.gateway.config.DictaraProperties,
     private val stateService: SubmissionStateService,
     private val audioMetaRepo: AudioMetaRepository,
+    private val suggestionService: SuggestionService,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -204,15 +206,23 @@ class OrchestratorService(
         log.info("Summarization attempt ${attempt.attemptNum} started for submission $submissionId")
 
         try {
-            val summaryText = summarizer.summarize(
-                text = formattedText,
-                audioDurationSeconds = audioDurationS,
-                mode = mode,
-                language = languageHint,
+            val library = suggestionService.libraryOf(submissionId)
+            val analysis = summarizer.analyze(
+                AnalysisInput(
+                    text = formattedText,
+                    audioDurationSeconds = audioDurationS,
+                    mode = mode,
+                    language = languageHint,
+                    tags = library.tags,
+                    speakers = library.speakers,
+                )
             )
-            stateService.saveSummaryAndCompleteAttempt(submissionId, attempt.id!!, summaryText)
+            stateService.saveSummaryAndCompleteAttempt(submissionId, attempt.id!!, analysis.summary)
+            // The proposals are a bonus: whatever goes wrong with them must not cost the summary.
+            runCatching { suggestionService.record(submissionId, analysis) }
+                .onFailure { log.warn("Suggestions for submission $submissionId were not kept: ${it.message}") }
             stateService.completeSubmission(submissionId)
-            log.info("Summarization complete for submission $submissionId (${summaryText.length} chars)")
+            log.info("Summarization complete for submission $submissionId (${analysis.summary.length} chars)")
 
         } catch (e: Exception) {
             log.warn("Summarization attempt ${attempt.attemptNum} failed for submission $submissionId: ${e.message}")

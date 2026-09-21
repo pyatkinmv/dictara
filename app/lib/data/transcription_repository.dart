@@ -136,7 +136,7 @@ abstract class TranscriptionRepository {
   /// set one by one and the voices are left alone. Read the outcome back with [get].
   Future<Speaker> assignSpeaker(String id, Set<int> segmentIndexes, String name, {bool allBySpeaker = false});
 
-  // AI suggestions (`docs/api-gaps.md` §2.4, still marked TBD there). Each call
+  // AI suggestions (the gateway keeps them until the user settles them). Each call
   // resolves part of the suggestions of a transcription; the record disappears
   // once nothing is left. Read the outcome back with [get].
 
@@ -146,13 +146,13 @@ abstract class TranscriptionRepository {
   /// Rejects everything that is left.
   Future<void> dismissAllSuggestions(String id);
 
-  /// Adds the suggested tag to the transcription (and to the library if new).
+  /// Adds the suggested tag to the transcription. The gateway proposes only tags of the library.
   Future<void> acceptTagSuggestion(String id, String label);
 
   Future<void> rejectTagSuggestion(String id, String label);
 
-  /// Confirms the suggested speaker for a diarizer slot (adding them to the
-  /// library if new).
+  /// Confirms the suggested speaker for a diarizer slot. A speaker who is not in the
+  /// library yet is created now, not before: rejecting leaves no trace.
   Future<void> acceptSpeakerSuggestion(String id, int slot);
 
   Future<void> rejectSpeakerSuggestion(String id, int slot);

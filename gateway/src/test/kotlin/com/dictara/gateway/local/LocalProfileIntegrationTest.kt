@@ -138,6 +138,17 @@ class LocalProfileIntegrationTest {
     }
 
     @Test
+    fun `the seed proposes a title, a tag and three speakers for the product sync`() {
+        val s = get("/transcriptions/00000000-0000-4000-8000-0000000b0006")["suggestions"]
+
+        assertThat(s["title"].asText()).isEqualTo("Product Sync — Q3 Roadmap")
+        assertThat(s["tags"].map { it["label"].asText() }).containsExactly("meeting")
+        assertThat(s["speakers"].map { it["voice"].asText() to it["name"].asText() })
+            .containsExactly("SPEAKER_00" to "Alexei Sorokin", "SPEAKER_01" to "Maria Chen", "SPEAKER_02" to "Peter Novak")
+        assertThat(s["speakers"].map { it.has("speaker_id") }).containsExactly(true, true, false) // Peter is not in the library
+    }
+
+    @Test
     fun `the seed can be applied again without changing anything`() {
         fun counts() = listOf("users", "audio_meta", "submissions", "transcripts", "tags", "transcript_tags", "speakers", "transcript_voices", "transcript_segments").map {
             jdbc.queryForObject("SELECT count(*) FROM $it", Long::class.java)
@@ -200,6 +211,9 @@ class LocalProfileIntegrationTest {
         assertThat(detail["status"].asText()).isEqualTo("done")
         assertThat(detail["summary"].asText()).contains("stub summary").contains("**Key points**")
         assertThat(detail["segments"].map { it["speaker"].asText() }.toSet()).hasSizeBetween(1, 2) // at most the two voices asked for
+        // The stub proposes what its rules find; the title is always there, and a tag because the seed has a library.
+        assertThat(detail["suggestions"]["title"].asText()).isNotBlank()
+        assertThat(detail["suggestions"]["tags"]).isNotEmpty()
     }
 
     @Test
@@ -215,6 +229,7 @@ class LocalProfileIntegrationTest {
         val jobId = json.readTree(response.body)["item"]["job_id"].asText()
         waitUntilDone(jobId)
         assertThat(get("/transcriptions/$jobId").has("summary")).isFalse()
+        assertThat(get("/transcriptions/$jobId").has("suggestions")).isFalse() // off switches the AI off altogether
     }
 
     @Test

@@ -2,6 +2,7 @@ import 'dart:ui' show Color;
 
 import '../models/speaker.dart';
 import '../models/speaker_entry.dart';
+import '../models/suggestions.dart';
 import '../models/tag.dart';
 import '../models/tag_entry.dart';
 import '../models/transcription.dart';
@@ -10,23 +11,7 @@ import '../models/upload.dart';
 import 'gateway_client.dart';
 import 'transcription_repository.dart';
 
-/// A screen asked for something the gateway does not offer yet. Each such call names the integration
-/// iteration (`docs/local-backend-integration.md`, section 7) that connects it.
-class NotIntegratedException implements Exception {
-  const NotIntegratedException(this.what, this.iteration);
-
-  final String what;
-  final int iteration;
-
-  @override
-  String toString() => '$what is not connected to the gateway yet (integration iteration $iteration)';
-}
-
-/// The real data source: the gateway over HTTP.
-///
-/// Being connected screen by screen (`docs/local-backend-integration.md`): so far the transcription list,
-/// the tag and speaker libraries and the detail page (text, summary, rename, download) work. Everything else throws
-/// [NotIntegratedException].
+/// The real data source: the gateway over HTTP (`docs/local-backend-integration.md`).
 class HttpTranscriptionRepository implements TranscriptionRepository {
   HttpTranscriptionRepository(this._client);
 
@@ -267,25 +252,30 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
     return _speakerFromJson(body as Map<String, dynamic>);
   }
 
-  @override
-  Future<void> acceptAllSuggestions(String id) => _notYet('AI suggestions', 8);
+  // What the AI proposed is settled with `POST /transcriptions/{id}/suggestions/...`. The gateway answers what
+  // is still proposed; the controller reads the transcription again, so the answer is not used.
 
   @override
-  Future<void> dismissAllSuggestions(String id) => _notYet('AI suggestions', 8);
+  Future<void> acceptAllSuggestions(String id) => _suggestion(id, 'accept-all');
 
   @override
-  Future<void> acceptTagSuggestion(String id, String label) => _notYet('AI suggestions', 8);
+  Future<void> dismissAllSuggestions(String id) => _suggestion(id, 'dismiss-all');
 
   @override
-  Future<void> rejectTagSuggestion(String id, String label) => _notYet('AI suggestions', 8);
+  Future<void> acceptTagSuggestion(String id, String label) => _suggestion(id, 'tags/${Uri.encodeComponent(label)}/accept');
 
   @override
-  Future<void> acceptSpeakerSuggestion(String id, int slot) => _notYet('AI suggestions', 8);
+  Future<void> rejectTagSuggestion(String id, String label) => _suggestion(id, 'tags/${Uri.encodeComponent(label)}/reject');
 
   @override
-  Future<void> rejectSpeakerSuggestion(String id, int slot) => _notYet('AI suggestions', 8);
+  Future<void> acceptSpeakerSuggestion(String id, int slot) => _suggestion(id, 'speakers/${_voiceLabel(slot)}/accept');
 
-  Future<T> _notYet<T>(String what, int iteration) => Future.error(NotIntegratedException(what, iteration));
+  @override
+  Future<void> rejectSpeakerSuggestion(String id, int slot) => _suggestion(id, 'speakers/${_voiceLabel(slot)}/reject');
+
+  Future<void> _suggestion(String id, String action) async {
+    await _client.postJson('/transcriptions/${Uri.encodeComponent(id)}/suggestions/$action', const <String, Object>{});
+  }
 }
 
 /// One entry of the gateway's `GET /transcriptions`. Length, speakers and progress are optional there: they
@@ -344,6 +334,7 @@ TranscriptionDetail _detailFromJson(Map<String, dynamic> json) {
         if ((s as Map<String, dynamic>)['assigned_speaker'] case final own?)
           i: _speakerFromJson(own as Map<String, dynamic>),
     },
+    suggestions: _suggestionsFromJson(json['suggestions']),
     summary: json['summary'] as String?,
     originalFilename: fileName,
     fileSizeBytes: (json['file_size_bytes'] as num?)?.toInt() ?? 0,
@@ -357,6 +348,26 @@ TranscriptionDetail _detailFromJson(Map<String, dynamic> json) {
 int? _slotFromLabel(String? label) {
   final digits = label == null ? null : RegExp(r'(\d+)$').firstMatch(label)?.group(1);
   return digits == null ? null : int.parse(digits) + 1;
+}
+
+/// The label of the diarizer voice behind a page slot: slot 1 is `SPEAKER_00` (the reverse of [_slotFromLabel]).
+String _voiceLabel(int slot) => 'SPEAKER_${(slot - 1).toString().padLeft(2, '0')}';
+
+/// What the AI proposes, as the gateway sends it: `{title?, tags: [{label, color}], speakers: [{voice, name, color}]}`.
+/// Null when the transcription has nothing (left) to settle.
+Suggestions? _suggestionsFromJson(Object? json) {
+  if (json is! Map<String, dynamic>) return null;
+  final suggestions = Suggestions(
+    title: json['title'] as String?,
+    tags: [
+      for (final tag in (json['tags'] as List<dynamic>? ?? const [])) _tagFromJson(tag as Map<String, dynamic>),
+    ],
+    speakers: {
+      for (final s in (json['speakers'] as List<dynamic>? ?? const []))
+        ?_slotFromLabel((s as Map<String, dynamic>)['voice'] as String?): _speakerFromJson(s),
+    },
+  );
+  return suggestions.isEmpty ? null : suggestions;
 }
 
 /// Seconds (a JSON number, possibly fractional) as a [Duration]; null when absent.

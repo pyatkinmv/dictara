@@ -32,6 +32,7 @@ class SubmissionService(
     private val submissionListQuery: SubmissionListQuery,
     private val segmentQueries: TranscriptSegmentQueries,
     private val speakerQueries: TranscriptSpeakerQueries,
+    private val suggestionService: SuggestionService,
 ) {
     data class CreateResult(val submissionId: UUID, val dedup: Boolean)
 
@@ -79,6 +80,8 @@ class SubmissionService(
         val segments: List<DetailSegment>,
         /** Which speaker each named voice is; a voice not listed is still "Speaker N". */
         val voices: List<VoiceAssignment>,
+        /** What the AI proposes and the user has not settled; left out when there is nothing. */
+        val suggestions: Suggestions? = null,
     )
 
     data class ExportData(
@@ -226,6 +229,7 @@ class SubmissionService(
             summary = summaryRepo.findBySubmissionId(submissionId)?.text?.takeIf { it.isNotBlank() },
             segments = segments,
             voices = voices,
+            suggestions = transcript?.id?.let { suggestionService.pending(it) },
         )
     }
 

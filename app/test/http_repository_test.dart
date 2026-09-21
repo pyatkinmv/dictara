@@ -889,17 +889,78 @@ void main() {
     });
   });
 
-  group('not connected yet', () {
-    final repo = _repo(MockClient((request) async => _json([])));
+  group('AI suggestions', () {
+    Map<String, dynamic> withSuggestions(Object? suggestions) => {
+          'job_id': 't1',
+          'file_name': 'call.mp3',
+          'title': 'Call',
+          'created_at': '2026-09-20T16:36:21Z',
+          'status': 'done',
+          'tags': <Map<String, String>>[],
+          'segments': [
+            {'start': 0.0, 'end': 5.0, 'text': "Hi, I'm Anna.", 'speaker': 'SPEAKER_00'},
+            {'start': 5.0, 'end': 9.0, 'text': 'Hello.', 'speaker': 'SPEAKER_01'},
+          ],
+          'suggestions': ?suggestions,
+        };
 
-    test('other calls say which iteration connects them', () async {
-      await expectLater(repo.acceptAllSuggestions('1'), throwsA(isA<NotIntegratedException>()));
+    test('the proposals of the detail are read: title, tags and speakers by slot', () async {
+      final repo = _repo(MockClient((_) async => _json(withSuggestions({
+            'title': 'Intro call',
+            'tags': [_tag('meeting', color: '#059669')],
+            'speakers': [
+              {'voice': 'SPEAKER_01', 'name': 'Anna', 'color': '#8F13AE', 'evidence': "I'm Anna"},
+              {'voice': 'SPEAKER_00', 'name': 'Boris Petrov', 'color': '#2563EB', 'speaker_id': 'sp-1'},
+            ],
+          }))));
+
+      final s = (await repo.get('t1'))!.suggestions!;
+
+      expect(s.title, 'Intro call');
+      expect(s.tags.map((t) => (t.label, t.color)), [('meeting', const Color(0xFF059669))]);
+      expect(s.speakers.map((slot, speaker) => MapEntry(slot, (speaker.name, speaker.color))), {
+        2: ('Anna', const Color(0xFF8F13AE)),
+        1: ('Boris Petrov', const Color(0xFF2563EB)),
+      });
     });
 
-    test('the message names what is missing', () {
-      expect(
-        const NotIntegratedException('Uploading', 7).toString(),
-        'Uploading is not connected to the gateway yet (integration iteration 7)',
+    test('a detail without proposals, or with an empty object, has none', () async {
+      expect((await _repo(MockClient((_) async => _json(withSuggestions(null)))).get('t1'))!.suggestions, isNull);
+      final empty = {'tags': <Object>[], 'speakers': <Object>[]};
+      expect((await _repo(MockClient((_) async => _json(withSuggestions(empty)))).get('t1'))!.suggestions, isNull);
+    });
+
+    test('each action is a POST to its own address; a slot is the diarizer voice, a label is escaped', () async {
+      final seen = <http.Request>[];
+      final repo = _repo(MockClient((request) async {
+        seen.add(request);
+        return _json({});
+      }));
+
+      await repo.acceptAllSuggestions('t1');
+      await repo.dismissAllSuggestions('t1');
+      await repo.acceptTagSuggestion('t1', 'встреча');
+      await repo.rejectTagSuggestion('t1', 'idea');
+      await repo.acceptSpeakerSuggestion('t1', 1);
+      await repo.rejectSpeakerSuggestion('t1', 12);
+
+      expect(seen.map((r) => r.method).toSet(), {'POST'});
+      expect(seen.map((r) => r.url.path.replaceFirst('/api/transcriptions/t1/suggestions/', '')), [
+        'accept-all',
+        'dismiss-all',
+        'tags/${Uri.encodeComponent('встреча')}/accept',
+        'tags/idea/reject',
+        'speakers/SPEAKER_00/accept',
+        'speakers/SPEAKER_11/reject',
+      ]);
+    });
+
+    test('a refusal says why', () async {
+      final repo = _repo(MockClient((_) async => _json({'message': 'No such suggestion'}, status: 404)));
+
+      await expectLater(
+        repo.acceptTagSuggestion('t1', 'idea'),
+        throwsA(isA<GatewayException>().having((e) => e.message, 'message', 'No such suggestion')),
       );
     });
   });

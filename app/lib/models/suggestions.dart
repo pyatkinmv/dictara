@@ -7,8 +7,9 @@ import 'tag.dart';
 /// The three parts are resolved independently; once nothing is left the
 /// server drops the record, so a resolved suggestion never comes back.
 ///
-/// How the gateway produces and stores them is open (`docs/api-gaps.md` §1.2,
-/// §4.2): one Gemini call or two.
+/// The gateway gets them from the same Gemini call as the summary and keeps them
+/// until they are settled. Tags are always tags of the library; a speaker is
+/// only a name until it is accepted.
 class Suggestions {
   const Suggestions({this.title, this.tags = const [], this.speakers = const {}});
 

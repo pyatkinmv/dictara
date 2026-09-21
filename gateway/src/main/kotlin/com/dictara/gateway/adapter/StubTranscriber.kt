@@ -148,7 +148,7 @@ internal object StubScenarios {
             "Job interview", "en",
             listOf(
                 0 to "Thanks for coming in, Anna. Let's start with a quick overview of your background and what drew you to this role.",
-                1 to "Of course. I've spent the last six years in backend engineering, mostly in payments. I was attracted by the scale of the problems you're solving here.",
+                1 to "Of course. I'm Anna, and I've spent the last six years in backend engineering, mostly in payments. I was attracted by the scale of the problems you're solving here.",
                 0 to "Can you walk me through a system you designed that you're particularly proud of?",
                 1 to "Sure. At my last company I redesigned the settlement pipeline. We moved from nightly batches to an event-driven flow, which cut reconciliation time from hours to minutes.",
                 0 to "What was the hardest part of that migration?",

@@ -185,7 +185,7 @@ VALUES
 ON CONFLICT (user_id, name) DO UPDATE SET description = EXCLUDED.description, created_at = EXCLUDED.created_at;
 
 -- Voices 0, 1, 2 of the diarized transcripts are Alexei, Maria and James (the interview has two voices).
--- Not the product sync (n = 6): it stays without names, for the AI suggestions of a later iteration.
+-- Not the product sync (n = 6): it stays without names; the AI suggestions below are about it.
 -- The speaker is looked up by name: one made by hand under the same name keeps its own id.
 INSERT INTO transcript_voices (transcript_id, voice, speaker_id)
 SELECT ('00000000-0000-4000-8000-0000000c00' || lpad(m.n::text, 2, '0'))::uuid, 'SPEAKER_0' || m.voice, sp.id
@@ -196,3 +196,25 @@ FROM (VALUES
 ) AS m(n, voice, speaker_name)
 JOIN speakers sp ON sp.user_id = '00000000-0000-4000-8000-000000000001' AND sp.name = m.speaker_name
 ON CONFLICT (transcript_id, voice) DO UPDATE SET speaker_id = EXCLUDED.speaker_id;
+
+-- ── What the AI proposes for the product sync (n = 6), as in the design ─────────────────────────────────
+-- A new title, a tag of the library and who the three voices are: two are speakers of the library, one is a
+-- name that is not in it (accepting it creates the speaker). Rows the user has already settled stay as they are.
+INSERT INTO transcript_suggestions (id, transcript_id, kind, title)
+VALUES ('00000000-0000-4000-8000-0000000e0001', '00000000-0000-4000-8000-0000000c0006', 'title', 'Product Sync — Q3 Roadmap')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO transcript_suggestions (id, transcript_id, kind, tag_id)
+SELECT '00000000-0000-4000-8000-0000000e0002', '00000000-0000-4000-8000-0000000c0006', 'tag', t.id
+FROM tags t WHERE t.user_id = '00000000-0000-4000-8000-000000000001' AND t.name = 'meeting'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO transcript_suggestions (id, transcript_id, kind, voice, speaker_name, speaker_id, evidence)
+SELECT m.id::uuid, '00000000-0000-4000-8000-0000000c0006', 'speaker', m.voice, m.name, sp.id, m.evidence
+FROM (VALUES
+    ('00000000-0000-4000-8000-0000000e0003', 'SPEAKER_00', 'Alexei Sorokin', 'Okay, quick sync on the roadmap.'),
+    ('00000000-0000-4000-8000-0000000e0004', 'SPEAKER_01', 'Maria Chen',     'From the support side, the top request is still speaker names.'),
+    ('00000000-0000-4000-8000-0000000e0005', 'SPEAKER_02', 'Peter Novak',    'And I''ll sketch the API changes this week.')
+) AS m(id, voice, name, evidence)
+LEFT JOIN speakers sp ON sp.user_id = '00000000-0000-4000-8000-000000000001' AND sp.name = m.name
+ON CONFLICT DO NOTHING;
