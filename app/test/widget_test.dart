@@ -3,6 +3,7 @@ import 'dart:ui' show Size;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dictara_web/app.dart';
 
+import 'support/fake_transcription_repository.dart';
 import 'test_utils.dart';
 
 void main() {
@@ -11,7 +12,7 @@ void main() {
 
   testWidgets('shell shows sidebar navigation and topbar title', (tester) async {
     useDesktopSize(tester);
-    await tester.pumpWidget(const DictaraApp());
+    await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository()));
     await settle(tester);
 
     // Sidebar item + topbar title.
@@ -24,7 +25,7 @@ void main() {
 
   testWidgets('navigating updates the topbar title', (tester) async {
     useDesktopSize(tester);
-    await tester.pumpWidget(const DictaraApp());
+    await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository()));
     await settle(tester);
 
     await tester.tap(find.text('Tags'));
@@ -39,7 +40,7 @@ void main() {
     tester.view.physicalSize = const Size(1280, 300);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(const DictaraApp());
+    await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository()));
     await settle(tester);
 
     // A RenderFlex overflow is reported as an exception and would fail the test.
@@ -49,7 +50,7 @@ void main() {
 
   testWidgets('profile menu opens and closes', (tester) async {
     useDesktopSize(tester);
-    await tester.pumpWidget(const DictaraApp());
+    await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository()));
     await settle(tester);
 
     expect(find.text('Sign out'), findsNothing);

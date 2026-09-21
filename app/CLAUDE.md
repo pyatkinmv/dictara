@@ -1,74 +1,58 @@
 # app — Flutter Web Client
 
-Flutter web client served as a Docker container on port 3000.
+Flutter web client (Material 3) served as a Docker container (nginx) on port 3000. The redesigned interface: transcriptions list and detail page, Tags and Speakers libraries, upload dialog, AI suggestions. Design: `docs/redesign-plan.md` (history), integration with the gateway: [docs/local-backend-integration.md](../docs/local-backend-integration.md).
+
+**Not done yet (before the first merge to `master`): login.** The client sends no `Authorization` header; locally the gateway's `local` profile puts every request under a seeded dev user. See "Итерация 9" in the integration document.
 
 ## Structure
 
 ```
 app/
   lib/
-    shared/
-      api_client.dart       HTTP client — calls /api/* proxied by nginx to gateway:8080
-      auth_service.dart     AuthService (ChangeNotifier) — Telegram login, JWT storage
-      history_section.dart  HistorySection widget — accordion list of past transcriptions
-      models.dart           Data classes: JobResult, TranscriptSegment, ProgressInfo, HistoryItem
-    material/
-      main_material.dart    Entry point for Material 3 build
-      transcribe_page.dart  Material 3 UI
-  Dockerfile                Multi-stage: flutter build web --target=... → nginx:alpine
-  nginx.conf                Serves static files; proxies /api/ → gateway:8080
+    material/main_material.dart   Entry point (also the Docker build target): real gateway repository, snack-bar error reporting
+    app.dart                      DictaraApp: providers (repository, controllers, ErrorReporter), MaterialApp.router
+    router.dart                   go_router routes
+    data/
+      transcription_repository.dart        The interface every screen talks to
+      http_transcription_repository.dart   Implementation over the gateway's HTTP API
+      gateway_client.dart                  JSON over HTTP under /api, GatewayException, message extraction
+    models/     Plain data classes (transcription, detail, tags, speakers, suggestions, upload options)
+    state/      ChangeNotifier controllers: list (paging, filters, polling), detail, tag and speaker libraries
+    pages/      Screens (transcriptions, detail with its tabs, tags, speakers, upload dialog)
+    shell/      App frame: sidebar, topbar, profile menu
+    widgets/    Shared widgets (modal, popover, status badge, transcription row, ErrorReporter...)
+    services/   Browser-only pieces behind conditional imports (`*_stub.dart` / `*_web.dart`): file chooser,
+                multipart uploader (XHR, upload progress), ".txt" saver
+    theme/      Palette and Material theme
+  test/
+    support/fake_transcription_repository.dart   In-memory double of the repository; only tests use it
+  web_dev_config.yaml   Dev server proxy: /api/ → localhost:8080 (the gateway)
+  Dockerfile            flutter build web → nginx:alpine
+  nginx.conf            Static files; /api/ → gateway:8080 with the /api prefix cut
 ```
 
-The `material/` variant uses Material 3 widgets. The `shared/` directory contains all API calls, data models, auth, and history logic shared across the app.
+## Run and test
 
-## Build
+Start the gateway with the `local` profile first (`scripts\dev.ps1`), then:
 
 ```bash
-docker compose build app-material
-docker compose up -d app-material
+flutter run -d web-server --web-port 3001 -t lib/material/main_material.dart
+flutter analyze lib test
+flutter test          # runs on the Dart VM, no browser needed
 ```
 
-## Authentication
-
-`AuthService` is a `ChangeNotifier` wired into both pages. On startup it restores a persisted JWT from `localStorage`. Token is passed as `Authorization: Bearer <jwt>` on every API call via `ApiClient.setToken()`.
-
-**Login flow:**
-1. User enters Telegram `@username` → `POST /api/auth/login-by-username`
-2. Gateway looks up the user in `auth_identities`:
-   - Found + `bot_started=true` → creates a login notification → bot sends Telegram confirm message → status `notified`
-   - Not found or `bot_started=false` → status `unknown_user` → hint shown to open bot
-3. Web polls `GET /api/auth/login-link/{token}` every 3s
-4. On confirm: gateway returns `{ confirmed: true, token: <jwt>, display_name: "..." }` → JWT stored, dialog closes
-
-## History section
-
-`HistorySection` loads on login, clears on logout. Metadata list fetched from `GET /api/transcriptions`. Content lazy-loaded via `GET /api/jobs/{jobId}` on expand, cached in memory. In-progress items poll every 3s. Download button per item (blob URL, `.txt`).
-
-Header has a **download-all** `PopupMenuButton` with two options — "Transcripts only" / "With audio" — that calls `GET /api/export` with the `Authorization` header and triggers a browser ZIP download. Shows a spinner while downloading to prevent double-clicks.
-
-New item prepended automatically when a transcription completes in the current session.
-
-## App flow
-
-```
-idle → [pick file] → [Transcribe button] → uploading → pending (queue position shown)
-                                                            ↓
-                                                       processing (progress: transcribing → diarizing)
-                                                            ↓
-                                                       summarizing (if enabled)
-                                                            ↓
-                                                          done ← result shown
-                                                            ↘ error → retry → idle
-```
-
-Gateway submission statuses: `pending` (waiting in queue), `processing` (transcriber active), `summarizing`, `done`, `failed`.
-
-Progress phases (within `processing`): `transcribing` (seconds processed / total), `diarizing` (0–100%).
+The app always talks to the gateway; there is no mock mode (it was removed before the first merge). The Docker image is built in CI (`FLUTTER_TARGET=lib/material/main_material.dart`).
 
 ## Key decisions
 
-- **No CORS** — nginx proxies `/api/` to `gateway:8080`; browser sees same origin
-- **nginx resolver** — uses `resolver 127.0.0.11` + `set $upstream` variable to defer DNS at startup
-- **No state management lib** — `StatefulWidget` + `setState` is sufficient
-- **`dart:html`** — used for the download button (blob URL trick). Deprecated in favour of `package:web` but JS builds work fine. Not Wasm-compatible
-- **`AuthService` + `GlobalKey<HistorySectionState>`** — auth state propagated via `ChangeNotifier`; parent calls `addItem()` on history after each completed job
+- **State:** `provider` + `ChangeNotifier` controllers; screens know only `TranscriptionRepository`. Widget tests run the real app on `FakeTranscriptionRepository`; `http_repository_test.dart` tests the HTTP repository with `MockClient`.
+- **No CORS:** the app calls `/api/...` on its own origin; nginx (production) or the dev server (`web_dev_config.yaml`) forwards it to the gateway and cuts `/api`.
+- **Errors:** an action that fails and is not handled by its screen ends in `runZonedGuarded` in `main` and is shown by `ErrorReporter` in a snack bar (the gateway's own message, or a plain sentence for connection/server trouble). In the browser such errors do not reach `PlatformDispatcher.onError`. The Upload dialog shows its own error in red. The list's timed refresh retries silently.
+- **Browser APIs** (`package:web`, XHR upload with progress, file chooser, saving a file) live only in `services/*_web.dart`; the stubs let the VM tests run. Verify anything web-only with `flutter build web`, the tests do not compile it.
+- **Ids and names:** a transcription is identified by the gateway's `job_id`; tags and speakers are looked up by name and resolved to gateway ids in the repository. A diarizer voice `SPEAKER_00` is "slot 1" on the page.
+- **Uploads:** the file is never copied into memory (the browser `Blob` goes into `FormData`); no timeout; cancellable; duplicates are answered by the gateway with the existing transcription.
+- **Suggestions** (title, tags of the library, speakers) come from the gateway with the transcription; accepting or rejecting is a POST, then the detail is read again. A suggested speaker exists in the library only after it is accepted.
+
+## Authentication (old client, for reference)
+
+The previous client logged in through Telegram (`@username` → confirmation message from the bot → polling `GET /api/auth/login-link/{token}` → JWT in `localStorage` → `Authorization: Bearer`). Its code (`lib/shared/auth_service.dart`, `api_client.dart`) was deleted with the old UI; it is in git history (`e226aa9 feat(auth): Telegram-based web login with JWT`).

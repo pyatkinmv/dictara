@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dictara_web/app.dart';
-import 'package:dictara_web/data/fake_transcription_repository.dart';
+import 'support/fake_transcription_repository.dart';
 import 'package:dictara_web/models/speaker.dart';
 import 'package:dictara_web/models/suggestions.dart';
 import 'package:dictara_web/models/tag.dart';
@@ -171,7 +171,7 @@ void main() {
       tester.view.physicalSize = const Size(1280, 2400);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
-      await tester.pumpWidget(DictaraApp(initialLocation: '/transcriptions/$id', repository: repo));
+      await tester.pumpWidget(DictaraApp(initialLocation: '/transcriptions/$id', repository: repo ?? FakeTranscriptionRepository()));
       await settle(tester);
     }
 

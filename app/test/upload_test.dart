@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dictara_web/app.dart';
-import 'package:dictara_web/data/fake_transcription_repository.dart';
+import 'support/fake_transcription_repository.dart';
 import 'package:dictara_web/data/gateway_client.dart';
 import 'package:dictara_web/data/transcription_repository.dart';
 import 'package:dictara_web/models/transcription.dart';
@@ -184,7 +184,7 @@ void main() {
       await tester.pumpWidget(
         DictaraApp(
           initialLocation: location,
-          repository: repo,
+          repository: repo ?? FakeTranscriptionRepository(),
           fileChooser: chooser ?? FakeFileChooser(),
         ),
       );

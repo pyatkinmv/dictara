@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dictara_web/app.dart';
-import 'package:dictara_web/data/fake_transcription_repository.dart';
+import 'support/fake_transcription_repository.dart';
 import 'package:dictara_web/models/speaker.dart';
 import 'package:dictara_web/models/tag.dart';
 import 'package:dictara_web/models/transcription.dart';
@@ -168,7 +168,7 @@ void main() {
   group('Speakers row', () {
     Future<void> openDetail(WidgetTester tester, [String id = '0']) async {
       useDesktopSize(tester);
-      await tester.pumpWidget(DictaraApp(initialLocation: '/transcriptions/$id'));
+      await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository(), initialLocation: '/transcriptions/$id'));
       await settle(tester);
     }
 
@@ -200,7 +200,7 @@ void main() {
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
-      await tester.pumpWidget(const DictaraApp(initialLocation: '/transcriptions/0'));
+      await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository(), initialLocation: '/transcriptions/0'));
       await settle(tester);
     }
 

@@ -5,9 +5,8 @@
 # development, so the browser sees one origin and the gateway needs no CORS.
 #
 # Start the gateway first (scripts/dev.ps1), then:
-#   flutter run -d web-server --web-port 3001 -t lib/material/main_material.dart --dart-define=BACKEND=local
+#   flutter run -d web-server --web-port 3001 -t lib/material/main_material.dart
 #
-# Has no effect when BACKEND=mock (the default), which never makes a request.
 server:
   proxy:
     - prefix: /api/

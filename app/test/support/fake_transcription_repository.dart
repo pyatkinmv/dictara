@@ -1,15 +1,15 @@
 import 'dart:ui' show Color;
 
-import '../models/speaker.dart';
-import '../models/speaker_entry.dart';
-import '../models/suggestions.dart';
-import '../models/tag.dart';
-import '../models/tag_entry.dart';
-import '../models/transcription.dart';
-import '../models/transcription_detail.dart';
-import '../models/upload.dart';
-import '../util/format.dart';
-import 'transcription_repository.dart';
+import 'package:dictara_web/models/speaker.dart';
+import 'package:dictara_web/models/speaker_entry.dart';
+import 'package:dictara_web/models/suggestions.dart';
+import 'package:dictara_web/models/tag.dart';
+import 'package:dictara_web/models/tag_entry.dart';
+import 'package:dictara_web/models/transcription.dart';
+import 'package:dictara_web/models/transcription_detail.dart';
+import 'package:dictara_web/models/upload.dart';
+import 'package:dictara_web/util/format.dart';
+import 'package:dictara_web/data/transcription_repository.dart';
 
 // Mock data copied from `designs/1.9/cards-teal.html`.
 const _meeting = Tag('meeting', Color(0xFF2563EB));

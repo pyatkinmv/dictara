@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dictara_web/app.dart';
-import 'package:dictara_web/data/fake_transcription_repository.dart';
+import 'support/fake_transcription_repository.dart';
 import 'package:dictara_web/data/transcription_repository.dart';
 import 'package:dictara_web/models/transcription.dart';
 import 'package:dictara_web/widgets/transcription_row.dart';
@@ -69,7 +69,7 @@ void main() {
   group('Transcriptions page', () {
     Future<void> open(WidgetTester tester) async {
       useDesktopSize(tester);
-      await tester.pumpWidget(const DictaraApp());
+      await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository()));
       await settle(tester);
     }
 

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dictara_web/app.dart';
-import 'package:dictara_web/data/fake_transcription_repository.dart';
+import 'support/fake_transcription_repository.dart';
 import 'package:dictara_web/models/tag.dart';
 
 import 'test_utils.dart';
@@ -153,7 +153,7 @@ void main() {
         addTearDown(tester.view.reset);
       }
       await tester.pumpWidget(
-        DictaraApp(initialLocation: '/speakers', repository: repo),
+        DictaraApp(initialLocation: '/speakers', repository: repo ?? FakeTranscriptionRepository()),
       );
       await settle(tester);
     }

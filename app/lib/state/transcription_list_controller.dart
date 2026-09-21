@@ -182,7 +182,17 @@ class TranscriptionListController extends ChangeNotifier {
     _poll = null;
     final interval = pollInterval;
     if (interval == null || !_items.any((i) => i.status != TranscriptionStatus.done)) return;
-    _poll = Timer(interval, () => _load());
+    _poll = Timer(interval, _pollOnce);
+  }
+
+  /// A refresh by the clock. When it fails (the gateway is restarting, the network blinked) nobody asked for
+  /// it, so the user is not bothered: it simply tries again at the next tick.
+  Future<void> _pollOnce() async {
+    try {
+      await _load();
+    } on Object {
+      if (!_disposed) _schedulePoll();
+    }
   }
 
   @override

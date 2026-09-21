@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'support/fake_transcription_repository.dart';
 import 'package:dictara_web/app.dart';
 import 'package:dictara_web/models/speaker.dart';
 import 'package:dictara_web/models/transcription.dart';
@@ -60,7 +61,7 @@ void main() {
   group('Detail page', () {
     Future<void> openDetail(WidgetTester tester, String location) async {
       useDesktopSize(tester);
-      await tester.pumpWidget(DictaraApp(initialLocation: location));
+      await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository(), initialLocation: location));
       await settle(tester);
     }
 

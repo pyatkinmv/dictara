@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dictara_web/app.dart';
-import 'package:dictara_web/data/fake_transcription_repository.dart';
+import 'support/fake_transcription_repository.dart';
 import 'package:dictara_web/models/transcription_detail.dart';
 import 'package:dictara_web/util/format.dart';
 
@@ -27,7 +27,7 @@ void main() {
     Future<void> open(WidgetTester tester) async {
       useDesktopSize(tester);
       saver = FakeTextSaver();
-      await tester.pumpWidget(DictaraApp(initialLocation: '/transcriptions/0', textSaver: saver));
+      await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository(), initialLocation: '/transcriptions/0', textSaver: saver));
       await settle(tester);
     }
 
