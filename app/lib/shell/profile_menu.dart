@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../state/auth_controller.dart';
 import '../theme/app_palette.dart';
 import '../widgets/popover.dart';
 
@@ -118,7 +120,15 @@ class _MenuPanel extends StatelessWidget {
           _MenuRow(icon: Icons.feedback_rounded, label: 'Give feedback', onTap: onSelected),
           _MenuRow(icon: Icons.help_outline_rounded, label: 'Support', onTap: onSelected),
           const PopoverSeparator(),
-          _MenuRow(icon: Icons.logout_rounded, label: 'Sign out', danger: true, onTap: onSelected),
+          _MenuRow(
+            icon: Icons.logout_rounded,
+            label: 'Sign out',
+            danger: true,
+            onTap: () {
+              context.read<AuthController>().logout();
+              onSelected();
+            },
+          ),
         ],
       ),
     );

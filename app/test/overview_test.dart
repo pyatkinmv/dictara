@@ -44,7 +44,7 @@ void main() {
   group('Overview tab', () {
     Future<void> openOverview(WidgetTester tester, [String id = '0']) async {
       useDesktopSize(tester);
-      await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository(), initialLocation: '/transcriptions/$id'));
+      await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: FakeTranscriptionRepository(), initialLocation: '/transcriptions/$id'));
       await settle(tester);
       await tester.tap(find.text('Overview'));
       await settle(tester);
@@ -118,7 +118,7 @@ void main() {
       tester.view.physicalSize = const Size(1254, 800); // narrow enough for the chip to sit near the edge
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
-      await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository(), initialLocation: '/transcriptions/0'));
+      await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: FakeTranscriptionRepository(), initialLocation: '/transcriptions/0'));
       await settle(tester);
       await tester.tap(find.text('Overview'));
       await settle(tester);

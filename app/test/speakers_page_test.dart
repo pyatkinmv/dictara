@@ -153,7 +153,7 @@ void main() {
         addTearDown(tester.view.reset);
       }
       await tester.pumpWidget(
-        DictaraApp(initialLocation: '/speakers', repository: repo ?? FakeTranscriptionRepository()),
+        DictaraApp(authController: signedInAuthController(), initialLocation: '/speakers', repository: repo ?? FakeTranscriptionRepository()),
       );
       await settle(tester);
     }

@@ -71,7 +71,7 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
       }
-      await tester.pumpWidget(DictaraApp(initialLocation: '/tags', repository: repo ?? FakeTranscriptionRepository()));
+      await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), initialLocation: '/tags', repository: repo ?? FakeTranscriptionRepository()));
       await settle(tester);
     }
 

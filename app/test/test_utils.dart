@@ -4,6 +4,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:dictara_web/models/upload.dart';
 import 'package:dictara_web/services/file_chooser.dart';
 import 'package:dictara_web/services/text_saver.dart';
+import 'package:dictara_web/services/token_store.dart';
+import 'package:dictara_web/state/auth_controller.dart';
+
+import 'support/fake_auth_api.dart';
+import 'support/in_memory_token_store.dart';
 
 /// Loads the bundled Inter font. Without it tests render text with a wide
 /// placeholder font, which produces false overflow errors.
@@ -59,6 +64,14 @@ class FakeTextSaver implements TextSaver {
     saved.add((fileName: fileName, text: text));
   }
 }
+
+/// An `AuthController` that starts already signed in — a saved session was already found, the way a returning
+/// visitor's would be. For the many tests that are not about login itself; a test of the login screen builds
+/// its own with `InMemoryTokenStore()` (no seed) instead.
+AuthController signedInAuthController({String displayName = 'Test User'}) => AuthController(
+      FakeAuthApi(),
+      InMemoryTokenStore(StoredToken(token: 'test-token', displayName: displayName)),
+    );
 
 /// Catches what the app puts on the clipboard, without a platform. Call before the app is shown.
 List<String> captureClipboard(WidgetTester tester) {

@@ -279,7 +279,7 @@ void main() {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
-      await tester.pumpWidget(DictaraApp(repository: repo));
+      await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: repo));
       await settle(tester);
       return Provider.of<TranscriptionListController>(tester.element(find.byType(Scaffold)), listen: false);
     }
@@ -482,7 +482,7 @@ void _searchDebounceTests() {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
-      await tester.pumpWidget(DictaraApp(repository: repo));
+      await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: repo));
       await settle(tester);
       final before = repo.calls.length;
 

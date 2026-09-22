@@ -69,7 +69,7 @@ void main() {
   group('Transcriptions page', () {
     Future<void> open(WidgetTester tester) async {
       useDesktopSize(tester);
-      await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository()));
+      await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: FakeTranscriptionRepository()));
       await settle(tester);
     }
 

@@ -6,6 +6,7 @@ Future<UploadReply> postMultipart(
   String url, {
   required Map<String, String> fields,
   required ChosenFile file,
+  Map<String, String> headers = const {},
   void Function(double fraction)? onProgress,
   UploadCancellation? cancellation,
 }) =>

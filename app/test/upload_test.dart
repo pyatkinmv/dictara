@@ -182,7 +182,7 @@ void main() {
     }) async {
       useDesktopSize(tester);
       await tester.pumpWidget(
-        DictaraApp(
+        DictaraApp(authController: signedInAuthController(), 
           initialLocation: location,
           repository: repo ?? FakeTranscriptionRepository(),
           fileChooser: chooser ?? FakeFileChooser(),
@@ -434,7 +434,7 @@ void main() {
   group('Upload dialog: sending, refusals, duplicates', () {
     Future<void> open(WidgetTester tester, _ScriptedRepository repo) async {
       useDesktopSize(tester);
-      await tester.pumpWidget(DictaraApp(initialLocation: '/transcriptions', repository: repo, fileChooser: FakeFileChooser(_memo)));
+      await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), initialLocation: '/transcriptions', repository: repo, fileChooser: FakeFileChooser(_memo)));
       await settle(tester);
       await tester.tap(find.text('Upload'));
       await settle(tester);
@@ -578,7 +578,7 @@ void main() {
           clock: () => now,
         );
         await tester.pumpWidget(
-          DictaraApp(
+          DictaraApp(authController: signedInAuthController(), 
             repository: repo,
             fileChooser: FakeFileChooser(_memo),
             pollInterval: const Duration(seconds: 2),
@@ -628,7 +628,7 @@ void main() {
         clock: () => now,
       );
       await repo.upload(const UploadRequest(file: _memo));
-      await tester.pumpWidget(DictaraApp(repository: repo));
+      await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: repo));
       await settle(tester);
       expect(
         tester

@@ -45,5 +45,8 @@ data class DictaraProperties(
         val diarizeSeconds: Double = 5.0,
         /** How long the stub summarizer takes, so that the summarizing state can be seen. */
         val summarizeSeconds: Double = 3.0,
+        /** How long the local Telegram bot stub waits before "tapping Confirm" itself, so the "Check your
+         *  Telegram" screen is visible. */
+        val loginConfirmSeconds: Double = 2.0,
     )
 }

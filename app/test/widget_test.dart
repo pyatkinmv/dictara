@@ -12,7 +12,7 @@ void main() {
 
   testWidgets('shell shows sidebar navigation and topbar title', (tester) async {
     useDesktopSize(tester);
-    await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository()));
+    await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: FakeTranscriptionRepository()));
     await settle(tester);
 
     // Sidebar item + topbar title.
@@ -25,7 +25,7 @@ void main() {
 
   testWidgets('navigating updates the topbar title', (tester) async {
     useDesktopSize(tester);
-    await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository()));
+    await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: FakeTranscriptionRepository()));
     await settle(tester);
 
     await tester.tap(find.text('Tags'));
@@ -40,7 +40,7 @@ void main() {
     tester.view.physicalSize = const Size(1280, 300);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository()));
+    await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: FakeTranscriptionRepository()));
     await settle(tester);
 
     // A RenderFlex overflow is reported as an exception and would fail the test.
@@ -50,7 +50,7 @@ void main() {
 
   testWidgets('profile menu opens and closes', (tester) async {
     useDesktopSize(tester);
-    await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository()));
+    await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: FakeTranscriptionRepository()));
     await settle(tester);
 
     expect(find.text('Sign out'), findsNothing);
@@ -64,5 +64,18 @@ void main() {
     await tester.tapAt(const Offset(800, 400));
     await settle(tester);
     expect(find.text('Sign out'), findsNothing);
+  });
+
+  testWidgets('Sign out logs out and blocks the app behind the login screen', (tester) async {
+    useDesktopSize(tester);
+    await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: FakeTranscriptionRepository()));
+    await settle(tester);
+
+    await tester.tap(find.text('Maxim P.'));
+    await settle(tester);
+    await tester.tap(find.text('Sign out'));
+    await settle(tester);
+
+    expect(find.text('Continue with your Telegram account'), findsOneWidget);
   });
 }

@@ -110,7 +110,7 @@ void main() {
 
     testWidgets('the app offers the reporter to its screens', (tester) async {
       useDesktopSize(tester);
-      await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository()));
+      await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: FakeTranscriptionRepository()));
       await settle(tester);
 
       final reporter = Provider.of<ErrorReporter>(tester.element(find.byType(Scaffold).first), listen: false);
@@ -125,7 +125,7 @@ void main() {
     testWidgets('a failed refresh is not reported and the next one goes through', (tester) async {
       useDesktopSize(tester);
       final repo = _FlakyRepository();
-      await tester.pumpWidget(DictaraApp(repository: repo, pollInterval: const Duration(seconds: 2)));
+      await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: repo, pollInterval: const Duration(seconds: 2)));
       await settle(tester);
       // The mock list has a transcription that is still being processed, so the list keeps polling.
       expect(find.byType(TranscriptionRow), findsWidgets);

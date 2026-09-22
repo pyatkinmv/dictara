@@ -2,7 +2,7 @@
 
 Flutter web client (Material 3) served as a Docker container (nginx) on port 3000. The redesigned interface: transcriptions list and detail page, Tags and Speakers libraries, upload dialog, AI suggestions. Design: `docs/redesign-plan.md` (history), integration with the gateway: [docs/local-backend-integration.md](../docs/local-backend-integration.md).
 
-**Not done yet (before the first merge to `master`): login.** The client sends no `Authorization` header; locally the gateway's `local` profile puts every request under a seeded dev user. See "Итерация 9" in the integration document.
+Login is mandatory: `LoginOverlay` blocks the whole window, blurred, until `AuthController.isLoggedIn`. **Not done yet (before the first merge to `master`): the sidebar profile panel** still shows made-up name/plan/usage data — see "Итерация 11" in the integration document.
 
 ## Structure
 
@@ -15,17 +15,19 @@ app/
     data/
       transcription_repository.dart        The interface every screen talks to
       http_transcription_repository.dart   Implementation over the gateway's HTTP API
-      gateway_client.dart                  JSON over HTTP under /api, GatewayException, message extraction
+      gateway_client.dart                  JSON over HTTP under /api, bearer token, 401 → onUnauthorized, GatewayException
+      auth_api.dart                        POST /auth/login-by-username, GET /auth/login-link/{token}
     models/     Plain data classes (transcription, detail, tags, speakers, suggestions, upload options)
-    state/      ChangeNotifier controllers: list (paging, filters, polling), detail, tag and speaker libraries
-    pages/      Screens (transcriptions, detail with its tabs, tags, speakers, upload dialog)
-    shell/      App frame: sidebar, topbar, profile menu
+    state/      ChangeNotifier controllers: list (paging, filters, polling), detail, tag and speaker libraries,
+                auth_controller.dart (login flow + session, `docs/local-backend-integration.md` "Итерация 10")
+    pages/      Screens (transcriptions, detail with its tabs, tags, speakers, upload dialog, login overlay)
+    shell/      App frame: sidebar, topbar, profile menu (its "Sign out" calls AuthController.logout)
     widgets/    Shared widgets (modal, popover, status badge, transcription row, ErrorReporter...)
     services/   Browser-only pieces behind conditional imports (`*_stub.dart` / `*_web.dart`): file chooser,
-                multipart uploader (XHR, upload progress), ".txt" saver
+                multipart uploader (XHR, upload progress), ".txt" saver, token_store (localStorage), external_link
     theme/      Palette and Material theme
   test/
-    support/fake_transcription_repository.dart   In-memory double of the repository; only tests use it
+    support/    Test doubles: fake_transcription_repository.dart, fake_auth_api.dart, in_memory_token_store.dart
   web_dev_config.yaml   Dev server proxy: /api/ → localhost:8080 (the gateway)
   Dockerfile            flutter build web → nginx:alpine
   nginx.conf            Static files; /api/ → gateway:8080 with the /api prefix cut
@@ -53,6 +55,6 @@ The app always talks to the gateway; there is no mock mode (it was removed befor
 - **Uploads:** the file is never copied into memory (the browser `Blob` goes into `FormData`); no timeout; cancellable; duplicates are answered by the gateway with the existing transcription.
 - **Suggestions** (title, tags of the library, speakers) come from the gateway with the transcription; accepting or rejecting is a POST, then the detail is read again. A suggested speaker exists in the library only after it is accepted.
 
-## Authentication (old client, for reference)
+## Authentication
 
-The previous client logged in through Telegram (`@username` → confirmation message from the bot → polling `GET /api/auth/login-link/{token}` → JWT in `localStorage` → `Authorization: Bearer`). Its code (`lib/shared/auth_service.dart`, `api_client.dart`) was deleted with the old UI; it is in git history (`e226aa9 feat(auth): Telegram-based web login with JWT`).
+Telegram only, mandatory: `@username` → the gateway asks the bot to confirm → `AuthController` polls `GET /auth/login-link/{token}` every 3 s → JWT + display name, kept in `localStorage` (`token_store.dart`). `LoginOverlay` blocks the window (blurred, no dismiss — nothing works without a session) until `AuthController.isLoggedIn`; its card has three stages (`LoginStage`): entering a username, "check your Telegram", and "we couldn't find you" (still polling — the same attempt resolves if the person starts the bot afterwards). A 401 on any request calls `GatewayClient.onUnauthorized`, wired to `AuthController.logout`. `main_material.dart` owns the one `GatewayClient` and `AuthController` for the app; widget tests use `test/support/fake_auth_api.dart` and either a fresh (logged-out) or seeded (`test_utils.dart`'s `signedInAuthController()`) session. Old client code for the same flow (`lib/shared/auth_service.dart`, `api_client.dart`) was deleted with the old UI; it is in git history (`e226aa9 feat(auth): Telegram-based web login with JWT`) and was the reference for the confirm/poll shape.

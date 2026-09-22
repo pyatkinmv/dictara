@@ -93,6 +93,7 @@ Every run is recorded in the `job_runs` table (`status`: `running` → `complete
 | `controller/ExportController.kt` | GET /export — streams ZIP of all user transcriptions (transcript + summary + optional audio) |
 | `client/TranscriberClient.kt` | HTTP client for the transcriber service |
 | `port/SummarizerPort.kt`, `adapter/GeminiSummarizer.kt` | The Gemini prompt and structured-output schema (one JSON: summary, title, tags, speakers) |
+| `service/AuthService.kt`, `controller/AuthController.kt` | Telegram login: username → bot confirmation → JWT (`port/TelegramBotSimulator.kt` stands in for the bot under `local`) |
 | `storage/GcsAudioStorage.kt` | Uploads audio to GCS (active outside the `local` profile) |
 | `job/JobTracker.kt` | Wraps any block in a `job_runs` DB record (running → completed/failed) |
 | `job/StorageMaintenanceService.kt` | The `@Scheduled` GCS maintenance jobs |
@@ -107,7 +108,7 @@ docker compose build gateway && docker compose up -d gateway
 
 ## Local development (profile `local`)
 
-`scripts\dev.ps1` starts Postgres (`docker-compose.dev.yml`, database `dictara_dev`) and the gateway with the `local` profile; `scripts\dev-reset.ps1` recreates the database. Under this profile a stub transcriber (`adapter/StubTranscriber.kt`) replaces `TranscriberClient`, a stub summarizer (`adapter/StubSummarizer.kt`, proposals worked out by simple rules) replaces Gemini, audio is kept in the database (`storage/LocalDbAudioStorage.kt`, table from `db/local/`), requests without a token belong to a seeded dev user (`filter/LocalDevAuthFilter.kt`), and the scheduled backup/cleanup jobs do not run.
+`scripts\dev.ps1` starts Postgres (`docker-compose.dev.yml`, database `dictara_dev`) and the gateway with the `local` profile; `scripts\dev-reset.ps1` recreates the database. Under this profile a stub transcriber (`adapter/StubTranscriber.kt`) replaces `TranscriberClient`, a stub summarizer (`adapter/StubSummarizer.kt`, proposals worked out by simple rules) replaces Gemini, a stub bot (`adapter/LocalTelegramBotSimulator.kt`) auto-confirms Telegram logins after a short pause (username `unknown` is left unregistered on purpose, to try the "not found" screen) so the real login screen works without `tg-bot` or a Telegram account, audio is kept in the database (`storage/LocalDbAudioStorage.kt`, table from `db/local/`), requests without a token still belong to a seeded dev user (`filter/LocalDevAuthFilter.kt`, kept alongside the real login for quick `curl`/script testing), and the scheduled backup/cleanup jobs do not run.
 
 `config/LocalProfileGuard.kt` makes the profile refuse to start unless the database is `dictara_dev` on localhost and `GCS_UPLOADS_BUCKET` is unset — keep it that way, the cleanup job would otherwise delete real audio. Everything local is off by default (`@Profile("local")` / `!local`, `db/local` is not on Flyway's default path). Details: [docs/local-backend-integration.md](../docs/local-backend-integration.md).
 

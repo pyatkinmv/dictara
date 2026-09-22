@@ -3,9 +3,11 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'data/transcription_repository.dart';
+import 'pages/login/login_overlay.dart';
 import 'router.dart';
 import 'services/file_chooser.dart';
 import 'services/text_saver.dart';
+import 'state/auth_controller.dart';
 import 'state/speaker_library_controller.dart';
 import 'state/tag_library_controller.dart';
 import 'state/transcription_detail_controller.dart';
@@ -20,6 +22,7 @@ class DictaraApp extends StatefulWidget {
     this.palette = AppPalette.teal,
     this.initialLocation = '/transcriptions',
     required this.repository,
+    required this.authController,
     this.fileChooser = const BrowserFileChooser(),
     this.textSaver = const BrowserTextSaver(),
     this.pollInterval,
@@ -31,6 +34,9 @@ class DictaraApp extends StatefulWidget {
 
   /// Where data comes from.
   final TranscriptionRepository repository;
+
+  /// The signed-in session; also blocks the app behind [LoginOverlay] while there is none.
+  final AuthController authController;
 
   /// How files are picked in the Upload dialog.
   final FileChooser fileChooser;
@@ -66,6 +72,7 @@ class _DictaraAppState extends State<DictaraApp> {
     return MultiProvider(
       providers: [
         Provider<TranscriptionRepository>.value(value: _repository),
+        ChangeNotifierProvider<AuthController>.value(value: widget.authController),
         Provider<FileChooser>.value(value: widget.fileChooser),
         Provider<TextSaver>.value(value: widget.textSaver),
         Provider<ErrorReporter>.value(value: _errors),
@@ -99,6 +106,24 @@ class _DictaraAppState extends State<DictaraApp> {
         scaffoldMessengerKey: _errors.messengerKey,
         theme: buildAppTheme(widget.palette),
         routerConfig: _router,
+        // On top of every route: nothing in the app works without a session, so this is not itself a route
+        // (no back button would make sense) and it never depends on where the router is. A fresh Overlay is
+        // needed here (not just a Stack) because the router's own Overlay lives inside `child`, one level too
+        // deep for the login card's TextField to reach as an ancestor.
+        builder: (context, child) => Overlay(
+          initialEntries: [
+            OverlayEntry(
+              builder: (context) => Stack(
+                children: [
+                  ?child,
+                  Consumer<AuthController>(
+                    builder: (context, auth, _) => auth.isLoggedIn ? const SizedBox.shrink() : const LoginOverlay(),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

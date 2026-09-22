@@ -168,7 +168,7 @@ void main() {
   group('Speakers row', () {
     Future<void> openDetail(WidgetTester tester, [String id = '0']) async {
       useDesktopSize(tester);
-      await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository(), initialLocation: '/transcriptions/$id'));
+      await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: FakeTranscriptionRepository(), initialLocation: '/transcriptions/$id'));
       await settle(tester);
     }
 
@@ -200,7 +200,7 @@ void main() {
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
-      await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository(), initialLocation: '/transcriptions/0'));
+      await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: FakeTranscriptionRepository(), initialLocation: '/transcriptions/0'));
       await settle(tester);
     }
 

@@ -37,18 +37,33 @@ class GatewayClient {
   final String baseUrl;
   final Duration timeout;
 
+  String? _token;
+
+  /// Told once, right when a request comes back 401: the bearer token on hand (if any) is no longer accepted.
+  /// `AuthController` points this at its own logout, so an expired session drops back to the login screen.
+  void Function()? onUnauthorized;
+
+  /// Every request from now on carries this as `Authorization: Bearer <token>`; null stops sending one.
+  void setToken(String? token) => _token = token;
+
+  Map<String, String> _headers([Map<String, String>? extra]) => {
+        if (_token != null) 'Authorization': 'Bearer $_token',
+        ...?extra,
+      };
+
   /// GET [path] (e.g. `/transcriptions`) and decode the JSON body.
-  Future<Object?> getJson(String path) async => _decode(await _send(() => _http.get(Uri.parse('$baseUrl$path'))));
+  Future<Object?> getJson(String path) async =>
+      _decode(await _send(() => _http.get(Uri.parse('$baseUrl$path'), headers: _headers())));
 
   /// GET [path] and return the body as text (UTF-8, whatever the server says the charset is).
   Future<String> getText(String path) async =>
-      utf8.decode((await _send(() => _http.get(Uri.parse('$baseUrl$path')))).bodyBytes);
+      utf8.decode((await _send(() => _http.get(Uri.parse('$baseUrl$path'), headers: _headers()))).bodyBytes);
 
   /// PATCH [path] with [body] as JSON; the answer is not read (the gateway sends 204).
   Future<void> patchJson(String path, Object body) async {
     await _send(() => _http.patch(
           Uri.parse('$baseUrl$path'),
-          headers: const {'Content-Type': 'application/json'},
+          headers: _headers(const {'Content-Type': 'application/json'}),
           body: jsonEncode(body),
         ));
   }
@@ -56,19 +71,20 @@ class GatewayClient {
   /// POST [body] as JSON to [path] and decode the JSON answer.
   Future<Object?> postJson(String path, Object body) async => _decode(await _send(() => _http.post(
         Uri.parse('$baseUrl$path'),
-        headers: const {'Content-Type': 'application/json'},
+        headers: _headers(const {'Content-Type': 'application/json'}),
         body: jsonEncode(body),
       )));
 
   /// PUT [body] as JSON to [path] and decode the JSON answer.
   Future<Object?> putJson(String path, Object body) async => _decode(await _send(() => _http.put(
         Uri.parse('$baseUrl$path'),
-        headers: const {'Content-Type': 'application/json'},
+        headers: _headers(const {'Content-Type': 'application/json'}),
         body: jsonEncode(body),
       )));
 
   /// DELETE [path]; the answer, if there is one, is decoded (`null` for the gateway's 204).
-  Future<Object?> deleteJson(String path) async => _decode(await _send(() => _http.delete(Uri.parse('$baseUrl$path'))));
+  Future<Object?> deleteJson(String path) async =>
+      _decode(await _send(() => _http.delete(Uri.parse('$baseUrl$path'), headers: _headers())));
 
   /// POST [file] and [fields] to [path] as a multipart form and decode the JSON answer. A file can take minutes
   /// to go out, so unlike other requests this has no time limit; [onProgress] says how far it is, and
@@ -86,12 +102,14 @@ class GatewayClient {
         '$baseUrl$path',
         fields: fields,
         file: file,
+        headers: _headers(),
         onProgress: onProgress,
         cancellation: cancellation,
       );
     } on UploadInterrupted catch (e) {
       throw GatewayException(e.message);
     }
+    if (reply.status == 401) onUnauthorized?.call();
     if (reply.status < 200 || reply.status >= 300) {
       throw GatewayException(messageOf(reply.body, fallback: 'HTTP ${reply.status}'), statusCode: reply.status);
     }
@@ -112,6 +130,7 @@ class GatewayClient {
       // No connection, a refused proxy target, a timeout: all "could not reach it".
       throw GatewayException('Could not reach the server: $e');
     }
+    if (response.statusCode == 401) onUnauthorized?.call();
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw GatewayException(_errorMessage(response), statusCode: response.statusCode);
     }

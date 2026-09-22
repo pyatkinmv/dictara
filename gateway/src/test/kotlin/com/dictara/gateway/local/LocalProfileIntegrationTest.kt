@@ -11,6 +11,7 @@ import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
@@ -33,6 +34,7 @@ import org.testcontainers.containers.PostgreSQLContainer
         "dictara.local.stub.transcribe-seconds=1",
         "dictara.local.stub.diarize-seconds=1",
         "dictara.local.stub.summarize-seconds=0.2",
+        "dictara.local.stub.login-confirm-seconds=0.2",
         "dictara.transcriber.poll-interval-ms=100",
     ],
 )
@@ -255,5 +257,72 @@ class LocalProfileIntegrationTest {
         val response = rest.postForEntity("/transcribe", HttpEntity(body, headers), String::class.java)
 
         assertThat(response.statusCode).isEqualTo(HttpStatus.BAD_REQUEST)
+    }
+
+    // ── The local Telegram bot stub (LocalTelegramBotSimulator) ──────────────────────────────────────────
+
+    private fun postJson(path: String, body: String): JsonNode {
+        val headers = HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON }
+        val response = rest.postForEntity(path, HttpEntity(body, headers), String::class.java)
+        assertThat(response.statusCode).describedAs("POST $path").isEqualTo(HttpStatus.OK)
+        return json.readTree(response.body)
+    }
+
+    private fun loginByUsername(username: String) = postJson("/auth/login-by-username", """{"telegram_username": "$username"}""")
+
+    private fun waitConfirmed(token: String): JsonNode {
+        val deadline = System.currentTimeMillis() + 10_000
+        while (System.currentTimeMillis() < deadline) {
+            val status = get("/auth/login-link/$token")
+            if (status["confirmed"].asBoolean()) return status
+            Thread.sleep(100)
+        }
+        throw AssertionError("Login $token was not confirmed in time")
+    }
+
+    @Test
+    fun `a username nobody has used before is auto-confirmed by the local bot stub`() {
+        val start = loginByUsername("dev_${System.nanoTime()}")
+        assertThat(start["status"].asText()).isEqualTo("notified")
+        assertThat(get("/auth/login-link/${start["token"].asText()}")["confirmed"].asBoolean()).isFalse() // not yet — the stub waits a bit
+
+        val confirmed = waitConfirmed(start["token"].asText())
+
+        assertThat(confirmed["token"].asText()).isNotBlank() // the JWT
+        assertThat(confirmed["display_name"].asText()).isNotBlank()
+    }
+
+    @Test
+    fun `logging in again under the same name returns the same account`() {
+        val username = "repeat_${System.nanoTime()}"
+        val first = waitConfirmed(loginByUsername(username)["token"].asText())
+
+        val second = waitConfirmed(loginByUsername(username)["token"].asText())
+
+        assertThat(second["display_name"].asText()).isEqualTo(first["display_name"].asText())
+        // Both JWTs decode to the same user: the seeded library shows up for either.
+        val library1 = rest.exchange("/tags", HttpMethod.GET, HttpEntity<Void>(HttpHeaders().apply { setBearerAuth(first["token"].asText()) }), String::class.java)
+        val library2 = rest.exchange("/tags", HttpMethod.GET, HttpEntity<Void>(HttpHeaders().apply { setBearerAuth(second["token"].asText()) }), String::class.java)
+        assertThat(library1.body).isEqualTo(library2.body)
+    }
+
+    @Test
+    fun `the username 'unknown' is left unregistered, so it exercises the 'not found' screen`() {
+        val start = loginByUsername("unknown")
+
+        assertThat(start["status"].asText()).isEqualTo("unknown_user")
+        assertThat(start["bot_url"].asText()).contains("t.me")
+
+        // The stub never auto-confirms an unknown_user attempt.
+        Thread.sleep(500)
+        assertThat(get("/auth/login-link/${start["token"].asText()}")["confirmed"].asBoolean()).isFalse()
+    }
+
+    @Test
+    fun `different names are different, brand-new accounts`() {
+        val a = waitConfirmed(loginByUsername("alice_${System.nanoTime()}")["token"].asText())
+        val b = waitConfirmed(loginByUsername("bob_${System.nanoTime()}")["token"].asText())
+
+        assertThat(a["display_name"].asText()).isNotEqualTo(b["display_name"].asText())
     }
 }

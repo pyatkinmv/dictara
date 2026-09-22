@@ -19,6 +19,7 @@ abstract class MultipartUploader {
     String url, {
     required Map<String, String> fields,
     required ChosenFile file,
+    Map<String, String> headers = const {},
     void Function(double fraction)? onProgress,
     UploadCancellation? cancellation,
   });
@@ -34,10 +35,11 @@ class BrowserUploader implements MultipartUploader {
     String url, {
     required Map<String, String> fields,
     required ChosenFile file,
+    Map<String, String> headers = const {},
     void Function(double fraction)? onProgress,
     UploadCancellation? cancellation,
   }) =>
-      impl.postMultipart(url, fields: fields, file: file, onProgress: onProgress, cancellation: cancellation);
+      impl.postMultipart(url, fields: fields, file: file, headers: headers, onProgress: onProgress, cancellation: cancellation);
 }
 
 /// The request never got an answer: no connection, or it was stopped.

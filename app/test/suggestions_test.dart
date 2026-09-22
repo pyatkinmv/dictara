@@ -171,7 +171,7 @@ void main() {
       tester.view.physicalSize = const Size(1280, 2400);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
-      await tester.pumpWidget(DictaraApp(initialLocation: '/transcriptions/$id', repository: repo ?? FakeTranscriptionRepository()));
+      await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), initialLocation: '/transcriptions/$id', repository: repo ?? FakeTranscriptionRepository()));
       await settle(tester);
     }
 

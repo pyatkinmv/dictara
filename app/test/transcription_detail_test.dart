@@ -61,7 +61,7 @@ void main() {
   group('Detail page', () {
     Future<void> openDetail(WidgetTester tester, String location) async {
       useDesktopSize(tester);
-      await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository(), initialLocation: location));
+      await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: FakeTranscriptionRepository(), initialLocation: location));
       await settle(tester);
     }
 

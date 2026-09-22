@@ -1177,6 +1177,7 @@ class _FakeUploader implements MultipartUploader {
   String? url;
   Map<String, String> fields = const {};
   ChosenFile? file;
+  Map<String, String> headers = const {};
   UploadCancellation? cancellation;
 
   @override
@@ -1184,12 +1185,14 @@ class _FakeUploader implements MultipartUploader {
     String url, {
     required Map<String, String> fields,
     required ChosenFile file,
+    Map<String, String> headers = const {},
     void Function(double fraction)? onProgress,
     UploadCancellation? cancellation,
   }) async {
     this.url = url;
     this.fields = fields;
     this.file = file;
+    this.headers = headers;
     this.cancellation = cancellation;
     onProgress?.call(0.25);
     onProgress?.call(1);

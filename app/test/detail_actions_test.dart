@@ -27,7 +27,7 @@ void main() {
     Future<void> open(WidgetTester tester) async {
       useDesktopSize(tester);
       saver = FakeTextSaver();
-      await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository(), initialLocation: '/transcriptions/0', textSaver: saver));
+      await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: FakeTranscriptionRepository(), initialLocation: '/transcriptions/0', textSaver: saver));
       await settle(tester);
     }
 
@@ -111,7 +111,7 @@ void plainTranscriptTests() {
   group('a transcript without diarization', () {
     testWidgets('shows the text in one block with no speaker header', (tester) async {
       useDesktopSize(tester);
-      await tester.pumpWidget(DictaraApp(initialLocation: '/transcriptions/4', repository: _PlainTranscriptRepository()));
+      await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), initialLocation: '/transcriptions/4', repository: _PlainTranscriptRepository()));
       await settle(tester);
 
       expect(find.text('First thought about the roadmap.'), findsOneWidget);

@@ -1,5 +1,6 @@
 package com.dictara.gateway.controller
 
+import com.dictara.gateway.port.TelegramBotSimulator
 import com.dictara.gateway.repository.LoginNotificationRepository
 import com.dictara.gateway.repository.LoginTokenRepository
 import com.dictara.gateway.service.AuthService
@@ -11,6 +12,7 @@ class AuthController(
     private val authService: AuthService,
     private val loginTokenRepo: LoginTokenRepository,
     private val loginNotificationRepo: LoginNotificationRepository,
+    private val botSimulator: TelegramBotSimulator,
 ) {
     data class LoginByUsernameRequest(val telegramUsername: String)
     data class LoginByUsernameResponse(val token: String, val status: String, val botUrl: String?)
@@ -31,9 +33,14 @@ class AuthController(
         authService.markBotStarted(uid)
     }
 
+    // Outside the `local` profile botSimulator does nothing (NoopTelegramBotSimulator): the real bot, a
+    // separate service, notices the notification and calls back on its own (see TelegramBotSimulator).
     @PostMapping("/auth/login-by-username")
     fun loginByUsername(@RequestBody req: LoginByUsernameRequest): LoginByUsernameResponse {
-        val result = authService.loginByUsername(req.telegramUsername.trimStart('@'))
+        val username = req.telegramUsername.trimStart('@')
+        botSimulator.beforeLogin(username)
+        val result = authService.loginByUsername(username)
+        botSimulator.afterLogin(username, result)
         return LoginByUsernameResponse(result.token.toString(), result.status, result.botUrl)
     }
 

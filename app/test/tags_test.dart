@@ -57,7 +57,7 @@ void main() {
   group('Tags row', () {
     Future<void> openDetail(WidgetTester tester, [String id = '0']) async {
       useDesktopSize(tester);
-      await tester.pumpWidget(DictaraApp(repository: FakeTranscriptionRepository(), initialLocation: '/transcriptions/$id'));
+      await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: FakeTranscriptionRepository(), initialLocation: '/transcriptions/$id'));
       await settle(tester);
     }
 

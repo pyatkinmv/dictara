@@ -11,6 +11,7 @@ Future<UploadReply> postMultipart(
   String url, {
   required Map<String, String> fields,
   required ChosenFile file,
+  Map<String, String> headers = const {},
   void Function(double fraction)? onProgress,
   UploadCancellation? cancellation,
 }) {
@@ -24,6 +25,7 @@ Future<UploadReply> postMultipart(
 
   final done = Completer<UploadReply>();
   final xhr = web.XMLHttpRequest()..open('POST', url);
+  headers.forEach((name, value) => xhr.setRequestHeader(name, value));
   xhr.upload.onprogress = (web.ProgressEvent event) {
     if (event.lengthComputable && event.total > 0) onProgress?.call(event.loaded / event.total);
   }.toJS;
