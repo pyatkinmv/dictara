@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:dictara_web/app.dart';
 import 'package:dictara_web/data/auth_api.dart';
 import 'package:dictara_web/data/gateway_client.dart';
+import 'package:dictara_web/data/transcription_repository.dart';
+import 'package:dictara_web/models/transcription.dart';
 import 'package:dictara_web/services/token_store.dart';
 import 'package:dictara_web/state/auth_controller.dart';
 
@@ -138,6 +140,25 @@ void main() {
       expect(find.text('Continue with your Telegram account'), findsNothing);
       expect(find.text('Transcriptions'), findsWidgets);
     });
+
+    testWidgets('the list, fetched before anyone was signed in, is fetched again once the login lands', (tester) async {
+      final (auth, api) = freshAuth();
+      final repo = _CountingRepository();
+      useDesktopSize(tester);
+      await tester.pumpWidget(DictaraApp(authController: auth, repository: repo));
+      await settle(tester);
+      final beforeLogin = repo.listCalls;
+      expect(beforeLogin, greaterThan(0)); // the list is built (and so loads) before anyone is signed in
+
+      api.confirm();
+      await tester.enterText(find.byKey(const Key('login-username-field')), 'maxim');
+      await tester.tap(find.text('Continue with Telegram'));
+      await settle(tester);
+      await tester.pump(const Duration(milliseconds: 30));
+      await settle(tester);
+
+      expect(repo.listCalls, greaterThan(beforeLogin)); // re-fetched under the now-real session, not left stale
+    });
   });
 
   group('AuthController', () {
@@ -199,4 +220,15 @@ void main() {
       expect(calls, greaterThanOrEqualTo(3));
     });
   });
+}
+
+/// Counts `list()` calls; otherwise the mock's own data.
+class _CountingRepository extends FakeTranscriptionRepository {
+  int listCalls = 0;
+
+  @override
+  Future<TranscriptionPage> list(TranscriptionQuery query, {int page = 0, int size = transcriptionPageSize}) {
+    listCalls++;
+    return super.list(query, page: page, size: size);
+  }
 }

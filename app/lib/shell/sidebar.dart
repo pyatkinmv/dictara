@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
+import '../state/profile_controller.dart';
 import '../theme/app_palette.dart';
 import 'nav_destinations.dart';
 import 'profile_menu.dart';
 
 const sidebarWidth = 220.0;
-
-// Mock usage from the design; replaced by real plan data later.
-const _mockPlanName = 'Free';
-const _mockUsedMinutes = 38;
-const _mockLimitMinutes = 60;
 
 class Sidebar extends StatelessWidget {
   const Sidebar({super.key, required this.location});
@@ -153,13 +150,21 @@ class _NavItem extends StatelessWidget {
   }
 }
 
+/// Plan badge, usage bar and count (`GET /users/me`, `docs/local-backend-integration.md` "Итерация 11").
+/// Nothing shows while the profile has not loaded yet, rather than a stale or made-up number.
 class _UsageBlock extends StatelessWidget {
   const _UsageBlock();
 
   @override
   Widget build(BuildContext context) {
+    final profile = context.watch<ProfileController>().profile;
+    if (profile == null) return const SizedBox.shrink();
+
     final p = context.palette;
     final label = TextStyle(fontSize: 11, color: p.text3);
+    final usage = profile.usage;
+    final capped = usage.max != null;
+
     return Container(
       margin: const EdgeInsets.only(top: 4),
       padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
@@ -175,32 +180,37 @@ class _UsageBlock extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
                 decoration: BoxDecoration(color: p.accentLight, borderRadius: BorderRadius.circular(100)),
                 child: Text(
-                  _mockPlanName,
+                  profile.planName,
                   style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: p.accent),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 5),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(2),
-            child: SizedBox(
-              height: 3,
-              child: ColoredBox(
-                color: p.border,
-                child: FractionallySizedBox(
-                  alignment: Alignment.centerLeft,
-                  widthFactor: _mockUsedMinutes / _mockLimitMinutes,
-                  child: ColoredBox(color: p.accent),
+          if (capped) ...[
+            const SizedBox(height: 5),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: SizedBox(
+                height: 3,
+                child: ColoredBox(
+                  color: p.border,
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: (usage.used / usage.max!).clamp(0, 1),
+                    child: ColoredBox(color: p.accent),
+                  ),
                 ),
               ),
             ),
-          ),
+          ],
           const SizedBox(height: 4),
           Row(
             children: [
-              Text('$_mockUsedMinutes / $_mockLimitMinutes min · ', style: label),
-              const _UpgradeLink(),
+              Text(
+                capped ? '${usage.used} / ${usage.max} ${usage.unit}' : '${usage.used} ${usage.unit} this month',
+                style: label,
+              ),
+              if (capped) ...[Text(' · ', style: label), const _UpgradeLink()],
             ],
           ),
         ],

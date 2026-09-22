@@ -7,6 +7,7 @@ import '../data/transcription_repository.dart';
 import '../models/tag.dart';
 import '../models/transcription.dart';
 import '../models/upload.dart';
+import 'auth_controller.dart';
 
 /// State of the transcriptions list screen: the query (search, filters, sort)
 /// and the result. Lives above the router so filters survive navigation.
@@ -20,17 +21,29 @@ class TranscriptionListController extends ChangeNotifier {
   ///
   /// [searchDebounce]: the search is done by the server, so a request is not sent for every letter typed
   /// but once the typing pauses this long (zero: at once).
+  ///
+  /// [auth]: this controller is built (and makes its first request) before the app knows whether anyone is
+  /// signed in yet, so that request can go out without a session. Given one, a login re-runs the query —
+  /// without it, a first request that failed (or, only locally, quietly answered as a different user through
+  /// `LocalDevAuthFilter`) would otherwise sit on screen unrefreshed.
   TranscriptionListController(
     this._repository, {
     this.pollInterval,
     this.pageSize = transcriptionPageSize,
     this.searchDebounce = const Duration(milliseconds: 250),
-  }) {
+    AuthController? auth,
+  }) : _auth = auth {
+    _auth?.addListener(_onAuthChanged);
     _loadTags();
     _load();
   }
 
   final TranscriptionRepository _repository;
+  final AuthController? _auth;
+
+  void _onAuthChanged() {
+    if (_auth!.isLoggedIn) reload();
+  }
   final Duration? pollInterval;
   final int pageSize;
   final Duration searchDebounce;
@@ -198,6 +211,7 @@ class TranscriptionListController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _auth?.removeListener(_onAuthChanged);
     _poll?.cancel();
     _searchTimer?.cancel();
     super.dispose();

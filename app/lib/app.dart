@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import 'data/profile_api.dart';
 import 'data/transcription_repository.dart';
 import 'pages/login/login_overlay.dart';
 import 'router.dart';
 import 'services/file_chooser.dart';
 import 'services/text_saver.dart';
 import 'state/auth_controller.dart';
+import 'state/profile_controller.dart';
 import 'state/speaker_library_controller.dart';
 import 'state/tag_library_controller.dart';
 import 'state/transcription_detail_controller.dart';
@@ -23,6 +25,7 @@ class DictaraApp extends StatefulWidget {
     this.initialLocation = '/transcriptions',
     required this.repository,
     required this.authController,
+    this.profileController,
     this.fileChooser = const BrowserFileChooser(),
     this.textSaver = const BrowserTextSaver(),
     this.pollInterval,
@@ -37,6 +40,10 @@ class DictaraApp extends StatefulWidget {
 
   /// The signed-in session; also blocks the app behind [LoginOverlay] while there is none.
   final AuthController authController;
+
+  /// The sidebar's plan and usage. Left out (tests that are not about it) it never loads anything and the
+  /// panel stays blank — production always gives it a real one built on the same [GatewayClient].
+  final ProfileController? profileController;
 
   /// How files are picked in the Upload dialog.
   final FileChooser fileChooser;
@@ -60,9 +67,12 @@ class _DictaraAppState extends State<DictaraApp> {
   late final GoRouter _router = createRouter(initialLocation: widget.initialLocation);
   late final TranscriptionRepository _repository = widget.repository;
   late final ErrorReporter _errors = widget.errorReporter ?? ErrorReporter(GlobalKey<ScaffoldMessengerState>());
+  late final ProfileController _profile = widget.profileController ?? ProfileController(const NoopProfileApi(), widget.authController);
+  late final bool _ownsProfile = widget.profileController == null;
 
   @override
   void dispose() {
+    if (_ownsProfile) _profile.dispose(); // ChangeNotifierProvider.value never disposes what it did not create
     _router.dispose();
     super.dispose();
   }
@@ -73,6 +83,7 @@ class _DictaraAppState extends State<DictaraApp> {
       providers: [
         Provider<TranscriptionRepository>.value(value: _repository),
         ChangeNotifierProvider<AuthController>.value(value: widget.authController),
+        ChangeNotifierProvider<ProfileController>.value(value: _profile),
         Provider<FileChooser>.value(value: widget.fileChooser),
         Provider<TextSaver>.value(value: widget.textSaver),
         Provider<ErrorReporter>.value(value: _errors),
@@ -80,6 +91,7 @@ class _DictaraAppState extends State<DictaraApp> {
           create: (context) => TranscriptionListController(
             context.read<TranscriptionRepository>(),
             pollInterval: widget.pollInterval,
+            auth: context.read<AuthController>(),
           ),
         ),
         ChangeNotifierProvider(

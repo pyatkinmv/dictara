@@ -55,10 +55,9 @@ void main() {
 
     expect(find.text('Sign out'), findsNothing);
 
-    await tester.tap(find.text('Maxim P.'));
+    await tester.tap(find.text('Test User'));
     await settle(tester);
     expect(find.text('Sign out'), findsOneWidget);
-    expect(find.text('pyatkinmv@gmail.com'), findsOneWidget);
 
     // Tapping outside closes it.
     await tester.tapAt(const Offset(800, 400));
@@ -71,7 +70,7 @@ void main() {
     await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: FakeTranscriptionRepository()));
     await settle(tester);
 
-    await tester.tap(find.text('Maxim P.'));
+    await tester.tap(find.text('Test User'));
     await settle(tester);
     await tester.tap(find.text('Sign out'));
     await settle(tester);

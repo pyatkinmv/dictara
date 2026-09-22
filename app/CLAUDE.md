@@ -2,7 +2,7 @@
 
 Flutter web client (Material 3) served as a Docker container (nginx) on port 3000. The redesigned interface: transcriptions list and detail page, Tags and Speakers libraries, upload dialog, AI suggestions. Design: `docs/redesign-plan.md` (history), integration with the gateway: [docs/local-backend-integration.md](../docs/local-backend-integration.md).
 
-Login is mandatory: `LoginOverlay` blocks the whole window, blurred, until `AuthController.isLoggedIn`. **Not done yet (before the first merge to `master`): the sidebar profile panel** still shows made-up name/plan/usage data — see "Итерация 11" in the integration document.
+Login is mandatory: `LoginOverlay` blocks the whole window, blurred, until `AuthController.isLoggedIn`. The sidebar profile panel shows the real signed-in name and the gateway's own plan/usage.
 
 ## Structure
 
@@ -17,17 +17,18 @@ app/
       http_transcription_repository.dart   Implementation over the gateway's HTTP API
       gateway_client.dart                  JSON over HTTP under /api, bearer token, 401 → onUnauthorized, GatewayException
       auth_api.dart                        POST /auth/login-by-username, GET /auth/login-link/{token}
+      profile_api.dart                     GET /users/me — plan name and usage, dynamic per plan (no unit is hardcoded)
     models/     Plain data classes (transcription, detail, tags, speakers, suggestions, upload options)
     state/      ChangeNotifier controllers: list (paging, filters, polling), detail, tag and speaker libraries,
-                auth_controller.dart (login flow + session, `docs/local-backend-integration.md` "Итерация 10")
+                auth_controller.dart (login flow + session), profile_controller.dart (follows AuthController)
     pages/      Screens (transcriptions, detail with its tabs, tags, speakers, upload dialog, login overlay)
-    shell/      App frame: sidebar, topbar, profile menu (its "Sign out" calls AuthController.logout)
+    shell/      App frame: sidebar (nav, usage panel), topbar, profile menu (name, plan, "Sign out")
     widgets/    Shared widgets (modal, popover, status badge, transcription row, ErrorReporter...)
     services/   Browser-only pieces behind conditional imports (`*_stub.dart` / `*_web.dart`): file chooser,
                 multipart uploader (XHR, upload progress), ".txt" saver, token_store (localStorage), external_link
     theme/      Palette and Material theme
   test/
-    support/    Test doubles: fake_transcription_repository.dart, fake_auth_api.dart, in_memory_token_store.dart
+    support/    Test doubles: fake_transcription_repository.dart, fake_auth_api.dart, fake_profile_api.dart, in_memory_token_store.dart
   web_dev_config.yaml   Dev server proxy: /api/ → localhost:8080 (the gateway)
   Dockerfile            flutter build web → nginx:alpine
   nginx.conf            Static files; /api/ → gateway:8080 with the /api prefix cut
@@ -54,6 +55,7 @@ The app always talks to the gateway; there is no mock mode (it was removed befor
 - **Ids and names:** a transcription is identified by the gateway's `job_id`; tags and speakers are looked up by name and resolved to gateway ids in the repository. A diarizer voice `SPEAKER_00` is "slot 1" on the page.
 - **Uploads:** the file is never copied into memory (the browser `Blob` goes into `FormData`); no timeout; cancellable; duplicates are answered by the gateway with the existing transcription.
 - **Suggestions** (title, tags of the library, speakers) come from the gateway with the transcription; accepting or rejecting is a POST, then the detail is read again. A suggested speaker exists in the library only after it is accepted.
+- **Profile panel:** `ProfileController` follows `AuthController` (loads on login, clears on logout) and is the one optional controller `DictaraApp` builds a harmless default for (`NoopProfileApi`, never resolves) when a test does not pass one — unlike `authController`, which is required, because a missing profile is only a blank panel, never a security gap. `unit` in `GET /users/me`'s usage is never assumed to be "transcriptions" in the UI; the server names it, so a future plan limited by something else needs no Flutter change.
 
 ## Authentication
 

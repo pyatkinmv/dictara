@@ -94,6 +94,7 @@ Every run is recorded in the `job_runs` table (`status`: `running` → `complete
 | `client/TranscriberClient.kt` | HTTP client for the transcriber service |
 | `port/SummarizerPort.kt`, `adapter/GeminiSummarizer.kt` | The Gemini prompt and structured-output schema (one JSON: summary, title, tags, speakers) |
 | `service/AuthService.kt`, `controller/AuthController.kt` | Telegram login: username → bot confirmation → JWT (`port/TelegramBotSimulator.kt` stands in for the bot under `local`) |
+| `plan/PlanService.kt`, `PlanStrategy.kt` | Enforces and reports plan usage (`GET /users/me`, `controller/UserController.kt`) — a strategy per plan (`MonthlySubmissionLimitStrategy`, `NoLimitStrategy`), each names its own unit |
 | `storage/GcsAudioStorage.kt` | Uploads audio to GCS (active outside the `local` profile) |
 | `job/JobTracker.kt` | Wraps any block in a `job_runs` DB record (running → completed/failed) |
 | `job/StorageMaintenanceService.kt` | The `@Scheduled` GCS maintenance jobs |

@@ -2,13 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../state/auth_controller.dart';
+import '../state/profile_controller.dart';
 import '../theme/app_palette.dart';
 import '../widgets/popover.dart';
 
-// Mock data from the design; replaced by real user/plan data later.
-const _mockName = 'Maxim P.';
-const _mockEmail = 'pyatkinmv@gmail.com';
-const _mockPlan = 'Free';
+/// The signed-in name, or a plain fallback for the instant between login and the session actually landing.
+String _nameOf(AuthController auth) => auth.displayName ?? 'Signed in';
+
+/// Up to two capitals for the avatar circle, the same rule as a library speaker's (`models/speaker.dart`).
+/// The fallback name the gateway gives someone with no first/last name on Telegram is `@username`; the `@`
+/// itself is not an initial.
+String _initialsOf(String name) {
+  final withoutAt = name.startsWith('@') ? name.substring(1) : name;
+  final letters = withoutAt.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).map((w) => w[0]);
+  final text = letters.join();
+  return (text.length > 2 ? text.substring(0, 2) : text).toUpperCase();
+}
 
 /// Profile row at the bottom of the sidebar. Clicking it opens a menu that
 /// floats above the row (`.profile-dd` in the design).
@@ -35,6 +44,8 @@ class _ProfileRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final name = _nameOf(context.watch<AuthController>());
+    final planName = context.watch<ProfileController>().profile?.planName;
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(8),
@@ -51,9 +62,9 @@ class _ProfileRow extends StatelessWidget {
                 height: 30,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(color: p.accent, shape: BoxShape.circle),
-                child: const Text(
-                  'M',
-                  style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                child: Text(
+                  _initialsOf(name),
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
                 ),
               ),
               const SizedBox(width: 10),
@@ -61,8 +72,8 @@ class _ProfileRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(_mockName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                    Text('$_mockPlan plan', style: TextStyle(fontSize: 11, color: p.text3)),
+                    Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+                    if (planName != null) Text('$planName plan', style: TextStyle(fontSize: 11, color: p.text3)),
                   ],
                 ),
               ),
@@ -87,6 +98,8 @@ class _MenuPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final name = _nameOf(context.watch<AuthController>());
+    final planName = context.watch<ProfileController>().profile?.planName;
     return PopoverPanel(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -94,27 +107,23 @@ class _MenuPanel extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(_mockName, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 1),
-                Text(_mockEmail, style: TextStyle(fontSize: 11, color: p.text3)),
-              ],
-            ),
+            // Telegram gives no email; there is nothing true to put under the name, so nothing is.
+            child: Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
           ),
           const PopoverSeparator(),
           _MenuRow(
             icon: Icons.star_rounded,
             label: 'Manage plan',
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
-              decoration: BoxDecoration(color: p.accentLight, borderRadius: BorderRadius.circular(100)),
-              child: Text(
-                _mockPlan,
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: p.accent),
-              ),
-            ),
+            trailing: planName == null
+                ? null
+                : Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                    decoration: BoxDecoration(color: p.accentLight, borderRadius: BorderRadius.circular(100)),
+                    child: Text(
+                      planName,
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: p.accent),
+                    ),
+                  ),
             onTap: onSelected,
           ),
           _MenuRow(icon: Icons.feedback_rounded, label: 'Give feedback', onTap: onSelected),
