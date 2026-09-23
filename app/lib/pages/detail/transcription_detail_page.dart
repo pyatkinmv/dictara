@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../data/transcription_repository.dart';
+import '../../state/audio_player_controller.dart';
 import '../../state/transcription_detail_controller.dart';
 import '../../theme/app_palette.dart';
 import 'detail_header.dart';
@@ -23,6 +25,10 @@ class TranscriptionDetailPage extends StatefulWidget {
 class _TranscriptionDetailPageState extends State<TranscriptionDetailPage> {
   DetailTab _tab = DetailTab.transcript;
 
+  /// Page-local, not a Provider above the router like the other detail controllers: playback has no reason
+  /// to continue once you leave this transcription, so it is created and disposed with this page.
+  final _audioPlayer = AudioPlayerController();
+
   @override
   void initState() {
     super.initState();
@@ -38,12 +44,22 @@ class _TranscriptionDetailPageState extends State<TranscriptionDetailPage> {
     }
   }
 
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
   void _open() {
     final id = widget.id;
     if (id == null) return;
     // Not during build: opening notifies listeners (the topbar shows the title).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) context.read<TranscriptionDetailController>().open(id);
+    });
+    context.read<TranscriptionRepository>().audioUrl(id).then((url) {
+      // A newer id may have replaced this one, or the page may be gone, by the time this answers.
+      if (mounted && widget.id == id && url != null) _audioPlayer.load(url);
     });
   }
 
@@ -73,6 +89,7 @@ class _TranscriptionDetailPageState extends State<TranscriptionDetailPage> {
               detail: detail,
               library: controller.speakers,
               onAssign: controller.assignSpeaker,
+              player: _audioPlayer,
             ),
             DetailTab.overview => OverviewView(detail: detail),
           },

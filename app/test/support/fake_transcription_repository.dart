@@ -215,12 +215,17 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   /// [jobTiming] makes uploads move on from `pending` through `processing` to
   /// `done` as time passes (judged by [clock] whenever data is asked for). Without
   /// it an upload stays `pending` forever, which keeps tests deterministic.
-  FakeTranscriptionRepository({this.latency, this.jobTiming, DateTime Function()? clock})
+  ///
+  /// [hasAudio]: false by default, so [audioUrl] answers null and the detail page never reaches for the real
+  /// (browser-only) audio backend — tests that exercise the player construct their own `AudioPlayerController`
+  /// directly with a fake backend instead of going through the full app for that.
+  FakeTranscriptionRepository({this.latency, this.jobTiming, DateTime Function()? clock, this.hasAudio = false})
       : _clock = clock ?? DateTime.now;
 
   final Duration Function()? latency;
   final JobTiming? jobTiming;
   final DateTime Function() _clock;
+  final bool hasAudio;
 
   /// Uploads that have not finished yet, by transcription id.
   final Map<String, _Job> _jobs = {};
@@ -404,6 +409,14 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
       for (var i = 0; i < detail.segments.length; i++)
         '[${formatTimestamp(detail.segments[i].start)}] ${detail.speakerOfSegment(i)?.name ?? ''}: ${detail.segments[i].text}',
     ].join('\n');
+  }
+
+  @override
+  Future<String?> audioUrl(String id) async {
+    if (!hasAudio) return null;
+    final detail = await get(id);
+    if (detail == null) return null;
+    return 'fake://audio/$id.mp3';
   }
 
   @override

@@ -72,6 +72,11 @@ abstract class TranscriptionRepository {
   /// there is none.
   Future<String?> transcriptText(String id);
 
+  /// A ready-to-use, short-lived URL to stream this transcription's audio for playback (`<audio src>`), or
+  /// null when there is no audio to play. Expires a while after being fetched — ask again if playback is
+  /// resumed much later (the audio player does this itself on a 403).
+  Future<String?> audioUrl(String id);
+
   /// Sends a file for transcription (`POST /transcriptions`) and returns the entry it became, which starts out
   /// `pending`, or, when the user has uploaded this file with these options before, the existing one
   /// ([UploadOutcome.duplicate]): nothing is transcribed twice. The options of the dialog travel with it.

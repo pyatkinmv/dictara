@@ -148,6 +148,20 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
   }
 
   @override
+  Future<String?> audioUrl(String id) async {
+    try {
+      final body = await _client.postJson('/transcriptions/${Uri.encodeComponent(id)}/audio-token', {});
+      final token = (body as Map<String, dynamic>?)?['token'] as String?;
+      if (token == null) return null;
+      return '${_client.baseUrl}/transcriptions/${Uri.encodeComponent(id)}/audio'
+          '?token=${Uri.encodeQueryComponent(token)}';
+    } on GatewayException catch (e) {
+      if (e.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
+  @override
   Future<void> rename(String id, String title) =>
       _client.patchJson('/jobs/${Uri.encodeComponent(id)}/title', {'title': title});
 

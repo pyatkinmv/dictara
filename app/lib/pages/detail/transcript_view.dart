@@ -2,16 +2,18 @@ import 'package:flutter/material.dart';
 
 import '../../models/speaker.dart';
 import '../../models/transcription_detail.dart';
+import '../../state/audio_player_controller.dart';
 import '../../theme/app_palette.dart';
 import '../../util/format.dart';
 import '../../widgets/popover.dart';
+import 'audio_player_bar.dart';
 import 'speaker_picker.dart';
 
 /// The Transcript tab: segments grouped into blocks by speaker, each with a
 /// colored left border (`.transcript-pane`). Clicking a block's speaker name
 /// opens the Speaker Picker.
 class TranscriptView extends StatelessWidget {
-  const TranscriptView({super.key, required this.detail, required this.library, required this.onAssign});
+  const TranscriptView({super.key, required this.detail, required this.library, required this.onAssign, required this.player});
 
   final TranscriptionDetail detail;
 
@@ -21,17 +23,26 @@ class TranscriptView extends StatelessWidget {
   /// Reassigns segments to the speaker with this name (created if new).
   final void Function(Set<int> segmentIndexes, String name, bool allBySpeaker) onAssign;
 
+  /// The audio player, floating over the transcript (only on this tab). Its own bar stays invisible until
+  /// `player.hasSource` — the URL fetch that feeds it is a separate round trip from the transcript itself.
+  final AudioPlayerController player;
+
   @override
   Widget build(BuildContext context) {
     final runs = detail.runs;
     // Selectable, so a passage can be copied.
-    return SelectionArea(
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-        itemCount: runs.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 5),
-        itemBuilder: (context, i) => _RunBlock(detail: detail, run: runs[i], library: library, onAssign: onAssign),
-      ),
+    return Stack(
+      children: [
+        SelectionArea(
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            itemCount: runs.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 5),
+            itemBuilder: (context, i) => _RunBlock(detail: detail, run: runs[i], library: library, onAssign: onAssign),
+          ),
+        ),
+        Positioned(left: 0, right: 0, bottom: 16, child: Center(child: AudioPlayerBar(controller: player))),
+      ],
     );
   }
 }
