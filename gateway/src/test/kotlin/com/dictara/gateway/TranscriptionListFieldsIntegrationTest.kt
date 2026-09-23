@@ -145,6 +145,44 @@ class TranscriptionListFieldsIntegrationTest : AbstractSharedContextIntegrationT
         assertThat(items()["mixed.mp3"]!!["speaker_count"].asInt()).isEqualTo(1)
     }
 
+    /** Names a library speaker, for the assignment tests below. */
+    private fun speaker(name: String): UUID {
+        val id = UUID.randomUUID()
+        jdbcTemplate.update("INSERT INTO speakers(id, user_id, name) VALUES (?, ?, ?)", id, userId, name)
+        return id
+    }
+
+    private fun transcriptIdOf(submissionId: UUID): UUID =
+        jdbcTemplate.queryForObject("SELECT id FROM transcripts WHERE submission_id = ?", UUID::class.java, submissionId)!!
+
+    @Test
+    fun `two voices confirmed as the same real speaker count once, not twice`() {
+        val id = addSubmission("three.mp3", segments = segments("SPEAKER_00", "SPEAKER_01", "SPEAKER_02"))
+        val transcriptId = transcriptIdOf(id)
+        val maria = speaker("Maria Chen")
+        // SPEAKER_00 and SPEAKER_01 both turn out to be Maria: three voices, but two real people.
+        jdbcTemplate.update(
+            "INSERT INTO transcript_voices(transcript_id, voice, speaker_id) VALUES (?, 'SPEAKER_00', ?), (?, 'SPEAKER_01', ?)",
+            transcriptId, maria, transcriptId, maria,
+        )
+
+        assertThat(items()["three.mp3"]!!["speaker_count"].asInt()).isEqualTo(2)
+    }
+
+    @Test
+    fun `a per-phrase mark to a new speaker is counted in addition to the voice's own`() {
+        val id = addSubmission("two.mp3", segments = segments("SPEAKER_00", "SPEAKER_00"))
+        val transcriptId = transcriptIdOf(id)
+        val james = speaker("James Wright")
+        // One of SPEAKER_00's two phrases is marked James by hand; the voice itself is still unconfirmed.
+        jdbcTemplate.update(
+            "UPDATE transcript_segments SET speaker_id = ? WHERE transcript_id = ? AND idx = 0",
+            james, transcriptId,
+        )
+
+        assertThat(items()["two.mp3"]!!["speaker_count"].asInt()).isEqualTo(2) // "Speaker 1" (phrase 1) and James
+    }
+
     // ── Progress ───────────────────────────────────────────────────────────────
 
     private fun progress(id: UUID, live: ProgressInfo?) {

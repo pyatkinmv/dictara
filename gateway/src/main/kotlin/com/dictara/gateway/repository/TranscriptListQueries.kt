@@ -11,7 +11,12 @@ import java.util.UUID
 @Repository
 class TranscriptListQueries(private val jdbc: NamedParameterJdbcTemplate) {
 
-    /** One transcript as the list sees it. [speakerCount] counts the distinct diarizer labels in the segments. */
+    /**
+     * One transcript as the list sees it. [speakerCount] counts distinct speakers actually present — a
+     * phrase's own mark, else its voice's confirmed speaker, else the voice itself as a stand-in identity
+     * (matching the detail page's `presentSpeakers`) — never the raw diarizer voice count, which does not
+     * shrink when two voices turn out to be the same person, or grow when one phrase is given to someone new.
+     */
     data class Row(val submissionId: UUID, val transcriptId: UUID, val title: String?, val speakerCount: Int)
 
     fun findRows(submissionIds: Collection<UUID>): List<Row> {
@@ -21,7 +26,12 @@ class TranscriptListQueries(private val jdbc: NamedParameterJdbcTemplate) {
             SELECT t.submission_id,
                    t.id,
                    t.title,
-                   (SELECT count(DISTINCT s.voice) FROM transcript_segments s WHERE s.transcript_id = t.id) AS speaker_count
+                   (
+                       SELECT count(DISTINCT COALESCE(s.speaker_id::text, tv.speaker_id::text, s.voice))
+                       FROM transcript_segments s
+                       LEFT JOIN transcript_voices tv ON tv.transcript_id = s.transcript_id AND tv.voice = s.voice
+                       WHERE s.transcript_id = t.id
+                   ) AS speaker_count
             FROM transcripts t
             WHERE t.submission_id IN (:ids)
             """.trimIndent(),
