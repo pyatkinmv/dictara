@@ -17,6 +17,16 @@ INSERT INTO users (id, display_name, plan)
 VALUES ('00000000-0000-4000-8000-000000000001', 'Dev User', 'unlimited')
 ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name, plan = EXCLUDED.plan;
 
+-- Logging in with the Telegram username "dev" on the real login screen (LocalTelegramBotSimulator, "Итерация
+-- 10") lands on this same dev user instead of creating a brand-new, empty one — without this row, no username
+-- reaches the seeded data below, since the simulator's telegram id (`local-<username>`) has nothing to match.
+INSERT INTO auth_identities (id, user_id, provider, provider_uid, metadata)
+VALUES (
+    '00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000001',
+    'telegram', 'local-dev', '{"username": "dev", "bot_started": true}'::jsonb
+)
+ON CONFLICT (id) DO UPDATE SET provider_uid = EXCLUDED.provider_uid, metadata = EXCLUDED.metadata;
+
 -- ── Transcriptions from the design (designs/1.9/cards-teal.html) ─────────────────────────────────────────
 -- One row per transcription: n is the number in the ids (audio ...0a<n>, submission ...0b<n>,
 -- transcript ...0c<n>), speakers how many voices the diarizer found (0 = no diarization), lines how many

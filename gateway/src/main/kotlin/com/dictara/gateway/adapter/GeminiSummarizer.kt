@@ -81,13 +81,28 @@ class GeminiSummarizer(
         )
 
         /**
-         * Reads the model's JSON. Without a summary the answer is useless and the call is retried; the
-         * proposals are optional, so a malformed one is left out rather than failing the whole answer.
+         * A summary that does not end in sentence-ending punctuation almost always means Gemini's structured
+         * output was cut short mid-sentence: it happens when the model writes a literal `"` inside the
+         * "summary" string (typically quoting a word from the transcript) without escaping it — the schema-
+         * constrained decoder then reads that `"` as the end of the string, leaving the rest of the JSON
+         * (title, tags, speakers) well-formed but the summary truncated. The prompt now tells the model to
+         * never use double quotes in "summary", but that is an instruction, not a guarantee, so this is the
+         * safety net: treating it as a parse failure reuses the retry [com.dictara.gateway.service.OrchestratorService]
+         * already does for any other exception from this call — no separate retry needed here.
+         */
+        private val looksComplete = Regex("""[.!?…][)\]"'*]*$""")
+
+        /**
+         * Reads the model's JSON. Without a summary, or with one that looks cut off, the answer is useless
+         * and the call is retried; the proposals are optional, so a malformed one is left out rather than
+         * failing the whole answer.
          */
         internal fun parse(json: String): Analysis {
             val root = mapper.readTree(json)
             val summary = root?.get("summary")?.takeIf { it.isTextual }?.asText()?.trim()
             if (summary.isNullOrEmpty()) throw RuntimeException("Gemini answered without a summary")
+            if (!looksComplete.containsMatchIn(summary))
+                throw RuntimeException("Gemini's summary looks cut off (no ending punctuation): \"${summary.takeLast(60)}\"")
             val tags = root["tags"]?.takeIf { it.isArray }?.mapNotNull { it.takeIf { t -> t.isTextual }?.asText() } ?: emptyList()
             val speakers = root["speakers"]?.takeIf { it.isArray }?.mapNotNull { item ->
                 val voice = item["voice"]?.takeIf { it.isTextual }?.asText()
@@ -155,6 +170,8 @@ class GeminiSummarizer(
                 "",
                 "\"summary\": a summary in Markdown, written in $responseLanguage (all section headers and labels too), in this format:",
                 formatInstruction,
+                "Never use a literal double-quote character (\") anywhere in \"summary\", not even to quote a word or phrase from the " +
+                    "transcript — use single quotes ('like this') instead. An unescaped double quote breaks the JSON.",
                 "",
                 "\"title\": a short title for the recording (at most 8 words, no quotes, no final period), in $responseLanguage.",
                 "",

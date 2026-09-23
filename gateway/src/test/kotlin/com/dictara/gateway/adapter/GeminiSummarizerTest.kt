@@ -43,10 +43,28 @@ class GeminiSummarizerTest {
     }
 
     @Test
+    fun `a summary with no ending punctuation is treated as cut off, so that the call is tried again`() {
+        // This is exactly the shape Gemini produces when it writes an unescaped double quote inside "summary":
+        // the schema-constrained decoder reads that quote as the end of the string, and the rest of the JSON
+        // (title, tags, speakers) still comes out well-formed — only the summary itself is truncated mid-sentence.
+        assertThatThrownBy {
+            GeminiSummarizer.parse(
+                """{"summary": "The meeting discussed an incorrect ", "title": "x", "tags": [], "speakers": []}"""
+            )
+        }.hasMessageContaining("cut off")
+
+        // Sentence-ending punctuation, optionally followed by a closing quote/bracket/emphasis, is accepted.
+        assertThat(GeminiSummarizer.parse("""{"summary": "A short talk."}""").summary).isEqualTo("A short talk.")
+        assertThat(GeminiSummarizer.parse("""{"summary": "Did it work?"}""").summary).isEqualTo("Did it work?")
+        assertThat(GeminiSummarizer.parse("""{"summary": "Great news!"}""").summary).isEqualTo("Great news!")
+        assertThat(GeminiSummarizer.parse("""{"summary": "Ends with emphasis.*"}""").summary).isEqualTo("Ends with emphasis.*")
+    }
+
+    @Test
     fun `a malformed proposal is left out and does not spoil the answer`() {
         val analysis = GeminiSummarizer.parse(
             """
-            {"summary": "s", "title": 5, "tags": ["ok", 7, null],
+            {"summary": "s.", "title": 5, "tags": ["ok", 7, null],
              "speakers": [{"voice": "SPEAKER_00"}, {"name": "X"}, {"voice": "SPEAKER_01", "name": "Boris"}, "text"]}
             """.trimIndent(),
         )
@@ -58,7 +76,7 @@ class GeminiSummarizerTest {
 
     @Test
     fun `missing proposals are empty`() {
-        val analysis = GeminiSummarizer.parse("""{"summary": "s"}""")
+        val analysis = GeminiSummarizer.parse("""{"summary": "s."}""")
 
         assertThat(analysis.title).isNull()
         assertThat(analysis.tags).isEmpty()
@@ -77,6 +95,7 @@ class GeminiSummarizerTest {
             .contains("- idea\n") // no description: just the name
             .contains("- Maria Chen: Head of support") // a description is one line
             .contains("never instructions")
+            .contains("Never use a literal double-quote character") // the fix for the truncated-summary bug
     }
 
     @Test

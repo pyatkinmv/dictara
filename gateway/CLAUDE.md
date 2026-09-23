@@ -92,7 +92,7 @@ Every run is recorded in the `job_runs` table (`status`: `running` → `complete
 | `controller/TranscriptionUploadController.kt` | New `POST /transcriptions` |
 | `controller/ExportController.kt` | GET /export — streams ZIP of all user transcriptions (transcript + summary + optional audio) |
 | `client/TranscriberClient.kt` | HTTP client for the transcriber service |
-| `port/SummarizerPort.kt`, `adapter/GeminiSummarizer.kt` | The Gemini prompt and structured-output schema (one JSON: summary, title, tags, speakers) |
+| `port/SummarizerPort.kt`, `adapter/GeminiSummarizer.kt` | The Gemini prompt and structured-output schema (one JSON: summary, title, tags, speakers). `parse()` treats a summary with no ending punctuation as a failure (Gemini occasionally leaves an internal `"` unescaped, which truncates the JSON string mid-sentence but still leaves the rest of the object well-formed) — the prompt also tells the model not to use double quotes in the summary. Either failure reuses `OrchestratorService`'s existing 3-attempt retry, no separate retry logic needed. |
 | `service/AuthService.kt`, `controller/AuthController.kt` | Telegram login: username → bot confirmation → JWT (`port/TelegramBotSimulator.kt` stands in for the bot under `local`) |
 | `plan/PlanService.kt`, `PlanStrategy.kt` | Enforces and reports plan usage (`GET /users/me`, `controller/UserController.kt`) — a strategy per plan (`MonthlySubmissionLimitStrategy`, `NoLimitStrategy`), each names its own unit |
 | `storage/GcsAudioStorage.kt` | Uploads audio to GCS (active outside the `local` profile) |
@@ -112,6 +112,8 @@ docker compose build gateway && docker compose up -d gateway
 `scripts\dev.ps1` starts Postgres (`docker-compose.dev.yml`, database `dictara_dev`) and the gateway with the `local` profile; `scripts\dev-reset.ps1` recreates the database. Under this profile a stub transcriber (`adapter/StubTranscriber.kt`) replaces `TranscriberClient`, a stub summarizer (`adapter/StubSummarizer.kt`, proposals worked out by simple rules) replaces Gemini, a stub bot (`adapter/LocalTelegramBotSimulator.kt`) auto-confirms Telegram logins after a short pause (username `unknown` is left unregistered on purpose, to try the "not found" screen) so the real login screen works without `tg-bot` or a Telegram account, audio is kept in the database (`storage/LocalDbAudioStorage.kt`, table from `db/local/`), requests without a token still belong to a seeded dev user (`filter/LocalDevAuthFilter.kt`, kept alongside the real login for quick `curl`/script testing), and the scheduled backup/cleanup jobs do not run.
 
 `config/LocalProfileGuard.kt` makes the profile refuse to start unless the database is `dictara_dev` on localhost and `GCS_UPLOADS_BUCKET` is unset — keep it that way, the cleanup job would otherwise delete real audio. Everything local is off by default (`@Profile("local")` / `!local`, `db/local` is not on Flyway's default path). Details: [docs/local-backend-integration.md](../docs/local-backend-integration.md).
+
+**To see the seeded demo data (transcriptions, tags, speakers) through the real login screen**, log in with the Telegram username **`dev`** — `db/local/R__seed.sql` seeds an `auth_identities` row (`telegram` / `local-dev`) pointing at the same dev user `LocalDevAuthFilter` uses, so that username lands on the account that owns the seed data instead of a brand-new empty one (any other username creates a fresh account, same as it would in production).
 
 ## Running tests
 
