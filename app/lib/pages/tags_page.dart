@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../models/tag_entry.dart';
 import '../state/tag_library_controller.dart';
+import '../state/transcription_list_controller.dart';
 import '../theme/app_palette.dart';
 import 'library/delete_dialog.dart';
 import 'library/edit_item_dialog.dart';
@@ -61,6 +63,11 @@ class _TagsPageState extends State<TagsPage> {
     if (confirmed) await controller.delete(entry.tag.label);
   }
 
+  void _viewInTranscriptions(TagEntry entry) {
+    context.read<TranscriptionListController>().filterByTag(entry.tag.label);
+    context.go('/transcriptions');
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<TagLibraryController>();
@@ -86,6 +93,7 @@ class _TagsPageState extends State<TagsPage> {
               hovered: hovered,
               onEdit: () => _openForm(entry),
               onDelete: () => _delete(entry),
+              onViewRest: () => _viewInTranscriptions(entry),
             ),
           ),
       ],
@@ -99,12 +107,14 @@ class _TagCardContent extends StatelessWidget {
     required this.hovered,
     required this.onEdit,
     required this.onDelete,
+    required this.onViewRest,
   });
 
   final TagEntry entry;
   final bool hovered;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onViewRest;
 
   @override
   Widget build(BuildContext context) {
@@ -134,7 +144,9 @@ class _TagCardContent extends StatelessWidget {
         Expanded(child: Align(alignment: Alignment.topLeft, child: CardDescription(entry.description))),
         CardUsage(
           countLabel: '${entry.count} file${entry.count == 1 ? '' : 's'}',
+          totalCount: entry.count,
           titles: entry.transcriptions,
+          onViewRest: onViewRest,
         ),
       ],
     );

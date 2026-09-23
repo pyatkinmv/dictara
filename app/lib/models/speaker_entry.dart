@@ -16,8 +16,8 @@ class SpeakerEntry {
   /// Role and topics; the AI uses it to recognise the voice in new transcriptions.
   final String description;
 
-  /// Titles of the transcriptions the speaker takes part in. All of them, oldest first, in the mock; from the
-  /// gateway only the latest few, newest first ([count] has the total).
+  /// Titles of the transcriptions the speaker takes part in: only the latest couple, newest first ([count]
+  /// has the total).
   final List<String> transcriptions;
 
   /// How long the speaker speaks in total. The gateway sums the length of their phrases; the mock has no

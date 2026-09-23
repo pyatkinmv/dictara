@@ -143,20 +143,30 @@ class CardDescription extends StatelessWidget {
 /// The rule, the "N files" line and the chips of linked transcriptions at the
 /// bottom of a card (`.card-divider`, `.card-stat`, `.card-files`).
 class CardUsage extends StatelessWidget {
-  const CardUsage({super.key, required this.countLabel, required this.titles});
+  const CardUsage({super.key, required this.countLabel, required this.totalCount, required this.titles, this.onViewRest});
 
   /// "3 files" / "2 transcriptions".
   final String countLabel;
 
-  /// Titles of the linked transcriptions; the first two are shown as chips.
+  /// How many transcriptions actually carry this tag/speaker — the real total, which can be more than
+  /// [titles].length: the gateway only ever sends the latest couple of sample titles, so the "+N more" chip
+  /// must count from this, never from titles.length (that undercounts whenever the gateway's own cap is at
+  /// or below what is shown here).
+  final int totalCount;
+
+  /// Titles of the linked transcriptions the gateway sent (already capped); the first two are shown as chips.
   final List<String> titles;
+
+  /// Opens the Transcriptions list filtered to just this tag/speaker; null hides the "+N more" chip's link
+  /// (still shown as plain text) — used only where a test has no navigation to exercise.
+  final VoidCallback? onViewRest;
 
   static const _shown = 2;
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final rest = titles.length - _shown;
+    final rest = totalCount - titles.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -182,7 +192,7 @@ class CardUsage extends StatelessWidget {
             runSpacing: 4,
             children: [
               for (final title in titles.take(_shown)) _FileChip(title),
-              if (rest > 0) _MoreChip(rest),
+              if (rest > 0) _MoreChip(rest, onTap: onViewRest),
             ],
           ),
       ],
@@ -231,10 +241,15 @@ class _FileChipState extends State<_FileChip> {
   }
 }
 
+/// "+N more →": the rest of the transcriptions that carry this tag/speaker, beyond the couple of sample
+/// chips next to it. A distinct, deliberately small link — not the count line above and not the card itself,
+/// which already opens editing — so it reads as "there is more, go look" rather than competing for the
+/// card's one big click target.
 class _MoreChip extends StatefulWidget {
-  const _MoreChip(this.count);
+  const _MoreChip(this.count, {required this.onTap});
 
   final int count;
+  final VoidCallback? onTap;
 
   @override
   State<_MoreChip> createState() => _MoreChipState();
@@ -246,13 +261,24 @@ class _MoreChipState extends State<_MoreChip> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final active = widget.onTap != null;
+    final color = active && _hover ? p.accent : p.text3;
+    final text = Text(
+      '+${widget.count} more${active ? ' →' : ''}',
+      style: TextStyle(
+        fontSize: 11,
+        fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+        color: color,
+        decoration: active && _hover ? TextDecoration.underline : TextDecoration.none,
+      ),
+    );
+    final padded = Padding(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2), child: text);
+    if (!active) return padded;
     return MouseRegion(
+      cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        child: Text('+${widget.count} more', style: TextStyle(fontSize: 11, color: _hover ? p.accent : p.text3)),
-      ),
+      child: GestureDetector(onTap: widget.onTap, child: padded),
     );
   }
 }

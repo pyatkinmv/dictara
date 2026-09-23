@@ -419,15 +419,17 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   Future<TagLibrary> tagLibrary() async => TagLibrary(
         entries: [
           for (final tag in _library)
-            TagEntry(
-              tag: tag,
-              description: _tagDescriptions[tag.label] ?? '',
-              // Items are kept oldest first, so this reads oldest first too.
-              transcriptions: [
-                for (final item in _items)
-                  if (item.tags.contains(tag)) item.title,
-              ],
-            ),
+            () {
+              // Items are kept oldest first; the gateway sends only the two most recent, newest first, with
+              // the true count separate — mirrored here so a tag used more than twice is testable.
+              final matching = [for (final item in _items.reversed) if (item.tags.contains(tag)) item.title];
+              return TagEntry(
+                tag: tag,
+                description: _tagDescriptions[tag.label] ?? '',
+                transcriptions: matching.take(2).toList(),
+                count: matching.length,
+              );
+            }(),
         ],
         taggedTranscriptions: _items.where((item) => item.tags.isNotEmpty).length,
       );
@@ -486,11 +488,14 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
     return [
       for (final speaker in _speakerLibrary)
         () {
+          // Items are kept oldest first; the gateway sends only the two most recent, newest first, with the
+          // true count separate — mirrored here so a speaker used more than twice is testable.
           final items = [for (final item in _items) if (_takesPart(item, speaker)) item];
           return SpeakerEntry(
             speaker: speaker,
             description: _speakerDescriptions[speaker.name] ?? '',
-            transcriptions: [for (final item in items) item.title],
+            transcriptions: [for (final item in items.reversed) item.title].take(2).toList(),
+            count: items.length,
             totalDuration: items.fold(Duration.zero, (sum, item) => sum + (item.duration ?? Duration.zero)),
           );
         }(),

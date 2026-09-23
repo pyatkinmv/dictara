@@ -4,6 +4,7 @@ import 'package:dictara_web/app.dart';
 import 'support/fake_transcription_repository.dart';
 import 'package:dictara_web/data/transcription_repository.dart';
 import 'package:dictara_web/models/transcription.dart';
+import 'package:dictara_web/state/transcription_list_controller.dart';
 import 'package:dictara_web/widgets/transcription_row.dart';
 
 import 'test_utils.dart';
@@ -85,6 +86,39 @@ void main() {
       expect(await titlesOf(const TranscriptionQuery(speakers: {'Dana Whitfield'})), ['Quarterly Review Meeting']);
       expect(await titlesOf(const TranscriptionQuery(speakers: {'Maria Chen'})),
           ['Daily Standup 19 Jun', 'Product Ideas — Voice Memo', 'Interview: Anna K.']); // '0' no longer among them
+    });
+  });
+
+  group('TranscriptionListController.filterByTag/filterBySpeaker', () {
+    test('replaces the whole query with just that one tag, dropping every other filter', () async {
+      final c = TranscriptionListController(FakeTranscriptionRepository());
+      c.setSearch('review');
+      c.toggleStatus(TranscriptionStatus.done);
+      c.toggleSpeaker('Alexei Sorokin');
+      await Future<void>.delayed(Duration.zero);
+
+      c.filterByTag('ideas');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(c.query.tags, {'ideas'});
+      expect(c.query.search, isEmpty);
+      expect(c.query.statuses, isEmpty);
+      expect(c.query.speakers, isEmpty);
+      expect(c.items.map((i) => i.title), ['Product Ideas — Voice Memo']);
+    });
+
+    test('the speaker counterpart does the same, the other way round', () async {
+      final c = TranscriptionListController(FakeTranscriptionRepository());
+      c.toggleTag('meeting');
+      await Future<void>.delayed(Duration.zero);
+
+      c.filterBySpeaker('James Wright');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(c.query.speakers, {'James Wright'});
+      expect(c.query.tags, isEmpty);
+      expect(c.items, isNotEmpty);
+      expect(c.items.every((i) => i.status == TranscriptionStatus.done), isTrue);
     });
   });
 

@@ -18,7 +18,8 @@ void main() {
       final entries = {for (final e in (await repo.tagLibrary()).entries) e.tag.label: e};
 
       expect(entries.keys, ['meeting', 'quarterly', 'interview', 'hiring', 'ideas', 'standup']);
-      expect(entries['meeting']!.transcriptions, ['Quarterly Review Meeting', 'Daily Standup 19 Jun']);
+      // Newest first (count has the true total, separate from how many sample titles are shown).
+      expect(entries['meeting']!.transcriptions, ['Daily Standup 19 Jun', 'Quarterly Review Meeting']);
       expect(entries['meeting']!.count, 2);
       expect(entries['quarterly']!.transcriptions, ['Quarterly Review Meeting']);
       expect(entries['meeting']!.description, startsWith('Regular team meetings'));
@@ -44,7 +45,7 @@ void main() {
       final sync = library.firstWhere((e) => e.tag.label == 'sync');
       expect(sync.tag.color, const Color(0xFF2563EB));
       expect(sync.description, 'New text');
-      expect(sync.transcriptions, ['Quarterly Review Meeting', 'Daily Standup 19 Jun']);
+      expect(sync.transcriptions, ['Daily Standup 19 Jun', 'Quarterly Review Meeting']);
       expect(library.any((e) => e.tag.label == 'meeting'), isFalse);
       expect((await repo.get('0'))!.item.tags.map((t) => t.label), ['sync', 'quarterly']);
       expect((await repo.tags()).map((t) => t.label), contains('sync'));
@@ -107,12 +108,29 @@ void main() {
       await openTags(tester, repo: repo);
 
       expect(find.text('3 files'), findsOneWidget);
-      expect(find.text('+1 more'), findsOneWidget);
-      // Oldest first: Quarterly, Product Ideas (now tagged too), Daily Standup.
-      // The first two are chips of the meeting card; the third is folded away,
-      // so "Daily Standup" only appears on the standup card.
+      expect(find.text('+1 more →'), findsOneWidget);
+      // Newest first: Daily Standup, Product Ideas (now tagged too), Quarterly — the oldest is folded away,
+      // so "Quarterly Review Meeting" only appears on its own card (title + quarterly card), not meeting's.
+      expect(find.text('Daily Standup 19 Jun'), findsNWidgets(2)); // meeting + standup cards
       expect(find.text('Product Ideas — Voice Memo'), findsNWidgets(2)); // meeting + ideas cards
-      expect(find.text('Daily Standup 19 Jun'), findsOneWidget); // standup card only
+      expect(find.text('Quarterly Review Meeting'), findsOneWidget); // its own card title only
+    });
+
+    testWidgets('tapping "+N more" jumps to Transcriptions filtered to just that tag', (tester) async {
+      final repo = FakeTranscriptionRepository();
+      await repo.addTag('4', 'meeting'); // a third use, so the chip appears
+      await openTags(tester, repo: repo);
+
+      await tester.tap(find.text('+1 more →'));
+      await settle(tester);
+
+      expect(find.text('Add tag'), findsNothing); // left the Tags page
+      expect(find.text('Filter · 1'), findsOneWidget);
+      final rows = tester.widgetList<TranscriptionRow>(find.byType(TranscriptionRow));
+      expect(
+        rows.map((r) => r.item.title),
+        containsAll(['Daily Standup 19 Jun', 'Product Ideas — Voice Memo', 'Quarterly Review Meeting']),
+      );
     });
 
     testWidgets('a tag without a description or usage says so', (tester) async {

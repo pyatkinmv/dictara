@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../models/speaker_entry.dart';
 import '../state/speaker_library_controller.dart';
+import '../state/transcription_list_controller.dart';
 import '../theme/app_palette.dart';
 import '../util/format.dart';
 import 'library/delete_dialog.dart';
@@ -68,6 +70,11 @@ class _SpeakersPageState extends State<SpeakersPage> {
     if (confirmed) await controller.delete(entry.speaker.name);
   }
 
+  void _viewInTranscriptions(SpeakerEntry entry) {
+    context.read<TranscriptionListController>().filterBySpeaker(entry.speaker.name);
+    context.go('/transcriptions');
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<SpeakerLibraryController>();
@@ -92,6 +99,7 @@ class _SpeakersPageState extends State<SpeakersPage> {
               hovered: hovered,
               onEdit: () => _openForm(entry),
               onDelete: () => _delete(entry),
+              onViewRest: () => _viewInTranscriptions(entry),
             ),
           ),
       ],
@@ -105,12 +113,14 @@ class _SpeakerCardContent extends StatelessWidget {
     required this.hovered,
     required this.onEdit,
     required this.onDelete,
+    required this.onViewRest,
   });
 
   final SpeakerEntry entry;
   final bool hovered;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onViewRest;
 
   @override
   Widget build(BuildContext context) {
@@ -190,7 +200,9 @@ class _SpeakerCardContent extends StatelessWidget {
         ),
         CardUsage(
           countLabel: '$count transcription${count == 1 ? '' : 's'}',
+          totalCount: count,
           titles: entry.transcriptions,
+          onViewRest: onViewRest,
         ),
       ],
     );

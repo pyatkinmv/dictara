@@ -156,6 +156,18 @@ class TranscriptionListController extends ChangeNotifier {
     _apply(_query.copyWith(speakers: _toggled(_query.speakers, name)));
   }
 
+  /// Replaces the query with just this one tag: every other filter (status, other tags/speakers, search)
+  /// is cleared, for the "N more →" link on the Tags page — a fresh, single-criterion view of that tag.
+  /// The sort order is left as it was, the same as [upload] leaves it when it resets the other filters.
+  void filterByTag(String label) {
+    _apply(_query.copyWith(search: '', statuses: {}, tags: {label}, speakers: {}));
+  }
+
+  /// The speaker counterpart of [filterByTag], for the Speakers page.
+  void filterBySpeaker(String name) {
+    _apply(_query.copyWith(search: '', statuses: {}, tags: {}, speakers: {name}));
+  }
+
   static Set<T> _toggled<T>(Set<T> set, T value) {
     return set.contains(value) ? ({...set}..remove(value)) : {...set, value};
   }

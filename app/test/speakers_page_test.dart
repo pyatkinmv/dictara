@@ -22,16 +22,18 @@ void main() {
         };
 
         expect(entries.keys, ['Alexei Sorokin', 'Maria Chen', 'James Wright']);
-        // Slots 1-3 in the three-speaker recordings, slots 1-2 in the interview.
+        // Slots 1-3 in the three-speaker recordings, slots 1-2 in the interview: 3 and 2 uses, but the
+        // sample titles are capped to the latest two, newest first (count carries the true total).
         expect(entries['Alexei Sorokin']!.transcriptions, [
-          'Quarterly Review Meeting',
+          'Daily Standup 19 Jun',
           'Interview: Anna K.',
-          'Daily Standup 19 Jun',
         ]);
+        expect(entries['Alexei Sorokin']!.count, 3);
         expect(entries['James Wright']!.transcriptions, [
-          'Quarterly Review Meeting',
           'Daily Standup 19 Jun',
+          'Quarterly Review Meeting',
         ]);
+        expect(entries['James Wright']!.count, 2);
         expect(
           entries['James Wright']!.totalDuration,
           const Duration(minutes: 22, seconds: 22),
@@ -208,9 +210,19 @@ void main() {
         expect(find.text('1h 9min'), findsNWidgets(2)); // Alexei and Maria
         expect(find.text('3 transcriptions'), findsNWidgets(2));
         expect(find.text('2 transcriptions'), findsOneWidget);
-        expect(find.text('+1 more'), findsNWidgets(2));
+        expect(find.text('+1 more →'), findsNWidgets(2));
       },
     );
+
+    testWidgets('tapping "+N more" jumps to Transcriptions filtered to just that speaker', (tester) async {
+      await openSpeakers(tester); // Alexei Sorokin already has 3 uses in the seed
+
+      await tester.tap(find.text('+1 more →').first);
+      await settle(tester);
+
+      expect(find.text('Add speaker'), findsNothing); // left the Speakers page
+      expect(find.text('Filter · 1'), findsOneWidget);
+    });
 
     testWidgets('a speaker without a description or usage says so', (
       tester,
