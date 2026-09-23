@@ -104,7 +104,9 @@ class _DetailsPanel extends StatelessWidget {
       _DetailChip(icon: Icons.schedule_rounded, value: formatTimestamp(item.duration ?? Duration.zero), label: 'Duration'),
       _DetailChip(
         icon: Icons.record_voice_over_rounded,
-        value: item.speakerCount > 0 ? '${item.speakerCount}' : '—',
+        // The same count the "Speakers:" header row shows (distinct speakers actually present), not the
+        // number of diarizer voices — a manual reassignment can merge or split it just as it does the header.
+        value: item.speakerCount > 0 ? '${detail.presentSpeakers.length}' : '—',
         label: 'Speakers',
       ),
       _DetailChip(icon: Icons.translate_rounded, value: detail.language ?? '—', label: 'Language'),

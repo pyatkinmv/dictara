@@ -90,6 +90,31 @@ void main() {
       expect(find.text('—'), findsOneWidget);
     });
 
+    testWidgets('the count follows a reassignment made on the Transcript tab', (tester) async {
+      const picker = ValueKey('speaker-picker');
+      Finder inPicker(Finder f) => find.descendant(of: find.byKey(picker), matching: f);
+
+      useDesktopSize(tester);
+      await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: FakeTranscriptionRepository(), initialLocation: '/transcriptions/0'));
+      await settle(tester);
+      await tester.tap(find.text('Overview'));
+      await settle(tester);
+      expect(find.text('3'), findsOneWidget); // Alexei, Maria, James
+
+      await tester.tap(find.text('Transcript'));
+      await settle(tester);
+      await tester.tap(find.text('ALEXEI SOROKIN').first);
+      await settle(tester);
+      await tester.tap(inPicker(find.textContaining('All segments by')));
+      await settle(tester);
+      await tester.tap(inPicker(find.text('James Wright')));
+      await settle(tester); // voice 1 (Alexei) is entirely James's now: down to 2 distinct speakers
+
+      await tester.tap(find.text('Overview'));
+      await settle(tester);
+      expect(find.text('2'), findsOneWidget);
+    });
+
     testWidgets('hovering the file chip shows the full name, which stays selectable', (tester) async {
       await openOverview(tester);
       expect(find.text(_filename), findsOneWidget); // the chip itself

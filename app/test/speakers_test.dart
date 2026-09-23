@@ -75,6 +75,30 @@ void main() {
     });
   });
 
+  group('TranscriptionDetail.presentSpeakers', () {
+    const mia = Speaker('Mia', Color(0xFF333333));
+
+    test('one entry per confirmed voice, in first-appearance order, no repeats', () {
+      final detail = _detail([1, 2, 1]);
+      expect(detail.presentSpeakers, [_ann, _bob]);
+    });
+
+    test('an unmapped slot still contributes its "Speaker N" placeholder', () {
+      final detail = _detail([1, 3]); // slot 3 has no confirmed speaker in {1: _ann, 2: _bob}
+      expect(detail.presentSpeakers.map((s) => s.name), ['Ann', 'Speaker 3']);
+    });
+
+    test('a single-phrase override adds a chip without dropping the voice\'s own, while it still has other phrases', () {
+      final detail = _detail([1, 2, 1], segmentSpeakers: const {0: mia}); // slot 1 has phrases 0 and 2; only 0 is overridden
+      expect(detail.presentSpeakers, [mia, _bob, _ann]); // 0: Mia, 1: Bob, 2: Ann (slot 1's own, still unmarked)
+    });
+
+    test('once every phrase of a voice shares one override, the voice\'s own name is gone from the list', () {
+      final detail = _detail([1, 2, 1], segmentSpeakers: const {0: mia, 2: mia}); // both of slot 1's phrases
+      expect(detail.presentSpeakers, [mia, _bob]); // "Ann" (slot 1's own name) no longer appears anywhere
+    });
+  });
+
   group('FakeTranscriptionRepository speakers', () {
     test('the library starts with the three speakers of the design', () async {
       final repo = FakeTranscriptionRepository();
@@ -238,8 +262,9 @@ void main() {
       expect(find.byKey(_picker), findsNothing);
       expect(find.text('ALEXEI SOROKIN'), findsNWidgets(2)); // the other two blocks stay
       expect(find.textContaining('Good morning everyone'), findsOneWidget);
-      // Header row follows the slot mapping, not manual assignments (as in the design).
+      // Alexei still has two other phrases, so his chip stays; James, already a voice of his own, gains none.
       expect(find.text('Alexei Sorokin'), findsOneWidget);
+      expect(find.text('James Wright'), findsOneWidget);
     });
 
     testWidgets('"All segments by" reassigns everything attributed to that speaker', (tester) async {
@@ -268,7 +293,27 @@ void main() {
 
       expect(find.text('ALEXEI SOROKIN'), findsNothing); // no block
       expect(find.text('Alexei Sorokin'), findsNothing); // and no chip: the voice is James now
-      expect(find.text('James Wright'), findsNWidgets(2)); // the chips of voice 1 and voice 3
+      // One chip, not two: voice 1 and voice 3 are the same person now, so they no longer get a chip each.
+      expect(find.text('James Wright'), findsOneWidget);
+    });
+
+    testWidgets('a manual assignment to a brand-new speaker adds a chip; the voice keeps its own via its other phrases',
+        (tester) async {
+      await openDetail(tester);
+      expect(find.text('Alexei Sorokin'), findsOneWidget);
+      expect(find.text('Maria Chen'), findsOneWidget);
+      expect(find.text('James Wright'), findsOneWidget);
+
+      await openPicker(tester, 'MARIA CHEN'); // block of segment 1, Maria's first of four
+      await tester.enterText(find.byType(TextField), 'Dana Whitfield');
+      await settle(tester);
+      await tester.tap(find.text('Create "Dana Whitfield"'));
+      await settle(tester);
+
+      expect(find.text('Alexei Sorokin'), findsOneWidget);
+      expect(find.text('Maria Chen'), findsOneWidget); // segments 4, 6 and 9 are still hers
+      expect(find.text('James Wright'), findsOneWidget);
+      expect(find.text('Dana Whitfield'), findsWidgets); // the new chip, and the reassigned block's header
     });
 
     testWidgets('every phrase of a block has its own button, so a merged block can be split again', (tester) async {

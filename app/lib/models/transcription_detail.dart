@@ -92,6 +92,20 @@ class TranscriptionDetail {
           if (speakerOfSegment(i)?.name == name) i,
       };
 
+  /// Every speaker actually heard in the transcript right now — one entry per distinct name, in the order
+  /// each first appears — used by the "Speakers:" header row and the Overview speaker count, so both track
+  /// exactly what the transcript body shows: a manual reassignment (one phrase or a whole voice) adds, merges
+  /// or removes a name immediately, with no separate "confirm" step to keep it in sync.
+  List<Speaker> get presentSpeakers {
+    final seen = <String>{};
+    final result = <Speaker>[];
+    for (var i = 0; i < segments.length; i++) {
+      final speaker = speakerOfSegment(i);
+      if (speaker != null && seen.add(speaker.name)) result.add(speaker);
+    }
+    return result;
+  }
+
   /// Groups consecutive segments by effective speaker (compared by name, as
   /// in the design: two slots mapped to the same person merge into one block).
   List<SpeakerRun> get runs {

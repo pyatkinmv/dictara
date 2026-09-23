@@ -187,6 +187,7 @@ class TranscriptionDetailController extends ChangeNotifier {
     _speakers = speakers;
     if (detail != null) _current = detail;
     notifyListeners();
+    _onChanged?.call();
   }
 
   @override

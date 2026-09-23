@@ -7,25 +7,21 @@ import '../../theme/app_palette.dart';
 import '../../widgets/dashed_border.dart';
 import 'ghost_actions.dart';
 
-/// "Speakers: ● Alexei ● Maria ● James" — one chip per diarizer slot, showing
-/// who the slot is mapped to (`.d-spk-row`). A slot with a pending AI
-/// suggestion shows `✨ Speaker 2 → ● Maria Chen ✓ ✗` instead.
-///
-/// As in the design it follows the slot mapping only, not the assignments made
-/// per segment in the Speaker Picker.
+/// "Speakers: ● Alexei ● Maria ● James" — one chip per speaker actually heard
+/// in the transcript right now (`.d-spk-row`), so a reassignment in the
+/// Speaker Picker — one phrase or a whole voice — adds, merges or removes a
+/// chip immediately, same as it changes the transcript body below. A voice
+/// with a pending AI suggestion shows `✨ Speaker 2 → ● Maria Chen ✓ ✗` instead
+/// of its current name, until the suggestion is accepted or rejected.
 class DetailSpeakersRow extends StatelessWidget {
   const DetailSpeakersRow({super.key});
-
-  /// Slot fallback of this row; the transcript uses a lighter grey (`#aaa`).
-  static const _unassignedColor = Color(0xFF888888);
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final controller = context.watch<TranscriptionDetailController>();
     final detail = controller.current;
-    final count = detail?.item.speakerCount ?? 0;
-    if (detail == null || count == 0) return const SizedBox.shrink();
+    if (detail == null || detail.item.speakerCount == 0) return const SizedBox.shrink();
     final pending = detail.suggestions?.speakers ?? const <int, Speaker>{};
 
     return Wrap(
@@ -34,18 +30,20 @@ class DetailSpeakersRow extends StatelessWidget {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         Text('Speakers:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: p.text3)),
-        for (var slot = 1; slot <= count; slot++)
-          if (pending[slot] case final suggested?)
-            _GhostSpeakerChip(
-              slot: slot,
-              suggested: suggested,
-              acceptBusy: controller.isBusy(SuggestionAction.acceptSpeaker(slot)),
-              rejectBusy: controller.isBusy(SuggestionAction.rejectSpeaker(slot)),
-              onAccept: () => controller.acceptSpeakerSuggestion(slot),
-              onReject: () => controller.rejectSpeakerSuggestion(slot),
-            )
-          else
-            _SpeakerChip(speaker: detail.speakers[slot] ?? Speaker('Speaker $slot', _unassignedColor)),
+        for (final slot in pending.keys.toList()..sort())
+          _GhostSpeakerChip(
+            slot: slot,
+            suggested: pending[slot]!,
+            acceptBusy: controller.isBusy(SuggestionAction.acceptSpeaker(slot)),
+            rejectBusy: controller.isBusy(SuggestionAction.rejectSpeaker(slot)),
+            onAccept: () => controller.acceptSpeakerSuggestion(slot),
+            onReject: () => controller.rejectSpeakerSuggestion(slot),
+          ),
+        // A segment of a slot with a pending suggestion still shows its "Speaker N" placeholder (the ghost chip
+        // above already covers that slot), so that placeholder name is skipped here — but a real name a segment
+        // of that same slot was separately given by hand still shows normally.
+        for (final speaker in detail.presentSpeakers)
+          if (!pending.keys.any((slot) => speaker.name == Speaker.unassigned(slot).name)) _SpeakerChip(speaker: speaker),
       ],
     );
   }
