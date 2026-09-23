@@ -304,10 +304,107 @@ class _FilterDropdown extends StatelessWidget {
                     ],
                   ),
                 ),
+              const PopoverSeparator(),
+              const PopoverSection('Speakers'),
+              const _SpeakerFilterSection(),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Search box + checklist of the speaker library, for the Speakers section of the Filter dropdown (a
+/// library can grow past what a plain list stays comfortable with, unlike Status or Tags). The search
+/// resets whenever the dropdown is reopened, same as the Speaker Picker's.
+class _SpeakerFilterSection extends StatefulWidget {
+  const _SpeakerFilterSection();
+
+  @override
+  State<_SpeakerFilterSection> createState() => _SpeakerFilterSectionState();
+}
+
+class _SpeakerFilterSectionState extends State<_SpeakerFilterSection> {
+  final _search = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final c = context.watch<TranscriptionListController>();
+    final matches = [
+      for (final s in c.speakers)
+        if (_query.isEmpty || s.name.toLowerCase().contains(_query)) s,
+    ];
+
+    OutlineInputBorder border(Color color) =>
+        OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: color));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 2, 8, 4),
+          child: TextField(
+            key: const Key('speaker-filter-search'),
+            controller: _search,
+            onChanged: (value) => setState(() => _query = value.trim().toLowerCase()),
+            cursorColor: p.accent,
+            style: TextStyle(fontSize: 12, color: p.text),
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: 'Search speakers…',
+              hintStyle: TextStyle(fontSize: 12, color: p.text3),
+              prefixIcon: Icon(Icons.search_rounded, size: 14, color: p.text3),
+              prefixIconConstraints: const BoxConstraints(minWidth: 26, minHeight: 14),
+              contentPadding: const EdgeInsets.symmetric(vertical: 6),
+              border: border(p.border),
+              enabledBorder: border(p.border),
+              focusedBorder: border(p.accent),
+            ),
+          ),
+        ),
+        if (matches.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            child: Text('No match', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: p.text3)),
+          )
+        else
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 180),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final speaker in matches)
+                    PopoverRow(
+                      onTap: () => c.toggleSpeaker(speaker.name),
+                      child: Row(
+                        children: [
+                          CheckMark(checked: c.query.speakers.contains(speaker.name)),
+                          const SizedBox(width: 8),
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(color: speaker.color, shape: BoxShape.circle),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(child: Text(speaker.name, overflow: TextOverflow.ellipsis)),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

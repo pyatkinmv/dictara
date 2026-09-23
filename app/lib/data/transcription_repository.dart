@@ -21,6 +21,7 @@ class TranscriptionQuery {
     this.search = '',
     this.statuses = const {},
     this.tags = const {},
+    this.speakers = const {},
     this.sort = TranscriptionSort.newest,
   });
 
@@ -31,20 +32,25 @@ class TranscriptionQuery {
 
   /// Any of (by label); empty = all.
   final Set<String> tags;
+
+  /// Any of (by name, from the speaker library); empty = all.
+  final Set<String> speakers;
   final TranscriptionSort sort;
 
-  int get activeFilterCount => statuses.length + tags.length;
+  int get activeFilterCount => statuses.length + tags.length + speakers.length;
 
   TranscriptionQuery copyWith({
     String? search,
     Set<TranscriptionStatus>? statuses,
     Set<String>? tags,
+    Set<String>? speakers,
     TranscriptionSort? sort,
   }) {
     return TranscriptionQuery(
       search: search ?? this.search,
       statuses: statuses ?? this.statuses,
       tags: tags ?? this.tags,
+      speakers: speakers ?? this.speakers,
       sort: sort ?? this.sort,
     );
   }

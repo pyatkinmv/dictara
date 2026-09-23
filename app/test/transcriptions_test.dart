@@ -64,6 +64,28 @@ void main() {
       final q = const TranscriptionQuery(tags: {'meeting'}, search: 'review');
       expect(await titles(q), ['Quarterly Review Meeting']);
     });
+
+    test('speaker filter matches any selected speaker, but never a still-queued item', () async {
+      final q = const TranscriptionQuery(speakers: {'Alexei Sorokin'});
+      // The 4 done items with a confirmed voice map; 'product_sync_2025_06_23.mp4' (done, but no speaker
+      // confirmed yet) and the pending/processing items are never among them.
+      expect(await titles(q), ['Daily Standup 19 Jun', 'Product Ideas — Voice Memo', 'Interview: Anna K.', 'Quarterly Review Meeting']);
+    });
+
+    test('a speaker nobody has been assigned to yet matches nothing', () async {
+      expect(await titles(const TranscriptionQuery(speakers: {'Dana Whitfield'})), isEmpty);
+    });
+
+    test('a live reassignment changes what the filter matches, the same as the detail page', () async {
+      final fresh = FakeTranscriptionRepository();
+      Future<List<String>> titlesOf(TranscriptionQuery q) async => [for (final t in (await fresh.list(q)).items) t.title];
+      // Settles voice 2 (Maria's, segments 1/4/6/9 of item '0') to a new name for that transcription only.
+      await fresh.assignSpeaker('0', {1, 4, 6, 9}, 'Dana Whitfield', allBySpeaker: true);
+
+      expect(await titlesOf(const TranscriptionQuery(speakers: {'Dana Whitfield'})), ['Quarterly Review Meeting']);
+      expect(await titlesOf(const TranscriptionQuery(speakers: {'Maria Chen'})),
+          ['Daily Standup 19 Jun', 'Product Ideas — Voice Memo', 'Interview: Anna K.']); // '0' no longer among them
+    });
   });
 
   group('Transcriptions page', () {
@@ -121,6 +143,39 @@ void main() {
       await tester.tap(find.widgetWithText(InkWell, 'interview'));
       await settle(tester);
       expect(visibleTitles(tester), ['Interview: Anna K.']);
+    });
+
+    testWidgets('speaker filter lists the speaker library and narrows the list', (tester) async {
+      await open(tester);
+      await tester.tap(find.text('Filter'));
+      await settle(tester);
+
+      for (final name in ['Alexei Sorokin', 'Maria Chen', 'James Wright']) {
+        expect(find.text(name), findsWidgets);
+      }
+      await tester.tap(find.widgetWithText(InkWell, 'James Wright'));
+      await settle(tester);
+
+      expect(visibleTitles(tester), ['Daily Standup 19 Jun', 'Product Ideas — Voice Memo', 'Interview: Anna K.', 'Quarterly Review Meeting']);
+      expect(find.text('Filter · 1'), findsOneWidget);
+    });
+
+    testWidgets('typing in the speaker search narrows the checklist, not the page list', (tester) async {
+      await open(tester);
+      await tester.tap(find.text('Filter'));
+      await settle(tester);
+
+      await tester.enterText(find.byKey(const Key('speaker-filter-search')), 'mar');
+      await settle(tester);
+
+      expect(find.text('Maria Chen'), findsOneWidget);
+      expect(find.text('Alexei Sorokin'), findsNothing);
+      expect(find.text('James Wright'), findsNothing);
+      expect(visibleTitles(tester), _newestFirst); // the search box only narrows the checklist
+
+      await tester.enterText(find.byKey(const Key('speaker-filter-search')), 'zzz');
+      await settle(tester);
+      expect(find.text('No match'), findsOneWidget);
     });
 
     testWidgets('sort changes the order and the button label', (tester) async {

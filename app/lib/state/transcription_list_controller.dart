@@ -4,6 +4,7 @@ import 'dart:math' show max, min;
 import 'package:flutter/foundation.dart';
 
 import '../data/transcription_repository.dart';
+import '../models/speaker.dart';
 import '../models/tag.dart';
 import '../models/transcription.dart';
 import '../models/upload.dart';
@@ -35,6 +36,7 @@ class TranscriptionListController extends ChangeNotifier {
   }) : _auth = auth {
     _auth?.addListener(_onAuthChanged);
     _loadTags();
+    _loadSpeakers();
     _load();
   }
 
@@ -53,6 +55,7 @@ class TranscriptionListController extends ChangeNotifier {
   TranscriptionQuery _query = const TranscriptionQuery();
   List<Transcription> _items = const [];
   List<Tag> _tags = const [];
+  List<Speaker> _speakers = const [];
   bool _loading = true;
   bool _hasMore = false;
   bool _loadingMore = false;
@@ -65,6 +68,9 @@ class TranscriptionListController extends ChangeNotifier {
 
   /// The tag library, for the filter dropdown.
   List<Tag> get tags => _tags;
+
+  /// The speaker library, for the filter dropdown.
+  List<Speaker> get speakers => _speakers;
 
   /// True until the first result arrives.
   bool get loading => _loading;
@@ -82,10 +88,16 @@ class TranscriptionListController extends ChangeNotifier {
   /// something changed a transcription or created a tag.
   Future<void> reload() async {
     await _loadTags();
-    // A tag that was deleted or renamed must not keep filtering the list.
-    final known = {for (final t in _tags) t.label};
-    if (_query.tags.any((label) => !known.contains(label))) {
-      _query = _query.copyWith(tags: {for (final label in _query.tags) if (known.contains(label)) label});
+    await _loadSpeakers();
+    // A tag or speaker that was deleted or renamed must not keep filtering the list.
+    final knownTags = {for (final t in _tags) t.label};
+    final knownSpeakers = {for (final s in _speakers) s.name};
+    if (_query.tags.any((label) => !knownTags.contains(label)) ||
+        _query.speakers.any((name) => !knownSpeakers.contains(name))) {
+      _query = _query.copyWith(
+        tags: {for (final label in _query.tags) if (knownTags.contains(label)) label},
+        speakers: {for (final name in _query.speakers) if (knownSpeakers.contains(name)) name},
+      );
     }
     await _load();
   }
@@ -98,7 +110,7 @@ class TranscriptionListController extends ChangeNotifier {
     UploadCancellation? cancellation,
   }) async {
     final outcome = await _repository.upload(request, onProgress: onProgress, cancellation: cancellation);
-    _query = _query.copyWith(search: '', statuses: {}, tags: {});
+    _query = _query.copyWith(search: '', statuses: {}, tags: {}, speakers: {});
     notifyListeners();
     await _load(reset: true);
     return outcome;
@@ -108,6 +120,13 @@ class TranscriptionListController extends ChangeNotifier {
     final tags = await _repository.tags();
     if (_disposed) return;
     _tags = tags;
+    notifyListeners();
+  }
+
+  Future<void> _loadSpeakers() async {
+    final speakers = await _repository.speakers();
+    if (_disposed) return;
+    _speakers = speakers;
     notifyListeners();
   }
 
@@ -131,6 +150,10 @@ class TranscriptionListController extends ChangeNotifier {
 
   void toggleTag(String label) {
     _apply(_query.copyWith(tags: _toggled(_query.tags, label)));
+  }
+
+  void toggleSpeaker(String name) {
+    _apply(_query.copyWith(speakers: _toggled(_query.speakers, name)));
   }
 
   static Set<T> _toggled<T>(Set<T> set, T value) {

@@ -35,10 +35,14 @@ object ListStatuses {
  *   when it has none), ignoring case; null or blank means no search
  * @property statuses any of these (client-side names, see [ListStatuses]); empty means all
  * @property tags any of these tag names; empty means all
+ * @property speakers any of these library speaker names actually speak in the transcript — a phrase's own
+ *   mark, else its voice's confirmed speaker (never an unconfirmed "Speaker N" voice, which matches no name);
+ *   empty means all
  */
 data class TranscriptionListFilter(
     val search: String? = null,
     val statuses: Set<String> = emptySet(),
     val tags: Set<String> = emptySet(),
+    val speakers: Set<String> = emptySet(),
     val sort: ListSort = ListSort.NEWEST,
 )

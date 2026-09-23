@@ -10,10 +10,10 @@ import java.util.UUID
 /**
  * Finds which submissions belong on a page of the transcription list, in the right order.
  *
- * One query serves every case (no filter at all, any mix of search, status and tag filters, any sort): it
- * has to reach into other tables (the title, the audio length, the tags), which the repository methods
- * Spring derives from names cannot do. Only the ids come back; the entries themselves are assembled from
- * them afterwards in a few batched lookups.
+ * One query serves every case (no filter at all, any mix of search, status, tag and speaker filters, any
+ * sort): it has to reach into other tables (the title, the audio length, the tags, who speaks), which the
+ * repository methods Spring derives from names cannot do. Only the ids come back; the entries themselves are
+ * assembled from them afterwards in a few batched lookups.
  *
  * The SQL text is put together from fixed fragments. Everything that comes from the caller (the user id,
  * the search text, statuses and tag names, page and size) is a bound parameter, and the sort column is
@@ -58,6 +58,16 @@ class SubmissionListQuery(private val jdbc: NamedParameterJdbcTemplate) {
             where += """EXISTS (SELECT 1 FROM transcript_tags tt JOIN tags g ON g.id = tt.tag_id
                         WHERE tt.transcript_id = t.id AND g.user_id = :user AND g.name IN (:tags))"""
             params["tags"] = filter.tags.toList()
+        }
+        if (filter.speakers.isNotEmpty()) {
+            // Same precedence as the header/Overview/list-count resolution: a phrase's own mark, else its
+            // voice's confirmed speaker. An unconfirmed voice (no mark, no transcript_voices row) resolves to
+            // no speaker_id at all, so the inner join drops it — it cannot match a name in the filter.
+            where += """EXISTS (SELECT 1 FROM transcript_segments seg
+                        LEFT JOIN transcript_voices tv ON tv.transcript_id = seg.transcript_id AND tv.voice = seg.voice
+                        JOIN speakers sp ON sp.id = COALESCE(seg.speaker_id, tv.speaker_id)
+                        WHERE seg.transcript_id = t.id AND sp.user_id = :user AND sp.name IN (:speakers))"""
+            params["speakers"] = filter.speakers.toList()
         }
 
         val sql = StringBuilder(

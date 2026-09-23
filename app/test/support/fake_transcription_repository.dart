@@ -338,10 +338,30 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   /// The mock hands out numeric ids (creation order), which the server would not.
   int _order(Transcription item) => int.parse(item.id);
 
+  /// Who actually speaks in transcription [id] right now, the same resolution `presentSpeakers` uses on the
+  /// detail page (a phrase's own mark, else its voice's confirmed speaker, else its "Speaker N" placeholder,
+  /// which can never match a filter since it is not a library name). Empty before there is a transcript to
+  /// read at all — same as `get()`, and as the real gateway's `LEFT JOIN transcripts`.
+  Set<String> _effectiveSpeakerNamesOf(String id) {
+    final item = _items.firstWhere((i) => i.id == id);
+    if (item.status != TranscriptionStatus.done) return const {};
+    return TranscriptionDetail(
+      item: item,
+      segments: _transcript,
+      speakers: _slotsOf(id),
+      segmentSpeakers: _segmentSpeakers[id] ?? const {},
+      originalFilename: '',
+      fileSizeBytes: 0,
+    ).presentSpeakers.map((s) => s.name).toSet();
+  }
+
   @override
   Future<TranscriptionPage> list(TranscriptionQuery query, {int page = 0, int size = transcriptionPageSize}) async {
     _advanceJobs();
-    final items = filterTranscriptions(_items, query);
+    var items = filterTranscriptions(_items, query);
+    if (query.speakers.isNotEmpty) {
+      items = [for (final i in items) if (_effectiveSpeakerNamesOf(i.id).any(query.speakers.contains)) i];
+    }
 
     switch (query.sort) {
       case TranscriptionSort.newest:

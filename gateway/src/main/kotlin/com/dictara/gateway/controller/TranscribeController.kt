@@ -264,6 +264,8 @@ class TranscribeController(
      *    the parameter for several;
      *  - `tag`: any of these tag names; repeat the parameter for several (names may contain commas, so a
      *    comma is not a separator);
+     *  - `speaker`: any of these library speaker names actually speak in the transcript; repeat the parameter
+     *    for several;
      *  - `sort`: `newest` (default), `oldest`, `longest` or `name`.
      * An unknown status or sort is a 400 rather than being ignored, so a typo does not quietly return the
      * wrong list.
@@ -296,6 +298,7 @@ class TranscribeController(
             search = q,
             statuses = statuses,
             tags = servletRequest.getParameterValues("tag").orEmpty().filter { it.isNotEmpty() }.toSet(),
+            speakers = servletRequest.getParameterValues("speaker").orEmpty().filter { it.isNotEmpty() }.toSet(),
             sort = if (sort == null) ListSort.NEWEST else ListSort.parse(sort) ?: throw ResponseStatusException(
                 HttpStatus.BAD_REQUEST, "Unknown sort '$sort'; expected one of ${ListSort.entries.map { it.param }}",
             ),

@@ -47,8 +47,9 @@ class TranscriptionListFilterIntegrationTest : AbstractSharedContextIntegrationT
         status: String = "done",
         durationS: Double? = null,
         tags: List<String> = emptyList(),
+        speakers: List<String> = emptyList(),
         owner: UUID = userId,
-        withTranscript: Boolean = title != null || tags.isNotEmpty(),
+        withTranscript: Boolean = title != null || tags.isNotEmpty() || speakers.isNotEmpty(),
     ): UUID {
         val audioId = UUID.randomUUID()
         val id = UUID.randomUUID()
@@ -70,6 +71,18 @@ class TranscriptionListFilterIntegrationTest : AbstractSharedContextIntegrationT
                     jdbcTemplate.update("INSERT INTO tags(id, user_id, name) VALUES (?, ?, ?)", it, owner, tag)
                 }
                 jdbcTemplate.update("INSERT INTO transcript_tags(transcript_id, tag_id) VALUES (?, ?)", transcriptId, tagId)
+            }
+            // One phrase per named speaker, marked as theirs directly (the simplest way to make a voice
+            // resolve to a real speaker for the filter's purposes — see SubmissionListQuery).
+            speakers.forEachIndexed { idx, name ->
+                val speakerId = jdbcTemplate.query("SELECT id FROM speakers WHERE user_id = ? AND name = ?", { rs, _ -> rs.getObject(1, UUID::class.java) }, owner, name)
+                    .firstOrNull() ?: UUID.randomUUID().also {
+                    jdbcTemplate.update("INSERT INTO speakers(id, user_id, name) VALUES (?, ?, ?)", it, owner, name)
+                }
+                jdbcTemplate.update(
+                    "INSERT INTO transcript_segments(transcript_id, idx, start_s, end_s, text, voice, speaker_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    transcriptId, idx, idx.toDouble(), idx + 1.0, "line $idx", "SPEAKER_%02d".format(idx), speakerId,
+                )
             }
         }
         return id
@@ -274,6 +287,78 @@ class TranscriptionListFilterIntegrationTest : AbstractSharedContextIntegrationT
         add("b.mp3", title = "Two")
 
         assertThat(shown("tag" to "")).hasSize(2)
+    }
+
+    // ── Speakers ───────────────────────────────────────────────────────────────
+
+    @Test
+    fun `a speaker filter keeps the transcriptions they speak in`() {
+        add("a.mp3", title = "Standup", speakers = listOf("Alexei Sorokin", "Maria Chen"))
+        add("b.mp3", title = "Interview", speakers = listOf("James Wright"))
+        add("c.mp3", title = "No one confirmed", speakers = emptyList(), withTranscript = true)
+        add("d.mp3", title = "No transcript yet", status = "pending")
+
+        assertThat(shown("speaker" to "Alexei Sorokin")).containsExactly("Standup")
+        assertThat(shown("speaker" to "James Wright")).containsExactly("Interview")
+    }
+
+    @Test
+    fun `several speakers mean any of them`() {
+        add("a.mp3", title = "Standup", speakers = listOf("Alexei Sorokin", "Maria Chen"))
+        add("b.mp3", title = "Interview", speakers = listOf("James Wright"))
+        add("c.mp3", title = "Ideas", speakers = listOf("Dana Whitfield"))
+
+        assertThat(shown("speaker" to "Maria Chen", "speaker" to "Dana Whitfield")).containsExactly("Ideas", "Standup")
+        assertThat(shown("speaker" to "Alexei Sorokin", "speaker" to "Maria Chen")).containsExactly("Standup") // once, not twice
+    }
+
+    @Test
+    fun `a speaker who says nothing here, or does not exist, gives an empty list`() {
+        add("a.mp3", title = "Standup", speakers = listOf("Alexei Sorokin"))
+
+        assertThat(shown("speaker" to "Dana Whitfield")).isEmpty()
+        assertThat(shown("speaker" to "Alexei Sorokin", "speaker" to "Dana Whitfield")).containsExactly("Standup")
+    }
+
+    @Test
+    fun `an unconfirmed voice never matches, only a real name does`() {
+        // A diarized transcript with no per-phrase mark and no confirmed transcript_voices row: the voice
+        // resolves to nobody, so it can never satisfy a speaker filter, however the placeholder is spelled.
+        val id = add("a.mp3", title = "Unassigned", withTranscript = true)
+        val transcriptId = jdbcTemplate.queryForObject("SELECT id FROM transcripts WHERE submission_id = ?", UUID::class.java, id)
+        jdbcTemplate.update(
+            "INSERT INTO transcript_segments(transcript_id, idx, start_s, end_s, text, voice) VALUES (?, 0, 0, 1, 'hi', 'SPEAKER_00')",
+            transcriptId,
+        )
+
+        assertThat(shown("speaker" to "Speaker 1")).isEmpty()
+    }
+
+    @Test
+    fun `another user's speaker of the same name does not match`() {
+        val other = UUID.randomUUID()
+        jdbcTemplate.update("INSERT INTO users(id) VALUES (?)", other)
+        add("mine.mp3", title = "Mine", speakers = listOf("Alexei Sorokin"))
+        add("theirs.mp3", title = "Theirs", speakers = listOf("Alexei Sorokin"), owner = other)
+
+        assertThat(shown("speaker" to "Alexei Sorokin")).containsExactly("Mine")
+    }
+
+    @Test
+    fun `an empty speaker parameter is no filter`() {
+        add("a.mp3", title = "One", speakers = listOf("Alexei Sorokin"))
+        add("b.mp3", title = "Two")
+
+        assertThat(shown("speaker" to "")).hasSize(2)
+    }
+
+    @Test
+    fun `speaker and tag filters combine`() {
+        add("a.mp3", title = "Match", tags = listOf("meeting"), speakers = listOf("Alexei Sorokin"))
+        add("b.mp3", title = "Wrong tag", tags = listOf("interview"), speakers = listOf("Alexei Sorokin"))
+        add("c.mp3", title = "Wrong speaker", tags = listOf("meeting"), speakers = listOf("James Wright"))
+
+        assertThat(shown("tag" to "meeting", "speaker" to "Alexei Sorokin")).containsExactly("Match")
     }
 
     // ── Sort ───────────────────────────────────────────────────────────────────

@@ -29,11 +29,12 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
     );
   }
 
-  /// `/transcriptions?page=0&size=30&q=…&status=…&tag=…&sort=…`: only what narrows the list or changes its
-  /// order is sent, and lists are sent as repeated parameters (a tag name may contain a comma).
+  /// `/transcriptions?page=0&size=30&q=…&status=…&tag=…&speaker=…&sort=…`: only what narrows the list or
+  /// changes its order is sent, and lists are sent as repeated parameters (a name may contain a comma).
   static String _listPath(TranscriptionQuery query, int page, int size) {
     final search = query.search.trim();
     final tags = query.tags.toList()..sort();
+    final speakers = query.speakers.toList()..sort();
     return Uri(
       path: '/transcriptions',
       queryParameters: {
@@ -44,6 +45,7 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
         if (query.statuses.isNotEmpty)
           'status': [for (final s in TranscriptionStatus.values) if (query.statuses.contains(s)) s.name],
         if (tags.isNotEmpty) 'tag': tags,
+        if (speakers.isNotEmpty) 'speaker': speakers,
         if (query.sort != TranscriptionSort.newest) 'sort': query.sort.name,
       },
     ).toString();

@@ -30,11 +30,20 @@ class SubmissionListQueryTest {
 
     @Test
     fun `each filter adds its condition and parameter`() {
-        val built = build(TranscriptionListFilter(search = "review", statuses = setOf("done"), tags = setOf("meeting")))
+        val built = build(TranscriptionListFilter(
+            search = "review", statuses = setOf("done"), tags = setOf("meeting"), speakers = setOf("Maria"),
+        ))
 
-        assertThat(built.sql).contains("s.status IN (:statuses)").contains("ILIKE :search ESCAPE").contains("g.name IN (:tags)")
-        assertThat(built.params).containsOnlyKeys("user", "statuses", "search", "tags")
+        assertThat(built.sql).contains("s.status IN (:statuses)").contains("ILIKE :search ESCAPE")
+            .contains("g.name IN (:tags)").contains("sp.name IN (:speakers)")
+        assertThat(built.params).containsOnlyKeys("user", "statuses", "search", "tags", "speakers")
         assertThat(built.params["tags"]).isEqualTo(listOf("meeting"))
+        assertThat(built.params["speakers"]).isEqualTo(listOf("Maria"))
+    }
+
+    @Test
+    fun `no speaker filter means no speaker condition`() {
+        assertThat(build().sql).doesNotContain("transcript_segments").doesNotContain("sp.name")
     }
 
     @Test
@@ -56,7 +65,7 @@ class SubmissionListQueryTest {
     @Test
     fun `nothing from the caller is written into the SQL text`() {
         val hostile = "x'; DROP TABLE submissions; --"
-        val built = build(TranscriptionListFilter(search = hostile, tags = setOf(hostile)), page = 2, size = 30)
+        val built = build(TranscriptionListFilter(search = hostile, tags = setOf(hostile), speakers = setOf(hostile)), page = 2, size = 30)
 
         assertThat(built.sql).doesNotContain("DROP").doesNotContain(hostile).doesNotContain("x'")
         assertThat(built.params["search"] as String).contains("DROP TABLE") // it travels as a value
