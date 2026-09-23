@@ -188,19 +188,24 @@ void main() {
       expect(find.text('Filter · 1'), findsOneWidget);
     });
 
-    testWidgets("'Clear all' only shows up once something is active, and resets search too", (tester) async {
+    testWidgets("'Clear all' stays put (disabled) until something is active, and resets search too", (tester) async {
+      InkWell clearAllInkWell() =>
+          tester.widget<InkWell>(find.ancestor(of: find.text('Clear all'), matching: find.byType(InkWell)));
+
       await open(tester);
       await tester.tap(find.text('Filter'));
       await settle(tester);
-      expect(find.text('Clear all'), findsNothing); // nothing active yet
+      // Always present (no layout jump when it later turns active), but not tappable yet.
+      expect(find.text('Clear all'), findsOneWidget);
+      expect(clearAllInkWell().onTap, isNull);
 
       await tester.tap(find.widgetWithText(InkWell, 'Pending'));
       await settle(tester);
-      expect(find.text('Clear all'), findsOneWidget); // a status filter counts too
+      expect(clearAllInkWell().onTap, isNotNull); // a status filter counts too
 
       await tester.tap(find.text('Clear all'));
       await settle(tester);
-      expect(find.text('Clear all'), findsNothing); // nothing left to clear
+      expect(clearAllInkWell().onTap, isNull); // nothing left to clear
       expect(find.text('Filter'), findsOneWidget); // back to the unfiltered label, no "· N"
       expect(visibleTitles(tester), _newestFirst);
 
@@ -209,7 +214,7 @@ void main() {
       // open there are three TextFields (search plus the tag/speaker search boxes).
       await tester.enterText(find.byKey(const Key('main-search')), 'standup');
       await settle(tester);
-      expect(find.text('Clear all'), findsOneWidget);
+      expect(clearAllInkWell().onTap, isNotNull);
 
       await tester.tap(find.text('Clear all'));
       await settle(tester);

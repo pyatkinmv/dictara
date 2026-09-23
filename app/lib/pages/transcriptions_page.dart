@@ -279,29 +279,35 @@ class _FilterDropdown extends StatelessWidget {
       panelBuilder: (context, close) => Consumer<TranscriptionListController>(
         builder: (context, c, _) {
           final p = context.palette;
+          // Always in the layout, at the same size, so setting a filter never shifts the panel —
+          // only the link's color and tappability change with whether there's anything to clear.
+          final activeClear = count > 0 || c.query.search.isNotEmpty;
           return PopoverPanel(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (count > 0 || c.query.search.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 2, 8, 4),
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: InkWell(
-                        onTap: c.clearAll,
-                        borderRadius: BorderRadius.circular(6),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                          child: Text(
-                            'Clear all',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: p.accent),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 2, 8, 4),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: InkWell(
+                      onTap: activeClear ? c.clearAll : null,
+                      borderRadius: BorderRadius.circular(6),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        child: Text(
+                          'Clear all',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: activeClear ? p.accent : p.text3,
                           ),
                         ),
                       ),
                     ),
                   ),
+                ),
                 const PopoverSection('Status'),
                 for (final status in TranscriptionStatus.values)
                   PopoverRow(
