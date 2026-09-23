@@ -229,7 +229,10 @@ class TranscriptionListController extends ChangeNotifier {
     _poll?.cancel();
     _poll = null;
     final interval = pollInterval;
-    if (interval == null || !_items.any((i) => i.status != TranscriptionStatus.done)) return;
+    // "failed" is a final status too, same as "done" — polling it forever would never change anything.
+    if (interval == null || !_items.any((i) => i.status == TranscriptionStatus.pending || i.status == TranscriptionStatus.processing)) {
+      return;
+    }
     _poll = Timer(interval, _pollOnce);
   }
 
