@@ -107,10 +107,46 @@ class PersistenceIntegrationTest : AbstractSharedContextIntegrationTest() {
 
         val audioMeta = audioMetaRepo.findById(submission.audioId).orElse(null)
         assertThat(audioMeta?.durationS).isEqualTo(5.0)
+        assertThat(audioMeta?.metadata).isNull() // the transcriber's answer had no "audio_metadata" key
 
         val attempts = stageAttemptRepo.findBySubmissionIdAndStageOrderByAttemptNumDesc(jobId, "transcription")
         assertThat(attempts).hasSize(1)
         assertThat(attempts[0].status).isEqualTo("done")
+    }
+
+    @Test
+    fun `the transcriber's audio_metadata is persisted to audio_meta metadata`() {
+        wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
+            .willReturn(okJson("""{"job_id":"persist-meta-1"}""")))
+        wireMock.stubFor(get(urlEqualTo("/jobs/persist-meta-1"))
+            .willReturn(okJson("""
+                {"status":"done","duration_s":1.5,
+                 "result":{"formatted_text":"Hello world.","audio_duration_s":5.0,"language":"en",
+                           "segments":[{"start":0.0,"end":2.0,"text":"Hello world."}],
+                           "audio_metadata":{"format_name":"mov,mp4,m4a","bit_rate":128000,"codec":"aac",
+                                             "sample_rate":44100,"channels":2,
+                                             "tags":{"creation_time":"2026-06-22T14:41:00.000000Z"}}}}
+            """)))
+        val fakeAudio = object : ByteArrayResource(ByteArray(8)) {
+            override fun getFilename() = "test-audio.m4a"
+        }
+        val body = LinkedMultiValueMap<String, Any>().apply { add("file", fakeAudio) }
+        val headers = HttpHeaders().apply { contentType = MediaType.MULTIPART_FORM_DATA }
+        val jobId = UUID.fromString(
+            rest.postForEntity(
+                "/transcribe?model=fast&diarize=false&summary_mode=off",
+                HttpEntity(body, headers), Map::class.java,
+            ).body!!["job_id"] as String
+        )
+        waitForStatus(jobId, "done")
+
+        val submission = submissionRepo.findById(jobId).orElseThrow()
+        val audioMeta = audioMetaRepo.findById(submission.audioId).orElseThrow()
+
+        assertThat(audioMeta.metadata!!["format_name"].asText()).isEqualTo("mov,mp4,m4a")
+        assertThat(audioMeta.metadata!!["bit_rate"].asInt()).isEqualTo(128000)
+        assertThat(audioMeta.metadata!!["codec"].asText()).isEqualTo("aac")
+        assertThat(audioMeta.metadata!!["tags"]["creation_time"].asText()).isEqualTo("2026-06-22T14:41:00.000000Z")
     }
 
     @Test

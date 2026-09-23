@@ -1,6 +1,7 @@
 package com.dictara.gateway.repository
 
 import com.dictara.gateway.entity.AudioMetaEntity
+import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.data.jdbc.repository.query.Modifying
 import org.springframework.data.jdbc.repository.query.Query
 import org.springframework.data.repository.CrudRepository
@@ -28,5 +29,9 @@ interface AudioMetaRepository : CrudRepository<AudioMetaEntity, UUID> {
     @Modifying
     @Query("UPDATE audio_meta SET duration_s = :durationS WHERE id = :id")
     fun updateDurationS(id: UUID, durationS: Double?)
+
+    @Modifying
+    @Query("UPDATE audio_meta SET metadata = :metadata WHERE id = :id")
+    fun updateMetadata(id: UUID, metadata: JsonNode?)
 
 }

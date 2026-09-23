@@ -194,6 +194,13 @@ class LocalProfileIntegrationTest {
         assertThat(uris).anyMatch { it.startsWith("db://audio/") && it.endsWith("/weekly_call.mp3") }
         val owner = jdbc.queryForObject("SELECT user_id::text FROM submissions WHERE id = ?::uuid", String::class.java, jobId)
         assertThat(owner).isEqualTo("00000000-0000-4000-8000-000000000001")
+
+        // The stub transcriber's fake audio_metadata (standing in for a real ffprobe answer) reached the DB.
+        val metadataJson = jdbc.queryForObject(
+            "SELECT am.metadata::text FROM audio_meta am JOIN submissions s ON s.audio_id = am.id WHERE s.id = ?::uuid",
+            String::class.java, jobId,
+        )
+        assertThat(metadataJson).contains("creation_time")
     }
 
     @Test

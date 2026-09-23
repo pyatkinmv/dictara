@@ -134,7 +134,11 @@ class TranscriberClient(private val props: DictaraProperties) : TranscriberPort 
         val elapsedS = root["elapsed_s"]?.takeIf { !it.isNull }?.asDouble()
         val error = root["error"]?.takeIf { !it.isNull }?.asText()
         val retryable = root["retryable"]?.takeIf { !it.isNull }?.asBoolean() ?: true
+        val audioMetadata = root["result"]?.get("audio_metadata")?.takeIf { !it.isNull }
 
-        return TranscriberJobSnapshot(status, progress, segments, audioDurationS, detectedLanguage, durationS, elapsedS, error, retryable)
+        return TranscriberJobSnapshot(
+            status, progress, segments, audioDurationS, detectedLanguage, durationS, elapsedS, error, retryable,
+            audioMetadata,
+        )
     }
 }

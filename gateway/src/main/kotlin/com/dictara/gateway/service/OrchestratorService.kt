@@ -116,6 +116,7 @@ class OrchestratorService(
                 segments = snapshot.segments ?: emptyList(),
                 audioDurationS = snapshot.audioDurationS,
                 detectedLanguage = snapshot.detectedLanguage,
+                audioMetadata = snapshot.audioMetadata,
             )
             liveProgress.remove(submissionId)
             log.info("Transcription complete for submission $submissionId (duration=${snapshot.audioDurationS?.let { "%.1fs".format(it) } ?: "unknown"}, language=${snapshot.detectedLanguage ?: "unknown"}, segments=${snapshot.segments?.size ?: 0})")
@@ -158,6 +159,7 @@ class OrchestratorService(
                 segments = snapshot.segments ?: emptyList(),
                 audioDurationS = snapshot.audioDurationS,
                 detectedLanguage = snapshot.detectedLanguage,
+                audioMetadata = snapshot.audioMetadata,
             )
             liveProgress.remove(submissionId)
             log.info("Resumed transcription complete for submission $submissionId (duration=${snapshot.audioDurationS?.let { "%.1fs".format(it) } ?: "unknown"}, language=${snapshot.detectedLanguage ?: "unknown"}, segments=${snapshot.segments?.size ?: 0})")

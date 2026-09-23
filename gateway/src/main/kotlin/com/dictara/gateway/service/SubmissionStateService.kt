@@ -66,7 +66,7 @@ class SubmissionStateService(
         stageAttemptRepo.save(attempt)
     }
 
-    /** Marks an attempt done and saves the transcript; updates audio_meta.duration_s. */
+    /** Marks an attempt done and saves the transcript; updates audio_meta.duration_s and .metadata. */
     @Transactional
     fun saveTranscriptAndCompleteAttempt(
         submissionId: UUID,
@@ -75,6 +75,7 @@ class SubmissionStateService(
         segments: List<Segment>,
         audioDurationS: Double?,
         detectedLanguage: String?,
+        audioMetadata: JsonNode? = null,
     ) {
         val transcript = transcriptRepo.save(TranscriptEntity(
             submissionId = submissionId,
@@ -86,6 +87,7 @@ class SubmissionStateService(
         ))
         segmentQueries.insertAll(transcript.id!!, segments)
         audioMetaRepo.updateDurationS(audioId, audioDurationS)
+        if (audioMetadata != null) audioMetaRepo.updateMetadata(audioId, audioMetadata)
         val attempt = stageAttemptRepo.findById(attemptId).orElseThrow()
         attempt.status = "done"
         attempt.finishedAt = Instant.now()

@@ -6,6 +6,9 @@ import com.dictara.gateway.model.Segment
 import com.dictara.gateway.port.TranscribeParams
 import com.dictara.gateway.port.TranscriberJobSnapshot
 import com.dictara.gateway.port.TranscriberPort
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Component
@@ -42,6 +45,19 @@ class StubTranscriber internal constructor(
     )
 
     private val jobs = ConcurrentHashMap<String, Job>()
+    private val mapper = ObjectMapper().registerKotlinModule()
+
+    /** Stands in for a real `ffprobe` probe of the original upload (`docs/local-backend-integration.md`,
+     *  "audio metadata"): a plausible container with a `creation_time` tag, so the local profile can
+     *  exercise the same field a real M4A/MP4 recording would carry. */
+    private val fakeAudioMetadata: JsonNode = mapper.valueToTree(mapOf(
+        "format_name" to "mov,mp4,m4a",
+        "bit_rate" to 128000,
+        "codec" to "aac",
+        "sample_rate" to 44100,
+        "channels" to 2,
+        "tags" to mapOf("creation_time" to "2026-06-22T14:41:00.000000Z"),
+    ))
 
     override fun submitByReference(storageUri: String, params: TranscribeParams): String {
         val id = UUID.randomUUID().toString()
@@ -84,6 +100,7 @@ class StubTranscriber internal constructor(
                 segments = job.scenario.segments(job.diarize, job.numSpeakers),
                 audioDurationS = total, detectedLanguage = job.scenario.language,
                 durationS = end - pending, elapsedS = null, error = null,
+                audioMetadata = fakeAudioMetadata,
             )
         }
     }

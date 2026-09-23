@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import math
 import os
@@ -94,6 +95,32 @@ def _get_duration(wav_path: str) -> float:
     return float(result.stdout.strip())
 
 
+def _probe_metadata(path: str) -> dict | None:
+    """The container's own facts about the file — codec, bit rate, sample rate, channels, and whatever tags
+    it carries (many recorders write a `creation_time`, the actual recording date, distinct from the upload
+    time the gateway stamps). Must run on the original upload: the ffmpeg → WAV conversion that follows
+    strips all of this. None if ffprobe can't read the file, or finds nothing worth keeping."""
+    try:
+        probed = json.loads(subprocess.run(
+            ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", path],
+            check=True, capture_output=True, text=True,
+        ).stdout)
+    except (subprocess.CalledProcessError, json.JSONDecodeError):
+        logger.warning("ffprobe metadata probe failed for %s", path)
+        return None
+    fmt = probed.get("format", {})
+    audio_stream = next((s for s in probed.get("streams", []) if s.get("codec_type") == "audio"), {})
+    metadata = {
+        "format_name": fmt.get("format_name"),
+        "bit_rate": int(fmt["bit_rate"]) if fmt.get("bit_rate") else None,
+        "codec": audio_stream.get("codec_name"),
+        "sample_rate": int(audio_stream["sample_rate"]) if audio_stream.get("sample_rate") else None,
+        "channels": audio_stream.get("channels"),
+        "tags": fmt.get("tags", {}),
+    }
+    return metadata if any(v not in (None, {}) for v in metadata.values()) else None
+
+
 def _transcribe_chunked(
     job_id: str,
     wav_path: str,
@@ -163,6 +190,7 @@ def _run_transcription(job_id: str, tmp_path: str, language: str | None, diarize
     job_store.set_processing(job_id)
     wav_path = None
     try:
+        audio_metadata = _probe_metadata(tmp_path)
         # Convert to WAV so pyannote (soundfile) can read any input format
         wav_path = tmp_path + ".wav"
         try:
@@ -199,7 +227,7 @@ def _run_transcription(job_id: str, tmp_path: str, language: str | None, diarize
                 job_store.set_diarize_progress(job_id, completed, total)
             diarization = app.state.diarizer.diarize(wav_path, num_speakers=num_speakers, progress_callback=on_diarize)
             segments = merge_diarization(segments, diarization)
-        job_store.set_done(job_id, segments, detected_language, audio_duration_s)
+        job_store.set_done(job_id, segments, detected_language, audio_duration_s, audio_metadata)
     except Exception as exc:
         logger.exception("Transcription failed for job %s", job_id)
         job_store.set_failed(job_id, str(exc))

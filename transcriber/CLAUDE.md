@@ -51,10 +51,14 @@ curl http://localhost:8000/jobs/{job_id}
 
 # Poll result (done)
 curl http://localhost:8000/jobs/{job_id}
-# → {"status": "done", "result": {"segments": [...]}, "duration_s": 168.0, "error": null,
+# → {"status": "done", "result": {"segments": [...], "audio_metadata": {...}}, "duration_s": 168.0, "error": null,
 #    "elapsed_s": null, "progress": {"processed_s": 240.0, "total_s": 240.0, "phase": "transcribing", "diarize_progress": null}}
 # status values: pending | processing | done | failed
 # phase values: "transcribing" | "diarizing"
+# result.audio_metadata: ffprobe's read of the ORIGINAL upload (codec, bit_rate, sample_rate, channels, tags —
+# tags.creation_time is the actual recording date on most phone-recorded M4A/MP4). Probed before the ffmpeg → WAV
+# conversion, which strips all container metadata. null if ffprobe can't read the file or finds nothing (`app.py`,
+# `_probe_metadata`). The gateway stores this as-is in `audio_meta.metadata` — see `gateway/CLAUDE.md`.
 
 # Health check
 curl http://localhost:8000/health
