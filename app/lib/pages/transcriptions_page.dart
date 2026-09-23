@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/transcription_repository.dart';
+import '../models/speaker.dart';
+import '../models/tag.dart';
 import '../models/transcription.dart';
 import '../state/transcription_list_controller.dart';
 import '../theme/app_palette.dart';
@@ -292,21 +294,37 @@ class _FilterDropdown extends StatelessWidget {
                   ),
                 ),
               const PopoverSeparator(),
-              const PopoverSection('Tags'),
-              for (final tag in c.tags)
-                PopoverRow(
-                  onTap: () => c.toggleTag(tag.label),
-                  child: Row(
-                    children: [
-                      CheckMark(checked: c.query.tags.contains(tag.label)),
-                      const SizedBox(width: 8),
-                      MiniTag(tag),
-                    ],
-                  ),
-                ),
+              PopoverSection('Tags · ${c.tags.length}'),
+              _LibraryFilterSection<Tag>(
+                items: c.tags,
+                name: (tag) => tag.label,
+                isChecked: (tag) => c.query.tags.contains(tag.label),
+                onToggle: (tag) => c.toggleTag(tag.label),
+                rowContent: (tag) => MiniTag(tag),
+                searchKey: const Key('tag-filter-search'),
+                hintText: 'Search tags…',
+              ),
               const PopoverSeparator(),
-              const PopoverSection('Speakers'),
-              const _SpeakerFilterSection(),
+              PopoverSection('Speakers · ${c.speakers.length}'),
+              _LibraryFilterSection<Speaker>(
+                items: c.speakers,
+                name: (speaker) => speaker.name,
+                isChecked: (speaker) => c.query.speakers.contains(speaker.name),
+                onToggle: (speaker) => c.toggleSpeaker(speaker.name),
+                rowContent: (speaker) => Row(
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(color: speaker.color, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(child: Text(speaker.name, overflow: TextOverflow.ellipsis)),
+                  ],
+                ),
+                searchKey: const Key('speaker-filter-search'),
+                hintText: 'Search speakers…',
+              ),
             ],
           ),
         ),
@@ -315,17 +333,38 @@ class _FilterDropdown extends StatelessWidget {
   }
 }
 
-/// Search box + checklist of the speaker library, for the Speakers section of the Filter dropdown (a
-/// library can grow past what a plain list stays comfortable with, unlike Status or Tags). The search
-/// resets whenever the dropdown is reopened, same as the Speaker Picker's.
-class _SpeakerFilterSection extends StatefulWidget {
-  const _SpeakerFilterSection();
+/// Search box + checklist for a Tag/Speaker library section of the Filter dropdown (a library can grow
+/// past what a plain list stays comfortable with, unlike Status). The search resets whenever the dropdown
+/// is reopened, same as the Speaker Picker's.
+///
+/// A checked item the current search text doesn't match is still kept — appended below the visible
+/// matches, past a separator — so ticking a checkbox and then changing or clearing the search never makes
+/// a selection seem to vanish.
+class _LibraryFilterSection<T> extends StatefulWidget {
+  const _LibraryFilterSection({
+    super.key,
+    required this.items,
+    required this.name,
+    required this.isChecked,
+    required this.onToggle,
+    required this.rowContent,
+    required this.searchKey,
+    required this.hintText,
+  });
+
+  final List<T> items;
+  final String Function(T item) name;
+  final bool Function(T item) isChecked;
+  final void Function(T item) onToggle;
+  final Widget Function(T item) rowContent;
+  final Key searchKey;
+  final String hintText;
 
   @override
-  State<_SpeakerFilterSection> createState() => _SpeakerFilterSectionState();
+  State<_LibraryFilterSection<T>> createState() => _LibraryFilterSectionState<T>();
 }
 
-class _SpeakerFilterSectionState extends State<_SpeakerFilterSection> {
+class _LibraryFilterSectionState<T> extends State<_LibraryFilterSection<T>> {
   final _search = TextEditingController();
   String _query = '';
 
@@ -338,14 +377,29 @@ class _SpeakerFilterSectionState extends State<_SpeakerFilterSection> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final c = context.watch<TranscriptionListController>();
     final matches = [
-      for (final s in c.speakers)
-        if (_query.isEmpty || s.name.toLowerCase().contains(_query)) s,
+      for (final item in widget.items)
+        if (_query.isEmpty || widget.name(item).toLowerCase().contains(_query)) item,
+    ];
+    final matchedNames = {for (final item in matches) widget.name(item)};
+    final extras = [
+      for (final item in widget.items)
+        if (widget.isChecked(item) && !matchedNames.contains(widget.name(item))) item,
     ];
 
     OutlineInputBorder border(Color color) =>
         OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: color));
+
+    Widget row(T item) => PopoverRow(
+          onTap: () => widget.onToggle(item),
+          child: Row(
+            children: [
+              CheckMark(checked: widget.isChecked(item)),
+              const SizedBox(width: 8),
+              Flexible(child: widget.rowContent(item)),
+            ],
+          ),
+        );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -353,14 +407,14 @@ class _SpeakerFilterSectionState extends State<_SpeakerFilterSection> {
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 2, 8, 4),
           child: TextField(
-            key: const Key('speaker-filter-search'),
+            key: widget.searchKey,
             controller: _search,
             onChanged: (value) => setState(() => _query = value.trim().toLowerCase()),
             cursorColor: p.accent,
             style: TextStyle(fontSize: 12, color: p.text),
             decoration: InputDecoration(
               isDense: true,
-              hintText: 'Search speakers…',
+              hintText: widget.hintText,
               hintStyle: TextStyle(fontSize: 12, color: p.text3),
               prefixIcon: Icon(Icons.search_rounded, size: 14, color: p.text3),
               prefixIconConstraints: const BoxConstraints(minWidth: 26, minHeight: 14),
@@ -371,35 +425,24 @@ class _SpeakerFilterSectionState extends State<_SpeakerFilterSection> {
             ),
           ),
         ),
-        if (matches.isEmpty)
+        if (matches.isEmpty && extras.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             child: Text('No match', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: p.text3)),
           )
         else
           ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 180),
+            // 6 rows (32px each) fit fully, unclipped — a 7th peeks in to hint that scrolling reveals more.
+            constraints: const BoxConstraints(maxHeight: 210),
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final speaker in matches)
-                    PopoverRow(
-                      onTap: () => c.toggleSpeaker(speaker.name),
-                      child: Row(
-                        children: [
-                          CheckMark(checked: c.query.speakers.contains(speaker.name)),
-                          const SizedBox(width: 8),
-                          Container(
-                            width: 7,
-                            height: 7,
-                            decoration: BoxDecoration(color: speaker.color, shape: BoxShape.circle),
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(child: Text(speaker.name, overflow: TextOverflow.ellipsis)),
-                        ],
-                      ),
-                    ),
+                  for (final item in matches) row(item),
+                  if (extras.isNotEmpty) ...[
+                    const PopoverSeparator(),
+                    for (final item in extras) row(item),
+                  ],
                 ],
               ),
             ),
