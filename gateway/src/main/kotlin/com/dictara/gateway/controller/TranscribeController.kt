@@ -2,7 +2,9 @@ package com.dictara.gateway.controller
 
 import com.dictara.gateway.entity.*
 import com.dictara.gateway.repository.*
+import com.dictara.gateway.storage.AudioRef
 import com.dictara.gateway.storage.AudioStorage
+import com.dictara.gateway.service.JwtTokenProvider
 import com.dictara.gateway.service.ListSort
 import com.dictara.gateway.service.ListStatuses
 import com.dictara.gateway.service.OrchestratorService
@@ -20,6 +22,9 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 import org.springframework.web.server.ResponseStatusException
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody
+import java.io.InputStream
+import java.io.OutputStream
 import java.net.URLDecoder
 import java.time.Instant
 import java.util.UUID
@@ -39,6 +44,7 @@ class TranscribeController(
     private val telegramDeliveryRepo: TelegramDeliveryRepository,
     private val segmentQueries: TranscriptSegmentQueries,
     private val audioStorage: AudioStorage,
+    private val jwtTokenProvider: JwtTokenProvider,
 ) {
     companion object {
         private val log = LoggerFactory.getLogger(TranscribeController::class.java)
@@ -331,6 +337,59 @@ class TranscribeController(
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Transcription not found")
     }
 
+    /**
+     * A short-lived token (`JwtTokenProvider.AUDIO_TOKEN_TTL_SECONDS`) scoped to this one transcription's
+     * audio — the player passes it as `?token=` on [streamAudio] since an `<audio>` element can't send the
+     * usual `Authorization` header. Ownership is checked here, same as [getTranscription].
+     */
+    @PostMapping("/transcriptions/{id}/audio-token")
+    fun issueAudioToken(@PathVariable id: UUID, servletRequest: HttpServletRequest): Map<String, Any> {
+        val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
+            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
+        val submission = submissionRepo.findById(id).orElse(null)?.takeIf { it.userId == userId }
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Transcription not found")
+        return mapOf(
+            "token" to jwtTokenProvider.issueAudioToken(userId, submission.id!!),
+            "expiresInSeconds" to JwtTokenProvider.AUDIO_TOKEN_TTL_SECONDS,
+        )
+    }
+
+    /**
+     * Streams the original audio file for playback, honoring a single-range `Range` header so the player can
+     * seek without downloading from the start. Authorized by [token] (from [issueAudioToken]), not the usual
+     * bearer header. Multi-range requests (`bytes=0-10,20-30`) are treated as just the first range — browsers
+     * don't send those for `<audio>` seeking, only single open-ended ranges.
+     */
+    @GetMapping("/transcriptions/{id}/audio")
+    fun streamAudio(
+        @PathVariable id: UUID,
+        @RequestParam token: String,
+        @RequestHeader(value = "Range", required = false) rangeHeader: String?,
+    ): ResponseEntity<StreamingResponseBody> {
+        val tokenUserId = jwtTokenProvider.validateAudioToken(token, id)
+            ?: throw ResponseStatusException(HttpStatus.FORBIDDEN)
+        val submission = submissionRepo.findById(id).orElse(null)?.takeIf { it.userId == tokenUserId }
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        val audioMeta = audioMetaRepo.findById(submission.audioId).orElse(null)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        val storageUri = audioMeta.storageUri ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        val totalSize = audioMeta.sizeBytes
+
+        val (start, end) = parseAudioRange(rangeHeader, totalSize)
+        if (start >= totalSize) throw ResponseStatusException(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+        val length = end - start + 1
+
+        val body = StreamingResponseBody { out ->
+            audioStorage.openFrom(AudioRef(storageUri), start)?.use { it.copyRange(out, length) }
+        }
+        var builder = (if (rangeHeader != null) ResponseEntity.status(HttpStatus.PARTIAL_CONTENT) else ResponseEntity.ok())
+            .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+            .header(HttpHeaders.CONTENT_TYPE, audioMeta.contentType)
+            .header(HttpHeaders.CONTENT_LENGTH, length.toString())
+        if (rangeHeader != null) builder = builder.header(HttpHeaders.CONTENT_RANGE, "bytes $start-$end/$totalSize")
+        return builder.body(body)
+    }
+
     @GetMapping("/transcript")
     fun downloadTranscript(@RequestParam jobId: UUID): ResponseEntity<ByteArray> {
         val text = transcriptRepo.findBySubmissionId(jobId)?.id
@@ -421,5 +480,27 @@ class TranscribeController(
     fun deliveryFailed(@PathVariable jobId: String, @RequestBody body: Map<String, Any?>) {
         val retryAfterS = (body["retry_after_s"] as? Number)?.toLong()
         submissionService.scheduleDeliveryFailure(UUID.fromString(jobId), retryAfterS)
+    }
+}
+
+/** Parses a single-range `Range: bytes=start-end` header against [totalSize]. A missing or malformed header,
+ *  or a missing end, means "to the end". Does not handle suffix ranges (`bytes=-500`, "the last 500 bytes") —
+ *  browsers don't send those when seeking an `<audio>` element, only `bytes=START-` or no header at all. */
+private fun parseAudioRange(header: String?, totalSize: Long): Pair<Long, Long> {
+    if (header == null || !header.startsWith("bytes=")) return 0L to totalSize - 1
+    val parts = header.removePrefix("bytes=").substringBefore(',').split("-", limit = 2)
+    val start = (parts.getOrNull(0)?.toLongOrNull() ?: 0L).coerceIn(0, totalSize - 1)
+    val end = (parts.getOrNull(1)?.toLongOrNull() ?: (totalSize - 1)).coerceIn(start, totalSize - 1)
+    return start to end
+}
+
+private fun InputStream.copyRange(out: OutputStream, length: Long) {
+    val buffer = ByteArray(8192)
+    var remaining = length
+    while (remaining > 0) {
+        val n = read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
+        if (n < 0) break
+        out.write(buffer, 0, n)
+        remaining -= n
     }
 }

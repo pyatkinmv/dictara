@@ -67,6 +67,20 @@ class LocalDbAudioStorageTest {
     }
 
     @Test
+    fun `openFrom returns everything from the given offset, not from the start`() {
+        val bytes = ByteArray(20) { it.toByte() }
+        val result = storage.upload(UUID.randomUUID(), "ranged.mp3", ByteArrayInputStream(bytes), bytes.size.toLong(), "audio/mpeg")
+
+        assertThat(storage.openFrom(result.ref, 5)!!.readBytes()).isEqualTo(bytes.copyOfRange(5, 20))
+        assertThat(storage.openFrom(result.ref, 0)!!.readBytes()).isEqualTo(bytes)
+    }
+
+    @Test
+    fun `openFrom on an object that is not there is null`() {
+        assertThat(storage.openFrom(AudioRef("db://audio/2000-01-01/${UUID.randomUUID()}/x.mp3"), 0)).isNull()
+    }
+
+    @Test
     fun `listing shows uploaded audio with its creation time and skips backups`() {
         val result = storage.upload(UUID.randomUUID(), "listed.mp3", ByteArrayInputStream(ByteArray(3)), 3, "audio/mpeg")
         val backupName = "backups/2025-01-01/${UUID.randomUUID()}.json.gz"

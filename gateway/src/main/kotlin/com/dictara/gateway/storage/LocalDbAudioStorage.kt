@@ -53,6 +53,13 @@ class LocalDbAudioStorage(private val jdbc: JdbcTemplate) : AudioStorage {
 
     override fun uploadBytes(objectName: String, bytes: ByteArray) = put("db://$objectName", bytes)
 
+    override fun openFrom(ref: AudioRef, offset: Long): InputStream? {
+        val data = jdbc.query("SELECT data FROM local_audio_objects WHERE uri = ?", { rs, _ -> rs.getBytes(1) }, ref.uri)
+            .firstOrNull() ?: return null
+        val off = offset.toInt()
+        return ByteArrayInputStream(data, off, data.size - off)
+    }
+
     private fun put(uri: String, bytes: ByteArray) {
         jdbc.update(
             """INSERT INTO local_audio_objects (uri, data) VALUES (?, ?)

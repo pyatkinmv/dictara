@@ -83,4 +83,16 @@ class GcsAudioStorage(props: DictaraProperties) : AudioStorage {
         storage.create(blobInfo, bytes)
     }
 
+    /** Seeks the GCS read channel to [offset] before wrapping it as a stream, so bytes before it are never
+     *  transferred — a plain `InputStream.skip()` on a channel-backed stream would still read and discard them. */
+    override fun openFrom(ref: AudioRef, offset: Long): InputStream? = try {
+        val path = ref.uri.removePrefix("gs://$bucket/")
+        val reader = storage.reader(BlobId.of(bucket, path))
+        if (offset > 0) reader.seek(offset)
+        Channels.newInputStream(reader)
+    } catch (e: Exception) {
+        log.warn("Audio range-read failed for {} at offset {}: {}", ref.uri, offset, e.message)
+        null
+    }
+
 }
