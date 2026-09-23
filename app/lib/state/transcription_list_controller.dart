@@ -168,6 +168,12 @@ class TranscriptionListController extends ChangeNotifier {
     _apply(_query.copyWith(search: '', statuses: {}, tags: {}, speakers: {name}));
   }
 
+  /// Resets the search text and every filter (status, tags, speakers) in one go, for the "Clear all" link
+  /// in the Filter dropdown. Leaves sort as it was: that is an ordering preference, not a filter.
+  void clearAll() {
+    _apply(_query.copyWith(search: '', statuses: {}, tags: {}, speakers: {}));
+  }
+
   static Set<T> _toggled<T>(Set<T> set, T value) {
     return set.contains(value) ? ({...set}..remove(value)) : {...set, value};
   }

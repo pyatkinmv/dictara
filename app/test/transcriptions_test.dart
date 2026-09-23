@@ -122,6 +122,28 @@ void main() {
     });
   });
 
+  group('TranscriptionListController.clearAll', () {
+    test('resets the search text and every filter, leaving sort untouched', () async {
+      final c = TranscriptionListController(FakeTranscriptionRepository());
+      c.setSearch('standup');
+      c.toggleStatus(TranscriptionStatus.done);
+      c.toggleTag('meeting');
+      c.toggleSpeaker('Alexei Sorokin');
+      c.setSort(TranscriptionSort.oldest);
+      await Future<void>.delayed(Duration.zero);
+
+      c.clearAll();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(c.query.search, isEmpty);
+      expect(c.query.statuses, isEmpty);
+      expect(c.query.tags, isEmpty);
+      expect(c.query.speakers, isEmpty);
+      expect(c.query.sort, TranscriptionSort.oldest); // sort is not a filter: left as it was
+      expect(c.items.map((i) => i.title), _newestFirst.reversed);
+    });
+  });
+
   group('Transcriptions page', () {
     Future<void> open(WidgetTester tester) async {
       useDesktopSize(tester);
@@ -164,6 +186,35 @@ void main() {
 
       expect(visibleTitles(tester), ['Podcast Episode #47']);
       expect(find.text('Filter · 1'), findsOneWidget);
+    });
+
+    testWidgets("'Clear all' only shows up once something is active, and resets search too", (tester) async {
+      await open(tester);
+      await tester.tap(find.text('Filter'));
+      await settle(tester);
+      expect(find.text('Clear all'), findsNothing); // nothing active yet
+
+      await tester.tap(find.widgetWithText(InkWell, 'Pending'));
+      await settle(tester);
+      expect(find.text('Clear all'), findsOneWidget); // a status filter counts too
+
+      await tester.tap(find.text('Clear all'));
+      await settle(tester);
+      expect(find.text('Clear all'), findsNothing); // nothing left to clear
+      expect(find.text('Filter'), findsOneWidget); // back to the unfiltered label, no "· N"
+      expect(visibleTitles(tester), _newestFirst);
+
+      // The search field also counts, and clearing resets it too. The dropdown is still open from
+      // above ("Clear all" doesn't close it) — that's also why 'main-search' is needed here: with it
+      // open there are three TextFields (search plus the tag/speaker search boxes).
+      await tester.enterText(find.byKey(const Key('main-search')), 'standup');
+      await settle(tester);
+      expect(find.text('Clear all'), findsOneWidget);
+
+      await tester.tap(find.text('Clear all'));
+      await settle(tester);
+      expect(find.widgetWithText(TextField, 'standup'), findsNothing);
+      expect(visibleTitles(tester), _newestFirst);
     });
 
     testWidgets('tag filter lists the tag library', (tester) async {

@@ -176,6 +176,7 @@ class _SearchField extends StatelessWidget {
           borderSide: BorderSide(color: color),
         );
     return TextField(
+      key: const Key('main-search'),
       controller: controller,
       onChanged: context.read<TranscriptionListController>().setSearch,
       cursorColor: p.accent,
@@ -276,58 +277,79 @@ class _FilterDropdown extends StatelessWidget {
         onTap: toggle,
       ),
       panelBuilder: (context, close) => Consumer<TranscriptionListController>(
-        builder: (context, c, _) => PopoverPanel(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const PopoverSection('Status'),
-              for (final status in TranscriptionStatus.values)
-                PopoverRow(
-                  onTap: () => c.toggleStatus(status),
-                  child: Row(
+        builder: (context, c, _) {
+          final p = context.palette;
+          return PopoverPanel(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (count > 0 || c.query.search.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 2, 8, 4),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: InkWell(
+                        onTap: c.clearAll,
+                        borderRadius: BorderRadius.circular(6),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          child: Text(
+                            'Clear all',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: p.accent),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                const PopoverSection('Status'),
+                for (final status in TranscriptionStatus.values)
+                  PopoverRow(
+                    onTap: () => c.toggleStatus(status),
+                    child: Row(
+                      children: [
+                        CheckMark(checked: c.query.statuses.contains(status)),
+                        const SizedBox(width: 8),
+                        Text(status.label),
+                      ],
+                    ),
+                  ),
+                const PopoverSeparator(),
+                PopoverSection('Tags · ${c.tags.length}'),
+                _LibraryFilterSection<Tag>(
+                  items: c.tags,
+                  name: (tag) => tag.label,
+                  isChecked: (tag) => c.query.tags.contains(tag.label),
+                  onToggle: (tag) => c.toggleTag(tag.label),
+                  rowContent: (tag) => MiniTag(tag),
+                  searchKey: const Key('tag-filter-search'),
+                  hintText: 'Search tags…',
+                ),
+                const PopoverSeparator(),
+                PopoverSection('Speakers · ${c.speakers.length}'),
+                _LibraryFilterSection<Speaker>(
+                  items: c.speakers,
+                  name: (speaker) => speaker.name,
+                  isChecked: (speaker) => c.query.speakers.contains(speaker.name),
+                  onToggle: (speaker) => c.toggleSpeaker(speaker.name),
+                  rowContent: (speaker) => Row(
                     children: [
-                      CheckMark(checked: c.query.statuses.contains(status)),
-                      const SizedBox(width: 8),
-                      Text(status.label),
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(color: speaker.color, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(child: Text(speaker.name, overflow: TextOverflow.ellipsis)),
                     ],
                   ),
+                  searchKey: const Key('speaker-filter-search'),
+                  hintText: 'Search speakers…',
                 ),
-              const PopoverSeparator(),
-              PopoverSection('Tags · ${c.tags.length}'),
-              _LibraryFilterSection<Tag>(
-                items: c.tags,
-                name: (tag) => tag.label,
-                isChecked: (tag) => c.query.tags.contains(tag.label),
-                onToggle: (tag) => c.toggleTag(tag.label),
-                rowContent: (tag) => MiniTag(tag),
-                searchKey: const Key('tag-filter-search'),
-                hintText: 'Search tags…',
-              ),
-              const PopoverSeparator(),
-              PopoverSection('Speakers · ${c.speakers.length}'),
-              _LibraryFilterSection<Speaker>(
-                items: c.speakers,
-                name: (speaker) => speaker.name,
-                isChecked: (speaker) => c.query.speakers.contains(speaker.name),
-                onToggle: (speaker) => c.toggleSpeaker(speaker.name),
-                rowContent: (speaker) => Row(
-                  children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(color: speaker.color, shape: BoxShape.circle),
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(child: Text(speaker.name, overflow: TextOverflow.ellipsis)),
-                  ],
-                ),
-                searchKey: const Key('speaker-filter-search'),
-                hintText: 'Search speakers…',
-              ),
-            ],
-          ),
-        ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
