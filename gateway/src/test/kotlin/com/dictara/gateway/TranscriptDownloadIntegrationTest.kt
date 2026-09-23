@@ -116,7 +116,10 @@ class TranscriptDownloadIntegrationTest : AbstractSharedContextIntegrationTest()
 
         assertThat(resp.statusCode).isEqualTo(HttpStatus.OK)
         val responseText = String(resp.body!!, Charsets.UTF_8)
+        // Neither voice has been assigned a real speaker, so each resolves to its "Speaker N" fallback, not
+        // the raw diarizer label — the same names TranscriptReadersIntegrationTest checks in more detail.
         assertThat(responseText).contains(speaker0Text).contains(speaker1Text)
-            .contains("SPEAKER_00").contains("SPEAKER_01")
+            .contains("[Speaker 1]").contains("[Speaker 2]")
+            .doesNotContain("SPEAKER_00").doesNotContain("SPEAKER_01")
     }
 }

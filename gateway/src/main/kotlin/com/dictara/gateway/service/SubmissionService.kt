@@ -243,14 +243,36 @@ class SubmissionService(
             ExportData(
                 submissionId = id,
                 createdAt = s.createdAt,
-                transcriptText = transcriptRepo.findBySubmissionId(id)
-                    ?.let { TranscriptFormatter.format(segmentQueries.findByTranscriptId(it.id!!)) },
+                transcriptText = transcriptRepo.findBySubmissionId(id)?.id?.let { resolvedTranscriptText(it) },
                 summaryText = summaryRepo.findBySubmissionId(id)?.text,
                 originalName = audio?.originalName,
                 storageUri = audio?.storageUri,
             )
         }
     }
+
+    /**
+     * The `.txt` download, Copy, and the ZIP export: each phrase with who actually said it, matching what the
+     * page shows (a per-phrase mark, else its voice's confirmed speaker, else "Speaker N") — never the raw
+     * diarizer label ("SPEAKER_00"), which [com.dictara.gateway.util.TranscriptFormatter.format] alone gives.
+     * Empty when the transcript has no phrases (same as [TranscriptFormatter.format] on an empty list).
+     */
+    @Transactional(readOnly = true)
+    fun resolvedTranscriptText(transcriptId: UUID): String {
+        val phrases = speakerQueries.detailPhrases(transcriptId)
+        val voiceSpeakers = speakerQueries.voices(transcriptId).associate { it.voice to it.speaker.name }
+        return TranscriptFormatter.formatResolved(phrases.map { p ->
+            TranscriptFormatter.ResolvedPhrase(
+                start = p.start, end = p.end, text = p.text,
+                speakerName = p.own?.name ?: p.voice?.let { voiceSpeakers[it] ?: fallbackVoiceName(it) },
+            )
+        })
+    }
+
+    /** The diarizer names its voices `SPEAKER_00`, `SPEAKER_01`, ...; unassigned, the page calls them
+     *  "Speaker 1", "Speaker 2", ... (1-based) — this mirrors that naming for the exported text. */
+    private fun fallbackVoiceName(voice: String): String =
+        voice.removePrefix("SPEAKER_").toIntOrNull()?.let { "Speaker ${it + 1}" } ?: voice
 
     @Transactional
     fun addTag(submissionId: UUID, userId: UUID, tagName: String): List<String> {

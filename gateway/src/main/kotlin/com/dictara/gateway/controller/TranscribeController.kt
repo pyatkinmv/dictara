@@ -330,8 +330,8 @@ class TranscribeController(
 
     @GetMapping("/transcript")
     fun downloadTranscript(@RequestParam jobId: UUID): ResponseEntity<ByteArray> {
-        val text = transcriptRepo.findBySubmissionId(jobId)
-            ?.let { TranscriptFormatter.format(segmentQueries.findByTranscriptId(it.id!!)) }
+        val text = transcriptRepo.findBySubmissionId(jobId)?.id
+            ?.let { submissionService.resolvedTranscriptText(it) }
             ?.takeIf { it.isNotEmpty() }
             ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok()

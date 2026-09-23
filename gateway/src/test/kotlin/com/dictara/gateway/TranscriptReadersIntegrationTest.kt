@@ -15,9 +15,12 @@ import org.springframework.http.HttpStatus
 import java.util.UUID
 
 /**
- * The phrases of a transcript are rows (`transcript_segments`); these are the readers whose output the
- * old web client and the Telegram bot depend on, which must not change: `GET /jobs/{id}` (segments and
- * `formatted_text`), `GET /transcript` (the `.txt`) and the export.
+ * The phrases of a transcript are rows (`transcript_segments`). `GET /jobs/{id}` (segments and
+ * `formatted_text`) is the old web client's and the Telegram bot's reader and must not change: raw diarizer
+ * labels (`SPEAKER_00`), untouched by any speaker assignment. `GET /transcript` (the `.txt`) and the export
+ * are read by people, not old clients, so they show who actually speaks — resolved the same way the
+ * Speaker Picker's page does (see [SpeakerAssignmentIntegrationTest]): a per-phrase mark, else the voice's
+ * confirmed speaker, else "Speaker N" — never the raw label.
  */
 @SpringBootTest(webEnvironment = RANDOM_PORT)
 class TranscriptReadersIntegrationTest : AbstractSharedContextIntegrationTest() {
@@ -86,19 +89,52 @@ class TranscriptReadersIntegrationTest : AbstractSharedContextIntegrationTest() 
     }
 
     @Test
-    fun `the txt download is the formatted text, and a transcript without phrases is not found`() {
+    fun `the txt download resolves unassigned voices to Speaker N, not the raw label, and a transcript without phrases is not found`() {
         val id = addTranscription("meeting.m4a", diarized)
         val empty = addTranscription("empty.mp3", "[]")
 
         val ok = rest.getForEntity("/transcript?jobId=$id", String::class.java)
 
         assertThat(ok.statusCode).isEqualTo(HttpStatus.OK)
-        assertThat(ok.body).startsWith("[00:00:00.000 --> 00:00:30.500] [SPEAKER_00] Good morning.\n")
+        assertThat(ok.body).isEqualTo(
+            "[00:00:00.000 --> 00:00:30.500] [Speaker 1] Good morning.\n" +
+                "[01:01:11.789 --> 01:01:40.000] [Speaker 2] Later, \"quoted\".\n" +
+                "[01:01:40.000 --> 01:01:41.250] No speaker here.", // no diarization: no bracket at all
+        )
         assertThat(rest.getForEntity("/transcript?jobId=$empty", String::class.java).statusCode).isEqualTo(HttpStatus.NOT_FOUND)
     }
 
     @Test
-    fun `the export carries the same text`() {
+    fun `an assigned voice and a per-phrase mark resolve to their real names in the txt download`() {
+        val id = addTranscription("meeting.m4a", diarized)
+        val speakerId = UUID.randomUUID()
+        jdbcTemplate.update("INSERT INTO speakers(id, user_id, name) VALUES (?, ?, 'Maria Chen')", speakerId, userId)
+        val transcriptId = jdbcTemplate.queryForObject("SELECT id FROM transcripts WHERE submission_id = ?", UUID::class.java, id)
+        jdbcTemplate.update(
+            "INSERT INTO transcript_voices(transcript_id, voice, speaker_id) VALUES (?, 'SPEAKER_00', ?)",
+            transcriptId, speakerId,
+        )
+        val otherId = UUID.randomUUID()
+        jdbcTemplate.update("INSERT INTO speakers(id, user_id, name) VALUES (?, ?, 'James Wright')", otherId, userId)
+        jdbcTemplate.update(
+            "UPDATE transcript_segments SET speaker_id = ? WHERE transcript_id = ? AND idx = 1", // overrides voice SPEAKER_01
+            otherId, transcriptId,
+        )
+
+        val text = rest.getForEntity("/transcript?jobId=$id", String::class.java).body
+
+        assertThat(text).isEqualTo(
+            "[00:00:00.000 --> 00:00:30.500] [Maria Chen] Good morning.\n" + // SPEAKER_00's confirmed voice
+                "[01:01:11.789 --> 01:01:40.000] [James Wright] Later, \"quoted\".\n" + // its own mark wins over the voice
+                "[01:01:40.000 --> 01:01:41.250] No speaker here.",
+        )
+        // GET /jobs/{id} is the old client's reader: unaffected, still the raw diarizer label.
+        val jobsResult = json.readTree(rest.getForObject("/jobs/$id", String::class.java))["result"]
+        assertThat(jobsResult["formatted_text"].asText()).contains("[SPEAKER_00] Good morning.")
+    }
+
+    @Test
+    fun `the export carries the same resolved text as the txt download`() {
         val id = addTranscription("meeting.m4a", diarized)
         addTranscription("empty.mp3", "[]")
 
@@ -106,7 +142,7 @@ class TranscriptReadersIntegrationTest : AbstractSharedContextIntegrationTest() 
 
         assertThat(exported["meeting.m4a"]!!.submissionId).isEqualTo(id)
         assertThat(exported["meeting.m4a"]!!.transcriptText).isEqualTo(
-            json.readTree(rest.getForObject("/jobs/$id", String::class.java))["result"]["formatted_text"].asText(),
+            rest.getForEntity("/transcript?jobId=$id", String::class.java).body,
         )
         assertThat(exported["empty.mp3"]!!.transcriptText).isEmpty()
     }
