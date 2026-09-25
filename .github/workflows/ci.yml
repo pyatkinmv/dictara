@@ -32,6 +32,15 @@ jobs:
         run: |
           pip install fastapi httpx pytest python-multipart prometheus-fastapi-instrumentator prometheus_client
           pytest -v
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - name: Run app tests
+        working-directory: app
+        run: |
+          flutter pub get
+          flutter analyze lib test
+          flutter test
 
   build-images:
     needs: test
