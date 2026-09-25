@@ -14,16 +14,20 @@ class PlanService(
     private val planRepo: PlanRepository,
     private val submissionRepo: SubmissionRepository,
 ) {
+    /** [PlanRepository.findByUserId] can only come back null for a [userId] with no `users` row at all:
+     *  `users.plan` is `NOT NULL REFERENCES plans(name)` (V18), so every real user always resolves to a real
+     *  plan. Silently letting a request through here would turn "not a real user" into an unmetered bypass,
+     *  so this fails loud instead — it should never be reachable from an authenticated caller. */
     fun enforce(userId: UUID) {
-        val plan = planRepo.findByUserId(userId) ?: return
+        val plan = planRepo.findByUserId(userId) ?: throw NoSuchElementException("No such user: $userId")
         strategyFor(plan).enforce(userId)
     }
 
     /** The plan name and usage to show a user, worked out by their own plan — a plan with no cap still reports
-     *  how much was used, just with no denominator (see [NoLimitStrategy]). */
+     *  how much was used, just with no denominator (see [NoLimitStrategy]). See [enforce] for why a missing
+     *  plan means a missing user, not a missing plan. */
     fun info(userId: UUID): UserPlanInfo {
-        val plan = planRepo.findByUserId(userId)
-            ?: return UserPlanInfo("Free", PlanUsage(used = 0, max = null, unit = "transcriptions"))
+        val plan = planRepo.findByUserId(userId) ?: throw NoSuchElementException("No such user: $userId")
         return UserPlanInfo(plan.displayName, strategyFor(plan).usage(userId))
     }
 

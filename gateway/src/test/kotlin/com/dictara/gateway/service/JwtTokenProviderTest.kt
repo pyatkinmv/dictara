@@ -1,7 +1,10 @@
 package com.dictara.gateway.service
 
+import io.jsonwebtoken.Jwts
+import io.jsonwebtoken.security.Keys
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import java.util.Date
 import java.util.UUID
 
 /** Plain unit tests, no Spring context needed — [JwtTokenProvider] takes its secret and expiry as plain
@@ -41,5 +44,30 @@ class JwtTokenProviderTest {
         val submissionId = UUID.randomUUID()
         assertThat(jwt.validate("not.a.jwt")).isNull()
         assertThat(jwt.validateAudioToken("not.a.jwt", submissionId)).isNull()
+    }
+
+    @Test
+    fun `a session token past its expiry is rejected, not just malformed ones`() {
+        val alreadyExpired = JwtTokenProvider(secret = "a".repeat(40), expiryDays = -1)
+        assertThat(alreadyExpired.validate(alreadyExpired.issue(UUID.randomUUID()))).isNull()
+    }
+
+    @Test
+    fun `an audio token past its TTL is rejected`() {
+        // issueAudioToken's TTL is a fixed 45-minute constant, not an injectable field like expiryDays — so
+        // this hand-builds a token with the same secret and shape but an expiration in the past, the way an
+        // audio link opened well after the page was left idle would arrive.
+        val secret = "a".repeat(40)
+        val userId = UUID.randomUUID()
+        val submissionId = UUID.randomUUID()
+        val expiredToken = Jwts.builder()
+            .subject(userId.toString())
+            .claim("aud_sid", submissionId.toString())
+            .issuedAt(Date(System.currentTimeMillis() - 2 * 3_600_000))
+            .expiration(Date(System.currentTimeMillis() - 3_600_000))
+            .signWith(Keys.hmacShaKeyFor(secret.toByteArray()))
+            .compact()
+
+        assertThat(JwtTokenProvider(secret = secret, expiryDays = 30).validateAudioToken(expiredToken, submissionId)).isNull()
     }
 }

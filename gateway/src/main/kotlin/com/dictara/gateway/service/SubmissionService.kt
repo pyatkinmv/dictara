@@ -112,6 +112,17 @@ class SubmissionService(
     ): CreateResult {
         val contentHash = uploadResult.contentHash
         if (contentHash.isNotEmpty()) {
+            // Blocks here (not just checks) until any other in-flight request with the exact same dedup key
+            // has committed — otherwise this check and the INSERT below race it (see tryLockForDedup's doc).
+            // The holder only ever does a SELECT + INSERT with no external I/O in between, so contention is
+            // brief; the cap just turns a pathological stuck holder into a clear error instead of a hang.
+            val dedupKey = listOf(userId, contentHash, model, languageHint, diarize, numSpeakers ?: 0, summaryMode).joinToString(":")
+            var attempts = 0
+            while (!submissionRepo.tryLockForDedup(dedupKey)) {
+                if (++attempts > 250) throw IllegalStateException("Timed out waiting for the dedup lock ($dedupKey)")
+                Thread.sleep(20)
+            }
+
             val duplicate = submissionRepo.findDuplicate(userId, contentHash, model, languageHint, diarize, numSpeakers, summaryMode)
             if (duplicate != null) return CreateResult(duplicate.id!!, dedup = true)
         }
