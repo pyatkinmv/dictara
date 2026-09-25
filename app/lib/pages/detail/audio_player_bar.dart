@@ -36,6 +36,10 @@ class AudioPlayerBar extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               _PlayButton(controller: controller),
+              if (controller.error != null) ...[
+                const SizedBox(width: 6),
+                _ErrorBadge(message: controller.error!),
+              ],
               const SizedBox(width: 8),
               Text(formatTimestamp(position), style: TextStyle(fontSize: 11, color: p.text3)),
               const SizedBox(width: 8),
@@ -64,6 +68,24 @@ class AudioPlayerBar extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// A small warning glyph for when playback has failed (`AudioPlayerController.error`) — the play button alone
+/// reverting to its paused state gives no clue why, so this makes the failure visible without permanently
+/// taking over the pill's layout the way a full error line would.
+class _ErrorBadge extends StatelessWidget {
+  const _ErrorBadge({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Tooltip(
+      message: message,
+      child: Icon(Icons.error_outline_rounded, size: 16, color: p.danger),
     );
   }
 }

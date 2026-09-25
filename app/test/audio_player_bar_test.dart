@@ -81,4 +81,32 @@ void main() {
     expect(find.text('0:12'), findsOneWidget);
     expect(find.text('14:22'), findsOneWidget);
   });
+
+  testWidgets('a backend error shows a warning badge with the message, not just a silently reset button', (tester) async {
+    final c = makeController();
+    c.load('u');
+    await pump(tester, c);
+    expect(find.byIcon(Icons.error_outline_rounded), findsNothing);
+
+    backend.onError('Could not load audio');
+    await tester.pump();
+
+    expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget); // reverted, but not silently
+    expect(find.byIcon(Icons.error_outline_rounded), findsOneWidget);
+    expect(find.byTooltip('Could not load audio'), findsOneWidget);
+  });
+
+  testWidgets('starting playback again clears the earlier error badge', (tester) async {
+    final c = makeController();
+    c.load('u');
+    await pump(tester, c);
+    backend.onError('Could not load audio');
+    await tester.pump();
+    expect(find.byIcon(Icons.error_outline_rounded), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.play_arrow_rounded));
+    await tester.pump();
+
+    expect(find.byIcon(Icons.error_outline_rounded), findsNothing);
+  });
 }
