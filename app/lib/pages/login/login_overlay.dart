@@ -183,6 +183,10 @@ class _InputStage extends StatelessWidget {
         ],
         const SizedBox(height: 14),
         _PrimaryButton(busy: auth.busy, onTap: _submit),
+        const SizedBox(height: 14),
+        _OrDivider(p: p),
+        const SizedBox(height: 14),
+        _AnonymousLink(busy: auth.busy, onTap: auth.continueAnonymously),
         const SizedBox(height: 10),
         Text(
           'More sign-in options — including Google — are coming soon.',
@@ -190,6 +194,67 @@ class _InputStage extends StatelessWidget {
           style: TextStyle(fontSize: 11, color: p.text3),
         ),
       ],
+    );
+  }
+}
+
+class _OrDivider extends StatelessWidget {
+  const _OrDivider({required this.p});
+
+  final AppPalette p;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: Divider(color: p.border)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text('or', style: TextStyle(fontSize: 11, color: p.text3)),
+        ),
+        Expanded(child: Divider(color: p.border)),
+      ],
+    );
+  }
+}
+
+class _AnonymousLink extends StatefulWidget {
+  const _AnonymousLink({required this.busy, required this.onTap});
+
+  final bool busy;
+  final VoidCallback onTap;
+
+  @override
+  State<_AnonymousLink> createState() => _AnonymousLinkState();
+}
+
+class _AnonymousLinkState extends State<_AnonymousLink> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return MouseRegion(
+      cursor: widget.busy ? MouseCursor.defer : SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        onTap: widget.busy ? null : widget.onTap,
+        child: Container(
+          key: const Key('login-anonymous-link'),
+          width: double.infinity,
+          alignment: Alignment.center,
+          child: Text(
+            'Continue without an account',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: p.text2,
+              decoration: _hover ? TextDecoration.underline : TextDecoration.none,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

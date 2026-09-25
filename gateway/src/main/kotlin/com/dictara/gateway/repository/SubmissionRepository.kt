@@ -58,4 +58,9 @@ interface SubmissionRepository : CrudRepository<SubmissionEntity, UUID> {
           AND status <> 'failed'
     """)
     fun countCurrentMonthSubmissions(userId: UUID): Long
+
+    /** Submissions ever, not scoped to the current month — for a plan with a lifetime cap instead of a
+     *  recurring monthly one (the anonymous "try it" plan). */
+    @Query("SELECT COUNT(*) FROM submissions WHERE user_id = :userId AND status <> 'failed'")
+    fun countAllSubmissions(userId: UUID): Long
 }

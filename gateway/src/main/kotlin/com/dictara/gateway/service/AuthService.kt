@@ -106,4 +106,12 @@ class AuthService(
         val user = userRepo.findById(entity.userId!!).orElseThrow()
         return LoginLinkStatus(true, jwt.issue(entity.userId!!), user.displayName)
     }
+
+    /** "Continue without an account" — unlike Telegram, nothing to confirm out of band, so this issues a JWT
+     *  immediately instead of a polling token. */
+    @Transactional
+    fun loginAnonymously(): LoginLinkStatus {
+        val user = userService.createAnonymous()
+        return LoginLinkStatus(true, jwt.issue(user.id!!), user.displayName)
+    }
 }

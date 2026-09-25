@@ -13,8 +13,15 @@ class FakeAuthApi implements AuthApi {
   /// Thrown by the next [loginByUsername] call, once.
   Object? failLoginWith;
 
+  /// What [loginAnonymously] answers.
+  LoginResult Function()? onAnonymous;
+
+  /// Thrown by the next [loginAnonymously] call, once.
+  Object? failAnonymousWith;
+
   int loginCalls = 0;
   int pollCalls = 0;
+  int anonymousCalls = 0;
   String? lastUsername;
   String? lastPollToken;
 
@@ -43,5 +50,16 @@ class FakeAuthApi implements AuthApi {
     pollCalls++;
     lastPollToken = pollToken;
     return onPoll?.call(pollToken) ?? _confirmed;
+  }
+
+  @override
+  Future<LoginResult> loginAnonymously() async {
+    anonymousCalls++;
+    final fail = failAnonymousWith;
+    if (fail != null) {
+      failAnonymousWith = null;
+      throw fail;
+    }
+    return onAnonymous?.call() ?? const LoginResult(jwt: 'anon-jwt', displayName: 'Guest');
   }
 }

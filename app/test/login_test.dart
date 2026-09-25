@@ -159,6 +159,31 @@ void main() {
 
       expect(repo.listCalls, greaterThan(beforeLogin)); // re-fetched under the now-real session, not left stale
     });
+
+    testWidgets('"Continue without an account" signs in immediately, no Telegram step', (tester) async {
+      final (auth, api) = freshAuth();
+      api.onAnonymous = () => const LoginResult(jwt: 'anon-jwt', displayName: 'Guest');
+      await pump(tester, auth);
+
+      await tester.tap(find.byKey(const Key('login-anonymous-link')));
+      await settle(tester);
+
+      expect(api.anonymousCalls, 1);
+      expect(find.text('Continue with your Telegram account'), findsNothing);
+      expect(find.text('Transcriptions'), findsWidgets);
+    });
+
+    testWidgets('a refused anonymous login shows the error and stays on the input stage', (tester) async {
+      final (auth, api) = freshAuth();
+      api.failAnonymousWith = const GatewayException('Could not reach the server');
+      await pump(tester, auth);
+
+      await tester.tap(find.byKey(const Key('login-anonymous-link')));
+      await settle(tester);
+
+      expect(find.text('Could not reach the server'), findsOneWidget);
+      expect(find.text('Continue with your Telegram account'), findsOneWidget);
+    });
   });
 
   group('AuthController', () {
@@ -218,6 +243,31 @@ void main() {
 
       expect(auth.isLoggedIn, isTrue);
       expect(calls, greaterThanOrEqualTo(3));
+    });
+
+    test('continueAnonymously signs in right away, with no polling', () async {
+      final api = FakeAuthApi()..onAnonymous = () => const LoginResult(jwt: 'anon-jwt', displayName: 'Guest');
+      final store = InMemoryTokenStore();
+      final tokens = <String?>[];
+      final auth = AuthController(api, store, onToken: tokens.add);
+
+      await auth.continueAnonymously();
+
+      expect(auth.isLoggedIn, isTrue);
+      expect(auth.displayName, 'Guest');
+      expect(tokens, ['anon-jwt']);
+      expect(store.read()?.token, 'anon-jwt');
+      expect(api.loginCalls, 0); // no Telegram request was made
+    });
+
+    test('a refused continueAnonymously leaves error set and the session signed out', () async {
+      final api = FakeAuthApi()..failAnonymousWith = const GatewayException('Could not reach the server');
+      final auth = AuthController(api, InMemoryTokenStore());
+
+      await auth.continueAnonymously();
+
+      expect(auth.isLoggedIn, isFalse);
+      expect(auth.error, 'Could not reach the server');
     });
   });
 }

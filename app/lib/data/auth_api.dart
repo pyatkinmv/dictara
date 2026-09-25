@@ -30,6 +30,10 @@ abstract class AuthApi {
 
   /// Null while the user has not confirmed yet; the caller polls again.
   Future<LoginResult?> pollLogin(String pollToken);
+
+  /// "Continue without an account": a brand new, disposable session, on a small fixed trial quota — nothing
+  /// to confirm, so unlike [loginByUsername] this succeeds right away with no polling.
+  Future<LoginResult> loginAnonymously();
 }
 
 class HttpAuthApi implements AuthApi {
@@ -57,6 +61,15 @@ class HttpAuthApi implements AuthApi {
     if (body['confirmed'] != true) return null;
     final jwt = body['token'] as String?;
     if (jwt == null) throw const GatewayException('Confirmed without a token');
+    return LoginResult(jwt: jwt, displayName: body['display_name'] as String?);
+  }
+
+  @override
+  Future<LoginResult> loginAnonymously() async {
+    final body = await _client.postJson('/auth/anonymous', {});
+    if (body is! Map<String, dynamic>) throw const GatewayException('Expected a login result');
+    final jwt = body['token'] as String?;
+    if (jwt == null) throw const GatewayException('Anonymous login without a token');
     return LoginResult(jwt: jwt, displayName: body['display_name'] as String?);
   }
 }

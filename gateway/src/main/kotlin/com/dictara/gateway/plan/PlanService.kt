@@ -28,6 +28,7 @@ class PlanService(
     }
 
     private fun strategyFor(plan: PlanEntity): PlanStrategy {
+        plan.constraints["lifetime_submissions"]?.asInt()?.let { return LifetimeSubmissionLimitStrategy(it, submissionRepo) }
         val limit = plan.constraints["monthly_submissions"]?.asInt() ?: return NoLimitStrategy(submissionRepo)
         return MonthlySubmissionLimitStrategy(limit, submissionRepo)
     }

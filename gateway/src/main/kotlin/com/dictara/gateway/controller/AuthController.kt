@@ -73,4 +73,10 @@ class AuthController(
         val result = authService.pollLoginLink(UUID.fromString(token))
         return LoginLinkStatusResponse(result.confirmed, result.jwtToken, result.displayName)
     }
+
+    @PostMapping("/auth/anonymous")
+    fun loginAnonymously(): LoginLinkStatusResponse {
+        val result = authService.loginAnonymously()
+        return LoginLinkStatusResponse(result.confirmed, result.jwtToken, result.displayName)
+    }
 }

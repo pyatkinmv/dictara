@@ -91,6 +91,25 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  /// "Continue without an account": a brand new disposable session on the trial quota, no confirmation step.
+  Future<void> continueAnonymously() async {
+    if (_busy) return;
+    _busy = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final result = await _api.loginAnonymously();
+      if (_disposed) return;
+      _busy = false;
+      _applySession(result.jwt, result.displayName, persist: true);
+    } on GatewayException catch (e) {
+      if (_disposed) return;
+      _busy = false;
+      _error = e.message;
+      notifyListeners();
+    }
+  }
+
   /// From "Check Telegram" or "not found", back to entering a username.
   void reset() {
     _pollTimer?.cancel();

@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.util.UUID
 
 @Service
 class UserService(
@@ -54,4 +55,17 @@ class UserService(
     }
 
     fun resolveAnonymous(): UserEntity = resolveByTelegramId(null, null, null, null)
+
+    /** A brand new, disposable account for "try it without an account" — unlike [resolveAnonymous] (which is
+     *  the old Telegram-bot fallback and, because of the `auth_identities` unique constraint, resolves every
+     *  caller to the *same* one shared user), every call here creates a genuinely new user with its own
+     *  identity, on the `anonymous` plan (a small lifetime cap, see `plans` table). Linking this account to a
+     *  real one on a later real login is not implemented yet (docs/redesign-plan.md, plan item 13) — the data
+     *  is simply left behind. */
+    @Transactional
+    fun createAnonymous(): UserEntity {
+        val user = userRepo.save(UserEntity(displayName = "Guest", plan = "anonymous"))
+        authIdentityRepo.save(AuthIdentityEntity(userId = user.id!!, provider = "anon", providerUid = UUID.randomUUID().toString()))
+        return user
+    }
 }

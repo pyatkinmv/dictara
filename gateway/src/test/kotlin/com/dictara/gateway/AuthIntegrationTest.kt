@@ -133,6 +133,40 @@ class AuthIntegrationTest {
     }
 
     @Test
+    fun `loginAnonymously issues a JWT right away, no confirmation needed`() {
+        val response = rest.postForEntity("/auth/anonymous", HttpEntity<Void>(jsonHeaders), Map::class.java)
+
+        assertThat(response.statusCode).isEqualTo(HttpStatus.OK)
+        assertThat(response.body!!["confirmed"]).isEqualTo(true)
+        assertThat(response.body!!["token"] as String?).isNotBlank()
+        assertThat(response.body!!["display_name"]).isEqualTo("Guest")
+    }
+
+    @Test
+    fun `loginAnonymously creates a distinct user every time, unlike the old shared-anonymous fallback`() {
+        val first = rest.postForEntity("/auth/anonymous", HttpEntity<Void>(jsonHeaders), Map::class.java).body!!
+        val second = rest.postForEntity("/auth/anonymous", HttpEntity<Void>(jsonHeaders), Map::class.java).body!!
+
+        assertThat(first["token"]).isNotEqualTo(second["token"])
+        val userCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users", Int::class.java)
+        assertThat(userCount).isEqualTo(2)
+    }
+
+    @Test
+    fun `an anonymous account is on the anonymous plan`() {
+        val response = rest.postForEntity("/auth/anonymous", HttpEntity<Void>(jsonHeaders), Map::class.java).body!!
+        val token = response["token"] as String
+
+        val me = rest.exchange(
+            "/users/me", org.springframework.http.HttpMethod.GET,
+            HttpEntity<Void>(HttpHeaders().apply { setBearerAuth(token) }),
+            Map::class.java,
+        )
+
+        assertThat(me.body!!["plan_name"]).isEqualTo("Try it")
+    }
+
+    @Test
     fun `confirmCallback on expired token returns 410`() {
         val expiredToken = loginTokenRepo.save(LoginTokenEntity(
             token = UUID.randomUUID(),

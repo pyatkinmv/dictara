@@ -62,6 +62,18 @@ class UserProfileIntegrationTest : AbstractSharedContextIntegrationTest() {
     }
 
     @Test
+    fun `an anonymous-plan user sees the lifetime cap, not a monthly one`() {
+        val user = newUser("anonymous")
+        addSubmissions(user, 2)
+
+        val body = me(user)
+
+        assertThat(body["plan_name"].asText()).isEqualTo("Try it")
+        assertThat(body["usage"]["used"].asInt()).isEqualTo(2)
+        assertThat(body["usage"]["max"].asInt()).isEqualTo(2)
+    }
+
+    @Test
     fun `an unlimited-plan user sees a count with no denominator`() {
         val user = newUser("unlimited")
         addSubmissions(user, 14)

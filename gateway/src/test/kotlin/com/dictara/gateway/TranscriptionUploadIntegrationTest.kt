@@ -58,7 +58,9 @@ class TranscriptionUploadIntegrationTest : AbstractSharedContextIntegrationTest(
         wireMock.stubFor(get(urlEqualTo("/jobs/stub-job")).willReturn(okJson("""{"status":"processing"}""")))
     }
 
-    private fun newUser() = UUID.randomUUID().also { jdbcTemplate.update("INSERT INTO users(id) VALUES (?)", it) }
+    private fun newUser(plan: String = "free") = UUID.randomUUID().also {
+        jdbcTemplate.update("INSERT INTO users(id, plan) VALUES (?, ?)", it, plan)
+    }
 
     private class Reply(val status: HttpStatus, val body: JsonNode?)
 
@@ -178,6 +180,19 @@ class TranscriptionUploadIntegrationTest : AbstractSharedContextIntegrationTest(
         assertThat(reply.status).isEqualTo(HttpStatus.TOO_MANY_REQUESTS)
         assertThat(reply.body!!["message"].asText()).startsWith("Monthly transcription limit reached (10/month)")
         assertThat(countSubmissions()).isEqualTo(10)
+    }
+
+    @Test
+    fun `the anonymous plan's lifetime limit is a 429, unlike the free plan it never resets`() {
+        val guest = newUser("anonymous")
+        repeat(2) { upload(content = "guest file $it".toByteArray(), user = guest) }
+        assertThat(countSubmissions(guest)).isEqualTo(2)
+
+        val reply = upload(content = "the third".toByteArray(), user = guest)
+
+        assertThat(reply.status).isEqualTo(HttpStatus.TOO_MANY_REQUESTS)
+        assertThat(reply.body!!["message"].asText()).startsWith("You've used your free trial.")
+        assertThat(countSubmissions(guest)).isEqualTo(2)
     }
 
     // ── The same file again ────────────────────────────────────────────────────
