@@ -70,6 +70,10 @@ interface SubmissionRepository : CrudRepository<SubmissionEntity, UUID> {
     """)
     fun countCurrentMonthSubmissions(userId: UUID): Long
 
+    /** The latest submission that is not failed on any of these audio files, if there is one. */
+    @Query("SELECT * FROM submissions WHERE audio_id IN (:audioIds) AND status <> 'failed' ORDER BY created_at DESC LIMIT 1")
+    fun findLatestNonFailedByAudioIds(audioIds: Collection<UUID>): SubmissionEntity?
+
     /** Submissions ever, not scoped to the current month — for a plan with a lifetime cap instead of a
      *  recurring monthly one (the anonymous "try it" plan). */
     @Query("SELECT COUNT(*) FROM submissions WHERE user_id = :userId AND status <> 'failed'")

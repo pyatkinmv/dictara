@@ -53,6 +53,9 @@ class LocalDbAudioStorage(private val jdbc: JdbcTemplate) : AudioStorage {
 
     override fun uploadBytes(objectName: String, bytes: ByteArray) = put("db://$objectName", bytes)
 
+    override fun isGone(ref: AudioRef): Boolean =
+        jdbc.queryForObject("SELECT NOT EXISTS (SELECT 1 FROM local_audio_objects WHERE uri = ?)", Boolean::class.java, ref.uri) == true
+
     override fun openFrom(ref: AudioRef, offset: Long): InputStream? {
         val data = jdbc.query("SELECT data FROM local_audio_objects WHERE uri = ?", { rs, _ -> rs.getBytes(1) }, ref.uri)
             .firstOrNull() ?: return null

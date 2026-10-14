@@ -83,6 +83,14 @@ class GcsAudioStorage(props: DictaraProperties) : AudioStorage {
         storage.create(blobInfo, bytes)
     }
 
+    override fun isGone(ref: AudioRef): Boolean = try {
+        val path = ref.uri.removePrefix("gs://$bucket/")
+        storage.get(BlobId.of(bucket, path), Storage.BlobGetOption.fields(Storage.BlobField.NAME)) == null
+    } catch (e: Exception) {
+        log.warn("Could not check whether {} still exists, assuming it does: {}", ref.uri, e.message)
+        false
+    }
+
     /** Seeks the GCS read channel to [offset] before wrapping it as a stream, so bytes before it are never
      *  transferred — a plain `InputStream.skip()` on a channel-backed stream would still read and discard them. */
     override fun openFrom(ref: AudioRef, offset: Long): InputStream? = try {

@@ -2,6 +2,7 @@ package com.dictara.gateway.controller
 
 import com.dictara.gateway.entity.*
 import com.dictara.gateway.repository.*
+import com.dictara.gateway.service.AudioIngestService
 import com.dictara.gateway.storage.AudioRef
 import com.dictara.gateway.storage.AudioStorage
 import com.dictara.gateway.service.JwtTokenProvider
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.URLDecoder
@@ -44,6 +46,7 @@ class TranscribeController(
     private val telegramDeliveryRepo: TelegramDeliveryRepository,
     private val segmentQueries: TranscriptSegmentQueries,
     private val audioStorage: AudioStorage,
+    private val audioIngest: AudioIngestService,
     private val jwtTokenProvider: JwtTokenProvider,
 ) {
     companion object {
@@ -159,7 +162,7 @@ class TranscribeController(
         val contentType = file.contentType ?: "application/octet-stream"
 
         val audioId = UUID.randomUUID()
-        val uploadResult = audioStorage.upload(audioId, originalName, file.inputStream, file.size, contentType)
+        val uploadResult = audioIngest.store(audioId, originalName, file, contentType)
 
         val result = submissionService.createSubmission(
             userId = user.id!!, audioId = audioId, originalName = originalName,
@@ -348,6 +351,7 @@ class TranscribeController(
             ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
         val submission = submissionRepo.findById(id).orElse(null)?.takeIf { it.userId == userId }
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Transcription not found")
+        requireAudioPresent(submission.audioId)
         return mapOf(
             "token" to jwtTokenProvider.issueAudioToken(userId, submission.id!!),
             "expiresInSeconds" to JwtTokenProvider.AUDIO_TOKEN_TTL_SECONDS,
@@ -373,6 +377,7 @@ class TranscribeController(
         val audioMeta = audioMetaRepo.findById(submission.audioId).orElse(null)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
         val storageUri = audioMeta.storageUri ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        requireAudioPresent(submission.audioId)
         val totalSize = audioMeta.sizeBytes
 
         val (start, end) = parseAudioRange(rangeHeader, totalSize)
@@ -380,7 +385,11 @@ class TranscribeController(
         val length = end - start + 1
 
         val body = StreamingResponseBody { out ->
-            audioStorage.openFrom(AudioRef(storageUri), start)?.use { it.copyRange(out, length) }
+            try {
+                audioStorage.openFrom(AudioRef(storageUri), start)?.use { it.copyRange(out, length) }
+            } catch (e: ClientAborted) {
+                log.debug("Audio stream of {} stopped by the client", id)
+            }
         }
         var builder = (if (rangeHeader != null) ResponseEntity.status(HttpStatus.PARTIAL_CONTENT) else ResponseEntity.ok())
             .header(HttpHeaders.ACCEPT_RANGES, "bytes")
@@ -388,6 +397,14 @@ class TranscribeController(
             .header(HttpHeaders.CONTENT_LENGTH, length.toString())
         if (rangeHeader != null) builder = builder.header(HttpHeaders.CONTENT_RANGE, "bytes $start-$end/$totalSize")
         return builder.body(body)
+    }
+
+    /** 410 when the audio of [audioId] is on record but its file no longer exists in storage: the player shows
+     *  "no longer available" instead of failing halfway through a stream. No record or no file reference is a 404. */
+    private fun requireAudioPresent(audioId: UUID) {
+        val uri = audioMetaRepo.findById(audioId).orElse(null)?.storageUri
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No audio")
+        if (audioStorage.isGone(AudioRef(uri))) throw ResponseStatusException(HttpStatus.GONE, "Audio is no longer available")
     }
 
     @GetMapping("/transcript")
@@ -494,13 +511,20 @@ private fun parseAudioRange(header: String?, totalSize: Long): Pair<Long, Long> 
     return start to end
 }
 
+/** The browser closed the connection (seeked elsewhere, left the page): normal for playback, not an error. */
+private class ClientAborted(cause: IOException) : RuntimeException(cause)
+
 private fun InputStream.copyRange(out: OutputStream, length: Long) {
     val buffer = ByteArray(8192)
     var remaining = length
     while (remaining > 0) {
         val n = read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
         if (n < 0) break
-        out.write(buffer, 0, n)
+        try {
+            out.write(buffer, 0, n)
+        } catch (e: IOException) {
+            throw ClientAborted(e)
+        }
         remaining -= n
     }
 }

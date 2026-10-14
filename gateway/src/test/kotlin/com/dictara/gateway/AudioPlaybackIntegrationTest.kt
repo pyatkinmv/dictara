@@ -79,6 +79,29 @@ class AudioPlaybackIntegrationTest : AbstractSharedContextIntegrationTest() {
     }
 
     @Test
+    fun `a recording whose file is gone is a 410 for the token, so the player can say so`() {
+        val gone = "gs://test/gone.mp3"
+        given(audioStorage.isGone(AudioRef(gone))).willReturn(true)
+        val id = addSubmission(storageUri = gone)
+
+        val resp = issueToken(id)
+
+        assertThat(resp.statusCode).isEqualTo(HttpStatus.GONE)
+    }
+
+    @Test
+    fun `streaming a recording whose file is gone is a 410 before any byte is sent, not an error halfway`() {
+        val id = addSubmission()
+        val token = issueToken(id).body!!["token"] as String
+        // The file disappears after the token was issued.
+        given(audioStorage.isGone(AudioRef("gs://test/audio.mp3"))).willReturn(true)
+
+        val resp = rest.getForEntity("/transcriptions/$id/audio?token=$token", String::class.java)
+
+        assertThat(resp.statusCode).isEqualTo(HttpStatus.GONE)
+    }
+
+    @Test
     fun `a fresh token streams the whole file when there is no Range header`() {
         val id = addSubmission()
         val token = issueToken(id).body!!["token"] as String
@@ -151,12 +174,13 @@ class AudioPlaybackIntegrationTest : AbstractSharedContextIntegrationTest() {
     }
 
     @Test
-    fun `no audio stored yet is a 404`() {
+    fun `no audio stored yet is a 404, for the token and for a stream that skips it`() {
         val id = addSubmission(storageUri = null)
-        val token = issueToken(id).body!!["token"] as String
 
-        val resp = rest.getForEntity("/transcriptions/$id/audio?token=$token", String::class.java)
+        assertThat(issueToken(id).statusCode).isEqualTo(HttpStatus.NOT_FOUND)
 
+        val forged = jwt.issueAudioToken(userId, id)
+        val resp = rest.getForEntity("/transcriptions/$id/audio?token=$forged", String::class.java)
         assertThat(resp.statusCode).isEqualTo(HttpStatus.NOT_FOUND)
     }
 }
