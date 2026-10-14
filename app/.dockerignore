@@ -1,0 +1,7 @@
+# Keep host build artifacts out of the image: .dart_tool holds absolute paths of the machine it was made on
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.idea/
+*.iml
