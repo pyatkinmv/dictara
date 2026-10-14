@@ -6,6 +6,7 @@ import com.google.cloud.storage.BlobInfo
 import com.google.cloud.storage.Storage
 import com.google.cloud.storage.StorageOptions
 import org.slf4j.LoggerFactory
+import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Component
 import java.io.InputStream
 import java.nio.channels.Channels
@@ -21,6 +22,7 @@ import java.util.UUID
  *
  *  Uploaded objects are NOT deleted by the application — the bucket has a 90-day
  *  lifecycle rule that expires them automatically. */
+@Profile("!local")
 @Component
 class GcsAudioStorage(props: DictaraProperties) : AudioStorage {
 
@@ -79,6 +81,18 @@ class GcsAudioStorage(props: DictaraProperties) : AudioStorage {
             .setContentEncoding("gzip")
             .build()
         storage.create(blobInfo, bytes)
+    }
+
+    /** Seeks the GCS read channel to [offset] before wrapping it as a stream, so bytes before it are never
+     *  transferred — a plain `InputStream.skip()` on a channel-backed stream would still read and discard them. */
+    override fun openFrom(ref: AudioRef, offset: Long): InputStream? = try {
+        val path = ref.uri.removePrefix("gs://$bucket/")
+        val reader = storage.reader(BlobId.of(bucket, path))
+        if (offset > 0) reader.seek(offset)
+        Channels.newInputStream(reader)
+    } catch (e: Exception) {
+        log.warn("Audio range-read failed for {} at offset {}: {}", ref.uri, offset, e.message)
+        null
     }
 
 }

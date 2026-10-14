@@ -5,36 +5,41 @@ Central HTTP entry point: auth, job persistence, orchestration.
 ## Architecture
 
 ```
-Client (tg-bot / Flutter)  ──HTTP──>  TranscribeController
-                                       - saves audio: GCS (AudioStorageClient) or BLOB (audio_content)
+Client (tg-bot / Flutter)  ──HTTP──>  Controllers (TranscribeController, TranscriptionUploadController,
+                                       Tag/Speaker/SuggestionController, AuthController, ExportController)
+                                       - audio goes to AudioStorage (GCS, the transcriber fetches it by gs:// reference)
                                              ↓
                                        OrchestratorService
                                        - single dispatchExecutor thread
                                        - dispatches one job at a time
                                              ↓
                               TranscriberClient  ──HTTP──>  transcriber
-                              (submit by reference or bytes, + poll)
+                              (submit by gs:// reference + poll)
                                              ↓
-                                       SummarizerPort (Gemini or Noop)
+                                       SummarizerPort.analyze  (Gemini, Noop, or the local stub)
+                                       one call: summary + title + tags + speaker names
+                                             ↓
+                                       SuggestionService.record (checks the proposals, keeps them as rows)
 ```
 
-### Audio storage: GCS reference vs in-DB BLOB
+Two generations of API live side by side and must both keep working while the old clients exist:
+- **Old** (Telegram bot `tg-bot`, `POST /transcribe`, `GET /jobs/{id}`, `/jobs/{id}/tags`…): kept as it was.
+- **New** (Flutter client): `POST /transcriptions`, `GET /transcriptions` (paged, filtered), `GET /transcriptions/{id}`, the tag and speaker libraries `/tags`, `/speakers`, speaker assignment `PUT /transcriptions/{id}/speakers`, AI suggestions `POST /transcriptions/{id}/suggestions/...`. These answer 401 without a token. Migrations and API changes are **additive only** (see [docs/local-backend-integration.md](../docs/local-backend-integration.md), 5.2). Everything about how the pieces were built and why is in that document.
 
-Cloud Run enforces a hard 32 MiB HTTP request body limit, so streaming large
-audio files directly to the transcriber returns `413`. When
-`dictara.storage.gcs.bucket` (`GCS_UPLOADS_BUCKET`) is configured,
-`AudioStorageClient` uploads the file to that bucket and the gateway submits the
-job by `gs://` reference (`TranscriberClient.submitByReference`,
-`audio_meta.storage_uri`) — the transcriber downloads it directly from GCS,
-bypassing the HTTP body entirely. Uploaded objects are not deleted by the
-application; a 90-day bucket lifecycle rule configured on the GCS bucket expires
-them automatically (see [docs/deployment.md](../docs/deployment.md)).
+### Audio storage
 
-When the bucket is not configured (e.g. local docker-compose), the gateway falls
-back to the legacy path: the file is stored as a BLOB in `audio_content` and
-streamed to the transcriber over multipart HTTP (`TranscriberClient.submit`).
-Both paths are fully supported side by side — `audio_meta.storage_uri` is `NULL`
-for BLOB-backed rows and a `gs://...` URI for GCS-backed ones.
+Cloud Run enforces a hard 32 MiB HTTP request body limit, so audio is not streamed to the transcriber. `dictara.storage.gcs.bucket` (`GCS_UPLOADS_BUCKET`) is **required**: `GcsAudioStorage` uploads the file to that bucket and the gateway submits the job by `gs://` reference (`TranscriberClient.submitByReference`, `audio_meta.storage_uri`); the transcriber downloads it directly. Uploaded objects are not deleted by the application; a 90-day bucket lifecycle rule expires them (see [docs/deployment.md](../docs/deployment.md)). Under the `local` profile `LocalDbAudioStorage` keeps the file in the database instead.
+
+`audio_meta.metadata` (JSONB) holds whatever the transcriber's `ffprobe` found on the original file — codec, bit rate, sample rate, channels and its raw container tags (`tags.creation_time` is the actual recording date on most phone-recorded M4A/MP4, distinct from `audio_meta.created_at`, which is upload time). The gateway never inspects the file itself for this — it only stores what `TranscriberJobSnapshot.audioMetadata` reports (`result.audio_metadata` in the transcriber's job response), since the gateway's own upload path deliberately never buffers the file (`GcsAudioStorage.upload` streams straight through) and has no ffmpeg/ffprobe in its image; the transcriber is the only place in the pipeline that ever has the original bytes on local disk. Null when `ffprobe` found nothing or the transcript has no phrases yet. Not surfaced anywhere yet — stored for future use.
+
+Duplicates: the same user + SHA-256 of the file + model + language + diarize + number of speakers + summary mode (failed jobs excluded) is not transcribed again; the existing job is returned. The file is uploaded to storage before that check.
+
+### Transcripts, speakers, suggestions (data model)
+
+- `transcript_segments`: one row per phrase (`idx`, `start_s`, `end_s`, `text`, `voice`, `speaker_id`). The old JSON column `transcripts.segments` is still written too (dual write, marked `TODO(drop-json-segments)`) and is to be dropped in a later release.
+- `transcript_voices`: a diarizer voice (`SPEAKER_01`) is a library speaker *in this transcript*. A phrase's speaker is its own mark, else its voice's, else nobody (shown as "Speaker N"). `GET /transcriptions/{id}` leaves this resolution to the client (it returns both the raw `segments[].speaker` and `voices`, and Flutter combines them — `TranscriptionDetail.speakerOfSegment`/`presentSpeakers`). Text meant to be read outside the app — `.txt` download, Copy, the ZIP export (`SubmissionService.resolvedTranscriptText`) — resolves it server-side instead, since there is no client there to do it; `GET /jobs/{id}`'s `formatted_text` (the old Telegram-bot reader, via `TranscriptFormatter.format`) is the one exception left with raw labels, kept as it was for that client.
+- Tags and speakers belong to a user; names are unique per user (speakers ignoring case). Their colors are computed from the name (`NameColors`), not stored.
+- `transcript_suggestions`: what the AI proposes (title, tags of the library, a speaker for a voice), `status` pending/accepted/rejected. **Nothing is applied until the user accepts**; a speaker is created in the library only on accept. The model's answer is checked before it is kept (tag in the library, voice exists, the quoted evidence is in the transcript, a new name is a whole word of the transcript). `Summary: Off` skips the whole AI call.
 
 ## Submission status lifecycle
 
@@ -49,7 +54,7 @@ pending  →  processing  →  summarizing  →  done
 | `pending` | Waiting in queue — not yet sent to transcriber |
 | `processing` | Transcriber is actively transcribing this job |
 | `summarizing` | Transcription done, summarizer running in parallel with next transcription job |
-| `done` | Complete (transcript + optional summary available) |
+| `done` | Complete (transcript + optional summary and suggestions available) |
 | `failed` | Terminal failure (non-retryable transcriber error or 3 attempts exhausted) |
 
 DB invariant: at most one submission can be `processing` at a time (enforced by partial unique index `idx_one_processing_submission`).
@@ -66,13 +71,13 @@ Returns `null` for `processing`, `summarizing`, `done`, `failed`.
 
 ## Scheduled maintenance jobs
 
-Two background jobs run automatically to keep GCS storage lean:
+Background jobs that run automatically:
 
 | Job | Schedule | What it does |
 |-----|----------|--------------|
 | `dedup_storage_uris` | Daily at 03:00 | Finds `audio_meta` rows with the same `content_hash` and updates them all to share the oldest `storage_uri`, making duplicate GCS objects unreferenced |
 | `cleanup_orphaned_gcs_objects` | Weekly Sunday at 04:00 | Lists all objects in the GCS bucket, deletes any not referenced by `audio_meta.storage_uri`. Skips objects younger than 1 hour (grace period to avoid race with in-flight uploads) |
-| `daily_db_backup` | Daily at 16:45 UTC | Queries all tables from `information_schema` (excluding `flyway_schema_history`), serializes each to gzipped JSON, uploads to `gs://{bucket}/backups/{date}/{table}.json.gz`. New tables added via Flyway are picked up automatically. **If the database grows large, this approach loads entire tables into memory and must be replaced with a streaming/pg_dump-based solution.** |
+| `daily_db_backup` | Daily at 16:45 UTC | Queries all tables from `information_schema` (excluding `flyway_schema_history`), serializes each to gzipped JSON, uploads to `gs://{bucket}/backups/{date}/{table}.json.gz`. New tables added via Flyway are picked up automatically. **If the database grows large, this approach loads entire tables into memory and must be replaced with a streaming/pg_dump-based solution** (`transcript_segments` is now one of the big tables). |
 
 Every run is recorded in the `job_runs` table (`status`: `running` → `completed`/`failed`, `rows_affected`, `finished_at`). Use `JobTracker.tracked(name) { ... }` to wrap any future job in the same way — one line, no boilerplate.
 
@@ -80,15 +85,23 @@ Every run is recorded in the `job_runs` table (`status`: `running` → `complete
 
 | File | Purpose |
 |------|---------|
-| `OrchestratorService.kt` | Job lifecycle: dispatch, transcription polling, summarization |
-| `SubmissionStateService.kt` | DB state transitions (all `@Transactional`) |
-| `TranscribeController.kt` | POST /transcribe, GET /jobs/{id} |
-| `ExportController.kt` | GET /export — streams ZIP of all user transcriptions (transcript + summary + optional audio) |
-| `TranscriberClient.kt` | HTTP client for transcriber service |
-| `AudioStorageClient.kt` | Uploads audio to GCS for the reference-based submit path (active only when `dictara.storage.gcs.bucket` is set) |
+| `service/OrchestratorService.kt` | Job lifecycle: dispatch, transcription polling, summarization (one call for summary and proposals) |
+| `service/SubmissionStateService.kt` | DB state transitions (all `@Transactional`) |
+| `service/SubmissionService.kt` | Reading and listing transcriptions, detail page data |
+| `service/SuggestionService.kt` | Checks and stores AI proposals; accept / reject / accept all / dismiss all |
+| `service/TagService.kt`, `SpeakerService.kt`, `TranscriptSpeakerService.kt` | Libraries and speaker assignment |
+| `controller/TranscribeController.kt` | Old `POST /transcribe`, `GET /jobs/{id}`; shared `validateUpload` |
+| `controller/TranscriptionUploadController.kt` | New `POST /transcriptions` |
+| `controller/ExportController.kt` | GET /export — streams ZIP of all user transcriptions (transcript + summary + optional audio) |
+| `client/TranscriberClient.kt` | HTTP client for the transcriber service |
+| `port/SummarizerPort.kt`, `adapter/GeminiSummarizer.kt` | The Gemini prompt and structured-output schema (one JSON: summary, title, tags, speakers). `parse()` treats a summary with no ending punctuation as a failure (Gemini occasionally leaves an internal `"` unescaped, which truncates the JSON string mid-sentence but still leaves the rest of the object well-formed) — the prompt also tells the model not to use double quotes in the summary. Either failure reuses `OrchestratorService`'s existing 3-attempt retry, no separate retry logic needed. |
+| `service/AuthService.kt`, `controller/AuthController.kt` | Telegram login: username → bot confirmation → JWT (`port/TelegramBotSimulator.kt` stands in for the bot under `local`) |
+| `plan/PlanService.kt`, `PlanStrategy.kt` | Enforces and reports plan usage (`GET /users/me`, `controller/UserController.kt`) — a strategy per plan (`MonthlySubmissionLimitStrategy`, `NoLimitStrategy`), each names its own unit |
+| `storage/GcsAudioStorage.kt` | Uploads audio to GCS (active outside the `local` profile) |
 | `job/JobTracker.kt` | Wraps any block in a `job_runs` DB record (running → completed/failed) |
-| `job/StorageMaintenanceService.kt` | Two `@Scheduled` GCS maintenance jobs |
-| `db/migration/` | Flyway migrations |
+| `job/StorageMaintenanceService.kt` | The `@Scheduled` GCS maintenance jobs |
+| `db/migration/` | Flyway migrations (additive only) |
+| `db/local/` | Seed for the `local` profile (not on Flyway's default path) |
 
 ## Build
 
@@ -96,40 +109,18 @@ Every run is recorded in the `job_runs` table (`status`: `running` → `complete
 docker compose build gateway && docker compose up -d gateway
 ```
 
-## Running integration tests locally
+## Local development (profile `local`)
 
-In CI, tests use Testcontainers (spins up a throwaway postgres). Locally, Testcontainers doesn't work (Docker Desktop API version mismatch), so tests connect to a real postgres container instead.
+`scripts\dev.ps1` starts Postgres (`docker-compose.dev.yml`, database `dictara_dev`) and the gateway with the `local` profile; `scripts\dev-reset.ps1` recreates the database. Under this profile a stub transcriber (`adapter/StubTranscriber.kt`) replaces `TranscriberClient`, a stub summarizer (`adapter/StubSummarizer.kt`, proposals worked out by simple rules) replaces Gemini, a stub bot (`adapter/LocalTelegramBotSimulator.kt`) auto-confirms Telegram logins after a short pause (username `unknown` is left unregistered on purpose, to try the "not found" screen) so the real login screen works without `tg-bot` or a Telegram account, audio is kept in the database (`storage/LocalDbAudioStorage.kt`, table from `db/local/`), requests without a token still belong to a seeded dev user (`filter/LocalDevAuthFilter.kt`, kept alongside the real login for quick `curl`/script testing), and the scheduled backup/cleanup jobs do not run.
 
-**One-time setup:**
+`config/LocalProfileGuard.kt` makes the profile refuse to start unless the database is `dictara_dev` on localhost and `GCS_UPLOADS_BUCKET` is unset — keep it that way, the cleanup job would otherwise delete real audio. Everything local is off by default (`@Profile("local")` / `!local`, `db/local` is not on Flyway's default path). Details: [docs/local-backend-integration.md](../docs/local-backend-integration.md).
 
-1. Start a dedicated local postgres for tests (separate from the compose postgres, different port so it can't accidentally hit the production DB via SSH tunnel):
+**To see the seeded demo data (transcriptions, tags, speakers) through the real login screen**, log in with the Telegram username **`dev`** — `db/local/R__seed.sql` seeds an `auth_identities` row (`telegram` / `local-dev`) pointing at the same dev user `LocalDevAuthFilter` uses, so that username lands on the account that owns the seed data instead of a brand-new empty one (any other username creates a fresh account, same as it would in production).
 
-```powershell
-docker run -d --name postgres-test -p 127.0.0.1:5433:5432 \
-  -e POSTGRES_USER=dictara \
-  -e POSTGRES_PASSWORD=hesoyam \
-  -e POSTGRES_DB=dictara \
-  postgres:16
-```
-
-2. Add to root `.env`:
-
-```
-TEST_DB_URL=jdbc:postgresql://localhost:5433/dictara
-TEST_DB_PASSWORD=hesoyam
-```
-
-`build.gradle.kts` reads these vars from `.env` automatically and passes them to the test JVM — no IntelliJ run-config edits needed.
-
-**Run tests:**
+## Running tests
 
 ```bash
 ./gradlew test
-# or just run them from IntelliJ as usual
 ```
 
-Flyway runs all migrations on first connect. If the DB gets into a broken state, wipe and restart:
-
-```powershell
-docker exec postgres-test psql -U dictara -d dictara -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO dictara;"
-```
+Integration tests use Testcontainers (a throwaway `postgres:16`, so Docker must be running); nothing needs to be configured, and no `TEST_DB_*` variable should be set. They `TRUNCATE audio_meta CASCADE` between tests, so **never point them at a database that holds data** (that is what `TEST_DB_URL` in the root `.env` would do; `build.gradle.kts` still forwards such variables if present). The `local`-profile test starts its own container named `dictara_dev`.

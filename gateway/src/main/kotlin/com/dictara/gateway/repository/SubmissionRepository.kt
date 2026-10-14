@@ -8,9 +8,18 @@ import java.util.UUID
 
 interface SubmissionRepository : CrudRepository<SubmissionEntity, UUID> {
 
-    fun findByUserIdOrderByCreatedAtDesc(userId: UUID): List<SubmissionEntity>
-
     fun findByUserIdAndStatusOrderByCreatedAtAsc(userId: UUID, status: String): List<SubmissionEntity>
+
+    /** Serializes concurrent [findDuplicate]-then-insert calls that share the same dedup [key] (see
+     *  `SubmissionService.createSubmission`): without this, two near-simultaneous uploads of identical content
+     *  can both pass the "no existing duplicate" check before either commits, since nothing at the DB level
+     *  enforces the dedup uniqueness (only a plain, non-unique index backs `audio_meta(user_id, content_hash)`
+     *  — see V12). `pg_try_advisory_xact_lock` is a session-scoped lock auto-released at the end of the
+     *  caller's transaction (commit or rollback); the caller retries on `false` until the other request's
+     *  transaction (and thus its INSERT) has committed, so the retry always then sees the row via
+     *  [findDuplicate] instead of racing it. */
+    @Query("SELECT pg_try_advisory_xact_lock(hashtext(:key)::bigint)")
+    fun tryLockForDedup(key: String): Boolean
 
     fun existsByStatus(status: String): Boolean
 
@@ -60,4 +69,9 @@ interface SubmissionRepository : CrudRepository<SubmissionEntity, UUID> {
           AND status <> 'failed'
     """)
     fun countCurrentMonthSubmissions(userId: UUID): Long
+
+    /** Submissions ever, not scoped to the current month — for a plan with a lifetime cap instead of a
+     *  recurring monthly one (the anonymous "try it" plan). */
+    @Query("SELECT COUNT(*) FROM submissions WHERE user_id = :userId AND status <> 'failed'")
+    fun countAllSubmissions(userId: UUID): Long
 }

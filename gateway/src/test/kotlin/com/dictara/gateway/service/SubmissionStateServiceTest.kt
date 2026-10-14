@@ -5,6 +5,7 @@ import com.dictara.gateway.entity.AudioMetaEntity
 import com.dictara.gateway.entity.SubmissionEntity
 import com.dictara.gateway.entity.UserEntity
 import com.dictara.gateway.repository.*
+import com.dictara.gateway.model.Segment
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.dictara.gateway.storage.AudioStorage
 import org.assertj.core.api.Assertions.assertThat
@@ -26,6 +27,7 @@ class SubmissionStateServiceTest : AbstractSharedContextIntegrationTest() {
     @Autowired lateinit var submissionRepo: SubmissionRepository
     @Autowired lateinit var transcriptRepo: TranscriptRepository
     @Autowired lateinit var stageAttemptRepo: StageAttemptRepository
+    @Autowired lateinit var segmentQueries: TranscriptSegmentQueries
 
     @Test
     fun `claimNextPendingSubmission returns null when no submissions exist`() {
@@ -56,7 +58,7 @@ class SubmissionStateServiceTest : AbstractSharedContextIntegrationTest() {
         val submission = submissionRepo.save(SubmissionEntity(userId = user.id!!, audioId = audio.id))
         val submissionId = submission.id!!
         val attempt = stateService.createAttempt(submissionId, "transcription")
-        val segments = ObjectMapper().readTree("""[{"start":0.0,"end":2.0,"text":"Hello"}]""")
+        val segments = listOf(Segment(0.0, 2.0, "Hello", "SPEAKER_00"), Segment(2.5, 4.0, "World", null))
 
         stateService.saveTranscriptAndCompleteAttempt(
             submissionId = submissionId,
@@ -73,6 +75,15 @@ class SubmissionStateServiceTest : AbstractSharedContextIntegrationTest() {
         val savedTranscript = transcriptRepo.findBySubmissionId(submissionId)
         assertThat(savedTranscript?.detectedLanguage).isEqualTo("ru")
         assertThat(savedTranscript?.segments).isNotNull
+
+        // The phrases are stored as rows, in order, and (for one more release) also as the old JSON.
+        assertThat(segmentQueries.findByTranscriptId(savedTranscript!!.id!!)).isEqualTo(segments)
+        val json = savedTranscript.segments!!
+        assertThat(json.size()).isEqualTo(2)
+        assertThat(json[0]["text"].asText()).isEqualTo("Hello")
+        assertThat(json[0]["speaker"].asText()).isEqualTo("SPEAKER_00")
+        assertThat(json[1]["speaker"].isNull).isTrue()
+        assertThat(json[1]["start"].asDouble()).isEqualTo(2.5)
 
         val savedAttempt = stageAttemptRepo.findById(attempt.id!!).orElseThrow()
         assertThat(savedAttempt.status).isEqualTo("done")

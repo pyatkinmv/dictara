@@ -1,17 +1,15 @@
 package com.dictara.gateway.service
 
-import com.dictara.gateway.client.TranscribeParams
-import com.dictara.gateway.client.TranscriberClient
+import com.dictara.gateway.port.TranscribeParams
+import com.dictara.gateway.port.TranscriberPort
 import com.dictara.gateway.dto.ProgressInfo
 import com.dictara.gateway.entity.StageAttemptEntity
 import com.dictara.gateway.entity.SubmissionEntity
 import com.dictara.gateway.model.SummaryMode
+import com.dictara.gateway.port.AnalysisInput
 import com.dictara.gateway.port.SummarizerPort
 import com.dictara.gateway.repository.AudioMetaRepository
 import com.dictara.gateway.util.TranscriptFormatter
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -21,11 +19,12 @@ import java.util.concurrent.Executors
 
 @Service
 class OrchestratorService(
-    private val transcriberClient: TranscriberClient,
+    private val transcriberClient: TranscriberPort,
     private val summarizer: SummarizerPort,
     private val props: com.dictara.gateway.config.DictaraProperties,
     private val stateService: SubmissionStateService,
     private val audioMetaRepo: AudioMetaRepository,
+    private val suggestionService: SuggestionService,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -33,7 +32,6 @@ class OrchestratorService(
     // Single-threaded: serializes all dispatch decisions so only one claim runs at a time
     private val dispatchExecutor = Executors.newSingleThreadExecutor()
     private val liveProgress = ConcurrentHashMap<UUID, ProgressInfo>()
-    private val mapper = ObjectMapper().registerKotlinModule()
 
     /** Called by controller after creating a pending submission. */
     fun signalPending() {
@@ -109,16 +107,16 @@ class OrchestratorService(
             log.info("Submission $submissionId submitted to transcriber (externalJobId=$transcriberJobId)")
 
             val snapshot = pollTranscriber(submissionId, transcriberJobId)
-            val segmentsNode = mapper.valueToTree<JsonNode>(snapshot.segments ?: emptyList<Any>())
             val formattedText = TranscriptFormatter.format(snapshot.segments ?: emptyList())
 
             stateService.saveTranscriptAndCompleteAttempt(
                 submissionId = submissionId,
                 audioId = submission.audioId,
                 attemptId = attempt.id!!,
-                segments = segmentsNode,
+                segments = snapshot.segments ?: emptyList(),
                 audioDurationS = snapshot.audioDurationS,
                 detectedLanguage = snapshot.detectedLanguage,
+                audioMetadata = snapshot.audioMetadata,
             )
             liveProgress.remove(submissionId)
             log.info("Transcription complete for submission $submissionId (duration=${snapshot.audioDurationS?.let { "%.1fs".format(it) } ?: "unknown"}, language=${snapshot.detectedLanguage ?: "unknown"}, segments=${snapshot.segments?.size ?: 0})")
@@ -151,7 +149,6 @@ class OrchestratorService(
         val submissionId = attempt.submissionId
         try {
             val snapshot = pollTranscriber(submissionId, attempt.externalJobId!!)
-            val segmentsNode = mapper.valueToTree<JsonNode>(snapshot.segments ?: emptyList<Any>())
             val formattedText = TranscriptFormatter.format(snapshot.segments ?: emptyList())
             val freshSubmission = stateService.loadSubmission(submissionId)
 
@@ -159,9 +156,10 @@ class OrchestratorService(
                 submissionId = submissionId,
                 audioId = freshSubmission.audioId,
                 attemptId = attempt.id!!,
-                segments = segmentsNode,
+                segments = snapshot.segments ?: emptyList(),
                 audioDurationS = snapshot.audioDurationS,
                 detectedLanguage = snapshot.detectedLanguage,
+                audioMetadata = snapshot.audioMetadata,
             )
             liveProgress.remove(submissionId)
             log.info("Resumed transcription complete for submission $submissionId (duration=${snapshot.audioDurationS?.let { "%.1fs".format(it) } ?: "unknown"}, language=${snapshot.detectedLanguage ?: "unknown"}, segments=${snapshot.segments?.size ?: 0})")
@@ -210,15 +208,23 @@ class OrchestratorService(
         log.info("Summarization attempt ${attempt.attemptNum} started for submission $submissionId")
 
         try {
-            val summaryText = summarizer.summarize(
-                text = formattedText,
-                audioDurationSeconds = audioDurationS,
-                mode = mode,
-                language = languageHint,
+            val library = suggestionService.libraryOf(submissionId)
+            val analysis = summarizer.analyze(
+                AnalysisInput(
+                    text = formattedText,
+                    audioDurationSeconds = audioDurationS,
+                    mode = mode,
+                    language = languageHint,
+                    tags = library.tags,
+                    speakers = library.speakers,
+                )
             )
-            stateService.saveSummaryAndCompleteAttempt(submissionId, attempt.id!!, summaryText)
+            stateService.saveSummaryAndCompleteAttempt(submissionId, attempt.id!!, analysis.summary)
+            // The proposals are a bonus: whatever goes wrong with them must not cost the summary.
+            runCatching { suggestionService.record(submissionId, analysis) }
+                .onFailure { log.warn("Suggestions for submission $submissionId were not kept: ${it.message}") }
             stateService.completeSubmission(submissionId)
-            log.info("Summarization complete for submission $submissionId (${summaryText.length} chars)")
+            log.info("Summarization complete for submission $submissionId (${analysis.summary.length} chars)")
 
         } catch (e: Exception) {
             log.warn("Summarization attempt ${attempt.attemptNum} failed for submission $submissionId: ${e.message}")
@@ -238,7 +244,7 @@ class OrchestratorService(
 
     // ── Helpers ─────────────────────────────────────────────────────────────
 
-    private fun pollTranscriber(submissionId: UUID, transcriberJobId: String): com.dictara.gateway.client.TranscriberJobSnapshot {
+    private fun pollTranscriber(submissionId: UUID, transcriberJobId: String): com.dictara.gateway.port.TranscriberJobSnapshot {
         val deadlineMs = System.currentTimeMillis() + props.transcriber.timeoutHours * 60 * 60 * 1000L
         while (System.currentTimeMillis() < deadlineMs) {
             Thread.sleep(props.transcriber.pollIntervalMs)

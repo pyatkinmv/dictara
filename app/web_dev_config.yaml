@@ -1,0 +1,14 @@
+# Settings of `flutter run -d web-server` / `-d chrome` (read from the project root).
+#
+# The app calls the gateway at /api/... on its own origin. In production nginx forwards that to the gateway
+# and cuts the /api prefix (app/nginx.conf: `rewrite ^/api/(.*) /$1`); this does the same for local
+# development, so the browser sees one origin and the gateway needs no CORS.
+#
+# Start the gateway first (scripts/dev.ps1), then:
+#   flutter run -d web-server --web-port 3001 -t lib/material/main_material.dart
+#
+server:
+  proxy:
+    - prefix: /api/
+      replace: /
+      target: http://localhost:8080

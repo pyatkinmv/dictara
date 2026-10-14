@@ -2,9 +2,15 @@ package com.dictara.gateway.controller
 
 import com.dictara.gateway.entity.*
 import com.dictara.gateway.repository.*
+import com.dictara.gateway.storage.AudioRef
 import com.dictara.gateway.storage.AudioStorage
+import com.dictara.gateway.service.JwtTokenProvider
+import com.dictara.gateway.service.ListSort
+import com.dictara.gateway.service.ListStatuses
 import com.dictara.gateway.service.OrchestratorService
 import com.dictara.gateway.service.SubmissionService
+import com.dictara.gateway.service.TagRef
+import com.dictara.gateway.service.TranscriptionListFilter
 import com.dictara.gateway.service.UserService
 import com.dictara.gateway.util.TranscriptFormatter
 import jakarta.servlet.http.HttpServletRequest
@@ -16,6 +22,9 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 import org.springframework.web.server.ResponseStatusException
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody
+import java.io.InputStream
+import java.io.OutputStream
 import java.net.URLDecoder
 import java.time.Instant
 import java.util.UUID
@@ -33,12 +42,21 @@ class TranscribeController(
     private val stageAttemptRepo: StageAttemptRepository,
     private val tagRepo: TagRepository,
     private val telegramDeliveryRepo: TelegramDeliveryRepository,
+    private val segmentQueries: TranscriptSegmentQueries,
     private val audioStorage: AudioStorage,
+    private val jwtTokenProvider: JwtTokenProvider,
 ) {
     companion object {
         private val log = LoggerFactory.getLogger(TranscribeController::class.java)
         val SUPPORTED_EXTENSIONS = setOf("mp3", "mp4", "m4a", "wav", "ogg", "oga", "opus", "flac", "webm", "mkv", "avi", "mov")
-        private val MAX_UPLOAD_SIZE_BYTES = 400L * 1024 * 1024
+        const val MAX_UPLOAD_SIZE_BYTES = 400L * 1024 * 1024
+
+        /** Page size of the paged list when the client does not say; the largest it may ask for. */
+        const val DEFAULT_PAGE_SIZE = 30
+        const val MAX_PAGE_SIZE = 500
+
+        /** The length of `transcripts.title`. */
+        const val MAX_TITLE_LENGTH = 200
 
         private val IMAGE_SIGNATURES = listOf(
             byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte())          to "JPEG",
@@ -61,6 +79,29 @@ class TranscribeController(
                 }
             }
             return null
+        }
+
+        /**
+         * Refuses a file the gateway will not take: too large, not one of [SUPPORTED_EXTENSIONS], or a picture
+         * with an audio extension. Shared by every endpoint that takes an upload, so they cannot drift apart.
+         */
+        fun validateUpload(file: MultipartFile) {
+            if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+                throw ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "File is too large. Maximum allowed size is 400 MB.")
+            }
+            val ext = file.originalFilename?.substringAfterLast('.', "")?.lowercase() ?: ""
+            if (ext !in SUPPORTED_EXTENSIONS) {
+                log.warn("Rejected upload: unsupported extension '.$ext' (file=${file.originalFilename})")
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Unsupported format: .$ext. Supported: ${SUPPORTED_EXTENSIONS.sorted().joinToString(", ")}")
+            }
+            val header = file.inputStream.readNBytes(16)
+            val imageFormat = detectImageFormat(header)
+            if (imageFormat != null) {
+                log.warn("Rejected upload: file appears to be a $imageFormat image (file=${file.originalFilename})")
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "File appears to be a $imageFormat image, not an audio/video file.")
+            }
         }
     }
 
@@ -102,22 +143,7 @@ class TranscribeController(
         @RequestHeader(name = "X-Telegram-Message-Id", required = false) telegramMessageId: Long?,
         servletRequest: HttpServletRequest,
     ): SubmitResponse {
-        if (file.size > MAX_UPLOAD_SIZE_BYTES) {
-            throw ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "File is too large. Maximum allowed size is 400 MB.")
-        }
-        val ext = file.originalFilename?.substringAfterLast('.', "")?.lowercase() ?: ""
-        if (ext !in SUPPORTED_EXTENSIONS) {
-            log.warn("Rejected upload: unsupported extension '.$ext' (file=${file.originalFilename})")
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "Unsupported format: .$ext. Supported: ${SUPPORTED_EXTENSIONS.sorted().joinToString(", ")}")
-        }
-        val header = file.inputStream.readNBytes(16)
-        val imageFormat = detectImageFormat(header)
-        if (imageFormat != null) {
-            log.warn("Rejected upload: file appears to be a $imageFormat image (file=${file.originalFilename})")
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "File appears to be a $imageFormat image, not an audio/video file.")
-        }
+        validateUpload(file)
 
         val authenticatedUserId = servletRequest.getAttribute("authenticatedUserId") as UUID?
         fun dec(v: String?) = v?.let { URLDecoder.decode(it, "UTF-8") }
@@ -165,8 +191,8 @@ class TranscribeController(
         val summary = summaryRepo.findBySubmissionId(id)
         val liveProgress = orchestrator.getLiveProgress(id)
 
-        val segmentsNode = transcript?.segments
-        val formattedText = TranscriptFormatter.format(segmentsNode)
+        val phrases = transcript?.id?.let { segmentQueries.findByTranscriptId(it) }
+        val formattedText = TranscriptFormatter.format(phrases ?: emptyList())
 
         val transcriptionAttempts = stageAttemptRepo.findBySubmissionIdAndStageOrderByAttemptNumDesc(id, "transcription")
         val latestFailedAttempt = transcriptionAttempts.firstOrNull { it.status == "failed" }
@@ -180,13 +206,8 @@ class TranscribeController(
             (Instant.now().toEpochMilli() - latestAttempt.startedAt!!.toEpochMilli()) / 1000.0
         } else null
 
-        val segments = segmentsNode?.map { seg ->
-            SegmentResponse(
-                start = seg["start"].asDouble(),
-                end = seg["end"].asDouble(),
-                text = seg["text"].asText(),
-                speaker = seg["speaker"]?.takeIf { !it.isNull }?.asText(),
-            )
+        val segments = phrases?.map { seg ->
+            SegmentResponse(start = seg.start, end = seg.end, text = seg.text, speaker = seg.speaker)
         }
 
         val tags = transcript?.let { tagRepo.findByTranscriptId(it.id!!) }?.map { it.name } ?: emptyList()
@@ -215,21 +236,164 @@ class TranscribeController(
         )
     }
 
-    data class TranscriptionSummary(val jobId: String, val fileName: String, val title: String, val createdAt: String, val status: String, val tags: List<String>)
+    /** One entry of the list. [T] is how a tag is shown: the plain array keeps names (the old client), the paged shape sends [TagRef]s with id and color. */
+    data class TranscriptionSummary<T>(
+        val jobId: String,
+        val fileName: String,
+        val title: String,
+        val createdAt: String,
+        val status: String,
+        val tags: List<T>,
+        /** Seconds of audio; absent until the transcriber has finished. */
+        val audioDurationS: Double? = null,
+        /** Distinct diarizer speakers in the transcript; absent while there is no transcript. */
+        val speakerCount: Int? = null,
+        /** How far transcribing is, in percent; only while transcribing. */
+        val processingPct: Int? = null,
+        /** `transcribing`, `diarizing` or `summarizing` while the job is worked on. */
+        val processingPhase: String? = null,
+    )
 
+    /** The paged shape of the list: what `GET /transcriptions?page=&size=` returns. */
+    data class TranscriptionPage(val items: List<TranscriptionSummary<TagRef>>, val page: Int, val size: Int, val hasNext: Boolean)
+
+    /**
+     * The user's transcriptions, newest first unless `sort` says otherwise.
+     *
+     * Without `page`/`size` this is the plain array the production web client has always received. With
+     * either of them it is a [TranscriptionPage] (`page` counts from 0, `size` defaults to
+     * [DEFAULT_PAGE_SIZE]); new clients use that and the old shape can go once the old client is retired.
+     *
+     * The list can be narrowed and ordered, in either shape:
+     *  - `q`: text to find in the title shown in the list, ignoring case;
+     *  - `status`: any of `pending`, `processing` (which includes summarizing), `done`, `failed`; repeat
+     *    the parameter for several;
+     *  - `tag`: any of these tag names; repeat the parameter for several (names may contain commas, so a
+     *    comma is not a separator);
+     *  - `speaker`: any of these library speaker names actually speak in the transcript; repeat the parameter
+     *    for several;
+     *  - `sort`: `newest` (default), `oldest`, `longest` or `name`.
+     * An unknown status or sort is a 400 rather than being ignored, so a typo does not quietly return the
+     * wrong list.
+     */
     @GetMapping("/transcriptions")
-    fun listTranscriptions(servletRequest: HttpServletRequest): List<TranscriptionSummary> {
+    fun listTranscriptions(
+        @RequestParam(required = false) page: Int?,
+        @RequestParam(required = false) size: Int?,
+        @RequestParam(required = false) q: String?,
+        @RequestParam(required = false) sort: String?,
+        servletRequest: HttpServletRequest,
+    ): Any {
         val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
             ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
-        return submissionService.listForUser(userId).map {
-            TranscriptionSummary(it.jobId.toString(), it.fileName, it.title, it.createdAt, it.status, it.tags)
+        fun <T> summary(it: SubmissionService.SubmissionSummary, tag: (TagRef) -> T) =
+            TranscriptionSummary(
+                it.jobId.toString(), it.fileName, it.title, it.createdAt, it.status, it.tags.map(tag),
+                it.audioDurationS, it.speakerCount, it.processingPct, it.processingPhase,
+            )
+
+        // Read straight from the request: binding a List would split "a,b" into two values.
+        val statuses = servletRequest.getParameterValues("status").orEmpty().onEach {
+            if (it !in ListStatuses.stored) {
+                throw ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Unknown status '$it'; expected one of ${ListStatuses.stored.keys.sorted()}",
+                )
+            }
+        }.toSet()
+        val filter = TranscriptionListFilter(
+            search = q,
+            statuses = statuses,
+            tags = servletRequest.getParameterValues("tag").orEmpty().filter { it.isNotEmpty() }.toSet(),
+            speakers = servletRequest.getParameterValues("speaker").orEmpty().filter { it.isNotEmpty() }.toSet(),
+            sort = if (sort == null) ListSort.NEWEST else ListSort.parse(sort) ?: throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST, "Unknown sort '$sort'; expected one of ${ListSort.entries.map { it.param }}",
+            ),
+        )
+
+        if (page == null && size == null) return submissionService.listForUser(userId, filter).map { summary(it) { tag -> tag.label } }
+
+        val pageNumber = page ?: 0
+        val pageSize = size ?: DEFAULT_PAGE_SIZE
+        if (pageNumber < 0) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "page must be 0 or more")
+        if (pageSize !in 1..MAX_PAGE_SIZE) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "size must be between 1 and $MAX_PAGE_SIZE")
         }
+        val result = submissionService.listPageForUser(userId, filter, pageNumber, pageSize)
+        return TranscriptionPage(result.items.map { summary(it) { tag -> tag } }, pageNumber, pageSize, result.hasNext)
+    }
+
+    /**
+     * One transcription with everything the detail page shows: file facts, tags, the summary (Markdown or
+     * null) and the segments. 404 when it does not exist or belongs to someone else, so ids of other users
+     * cannot be probed. `GET /jobs/{id}` stays as it is for the old client.
+     */
+    @GetMapping("/transcriptions/{id}")
+    fun getTranscription(@PathVariable id: String, servletRequest: HttpServletRequest): SubmissionService.TranscriptionDetail {
+        val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
+            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
+        val submissionId = runCatching { UUID.fromString(id) }.getOrNull()
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Transcription not found")
+        return submissionService.getDetail(userId, submissionId)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Transcription not found")
+    }
+
+    /**
+     * A short-lived token (`JwtTokenProvider.AUDIO_TOKEN_TTL_SECONDS`) scoped to this one transcription's
+     * audio — the player passes it as `?token=` on [streamAudio] since an `<audio>` element can't send the
+     * usual `Authorization` header. Ownership is checked here, same as [getTranscription].
+     */
+    @PostMapping("/transcriptions/{id}/audio-token")
+    fun issueAudioToken(@PathVariable id: UUID, servletRequest: HttpServletRequest): Map<String, Any> {
+        val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
+            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
+        val submission = submissionRepo.findById(id).orElse(null)?.takeIf { it.userId == userId }
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Transcription not found")
+        return mapOf(
+            "token" to jwtTokenProvider.issueAudioToken(userId, submission.id!!),
+            "expiresInSeconds" to JwtTokenProvider.AUDIO_TOKEN_TTL_SECONDS,
+        )
+    }
+
+    /**
+     * Streams the original audio file for playback, honoring a single-range `Range` header so the player can
+     * seek without downloading from the start. Authorized by [token] (from [issueAudioToken]), not the usual
+     * bearer header. Multi-range requests (`bytes=0-10,20-30`) are treated as just the first range — browsers
+     * don't send those for `<audio>` seeking, only single open-ended ranges.
+     */
+    @GetMapping("/transcriptions/{id}/audio")
+    fun streamAudio(
+        @PathVariable id: UUID,
+        @RequestParam token: String,
+        @RequestHeader(value = "Range", required = false) rangeHeader: String?,
+    ): ResponseEntity<StreamingResponseBody> {
+        val tokenUserId = jwtTokenProvider.validateAudioToken(token, id)
+            ?: throw ResponseStatusException(HttpStatus.FORBIDDEN)
+        val submission = submissionRepo.findById(id).orElse(null)?.takeIf { it.userId == tokenUserId }
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        val audioMeta = audioMetaRepo.findById(submission.audioId).orElse(null)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        val storageUri = audioMeta.storageUri ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        val totalSize = audioMeta.sizeBytes
+
+        val (start, end) = parseAudioRange(rangeHeader, totalSize)
+        if (start >= totalSize) throw ResponseStatusException(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+        val length = end - start + 1
+
+        val body = StreamingResponseBody { out ->
+            audioStorage.openFrom(AudioRef(storageUri), start)?.use { it.copyRange(out, length) }
+        }
+        var builder = (if (rangeHeader != null) ResponseEntity.status(HttpStatus.PARTIAL_CONTENT) else ResponseEntity.ok())
+            .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+            .header(HttpHeaders.CONTENT_TYPE, audioMeta.contentType)
+            .header(HttpHeaders.CONTENT_LENGTH, length.toString())
+        if (rangeHeader != null) builder = builder.header(HttpHeaders.CONTENT_RANGE, "bytes $start-$end/$totalSize")
+        return builder.body(body)
     }
 
     @GetMapping("/transcript")
     fun downloadTranscript(@RequestParam jobId: UUID): ResponseEntity<ByteArray> {
-        val text = transcriptRepo.findBySubmissionId(jobId)
-            ?.let { TranscriptFormatter.format(it.segments) }
+        val text = transcriptRepo.findBySubmissionId(jobId)?.id
+            ?.let { submissionService.resolvedTranscriptText(it) }
             ?.takeIf { it.isNotEmpty() }
             ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok()
@@ -272,7 +436,11 @@ class TranscribeController(
         }
         val userId = servletRequest.getAttribute("authenticatedUserId") as UUID?
             ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
-        val title = body["title"]
+        val title = body["title"]?.trim()
+        // The column is VARCHAR(200): say so instead of failing in the database.
+        if (title != null && title.length > MAX_TITLE_LENGTH) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Title must be at most $MAX_TITLE_LENGTH characters")
+        }
         submissionService.updateTitle(id, userId, title)
     }
 
@@ -312,5 +480,27 @@ class TranscribeController(
     fun deliveryFailed(@PathVariable jobId: String, @RequestBody body: Map<String, Any?>) {
         val retryAfterS = (body["retry_after_s"] as? Number)?.toLong()
         submissionService.scheduleDeliveryFailure(UUID.fromString(jobId), retryAfterS)
+    }
+}
+
+/** Parses a single-range `Range: bytes=start-end` header against [totalSize]. A missing or malformed header,
+ *  or a missing end, means "to the end". Does not handle suffix ranges (`bytes=-500`, "the last 500 bytes") —
+ *  browsers don't send those when seeking an `<audio>` element, only `bytes=START-` or no header at all. */
+private fun parseAudioRange(header: String?, totalSize: Long): Pair<Long, Long> {
+    if (header == null || !header.startsWith("bytes=")) return 0L to totalSize - 1
+    val parts = header.removePrefix("bytes=").substringBefore(',').split("-", limit = 2)
+    val start = (parts.getOrNull(0)?.toLongOrNull() ?: 0L).coerceIn(0, totalSize - 1)
+    val end = (parts.getOrNull(1)?.toLongOrNull() ?: (totalSize - 1)).coerceIn(start, totalSize - 1)
+    return start to end
+}
+
+private fun InputStream.copyRange(out: OutputStream, length: Long) {
+    val buffer = ByteArray(8192)
+    var remaining = length
+    while (remaining > 0) {
+        val n = read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
+        if (n < 0) break
+        out.write(buffer, 0, n)
+        remaining -= n
     }
 }

@@ -20,6 +20,9 @@ import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.*
 import org.springframework.util.LinkedMultiValueMap
 import java.util.UUID
+import java.util.concurrent.CyclicBarrier
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /** See [AudioStorageIntegrationTest] for why this helper is needed. */
 private fun <T> any(): T {
@@ -157,6 +160,34 @@ class DeduplicationIntegrationTest : AbstractSharedContextIntegrationTest() {
         val meta = audioMetaRepo.findById(submission.audioId).orElseThrow()
 
         assertThat(meta.contentHash).isEqualTo(HASH_A)
+    }
+
+    @Test
+    fun `two near-simultaneous uploads of the same file do not race past the dedup check`() {
+        // SubmissionService.createSubmission does "SELECT existing duplicate, then INSERT if none"; without
+        // tryLockForDedup serializing same-key callers, two requests that both pass the SELECT before either
+        // commits would both insert, silently doubling the quota charge and the GCS/transcriber work (there is
+        // no DB-level uniqueness to fall back on — only a plain, non-unique index backs
+        // audio_meta(user_id, content_hash), see V12). A CyclicBarrier lines both threads up at the same
+        // instant to make that window as likely as possible to hit if the lock were ever removed.
+        val barrier = CyclicBarrier(2)
+        val pool = Executors.newFixedThreadPool(2)
+        try {
+            val futures = List(2) {
+                pool.submit<ResponseEntity<Map<*, *>>> {
+                    barrier.await(10, TimeUnit.SECONDS)
+                    submit()
+                }
+            }
+            val results = futures.map { it.get(10, TimeUnit.SECONDS) }
+            val ids = results.map { jobId(it) }.toSet()
+
+            assertThat(ids).describedAs("both requests must resolve to the one submission, not a race").hasSize(1)
+            assertThat(results.map { it.body!!["dedup"] }).describedAs("one is the original, one is the dedup hit").containsExactlyInAnyOrder(false, true)
+            assertThat(submissionRepo.count()).isEqualTo(1L)
+        } finally {
+            pool.shutdown()
+        }
     }
 
     @Test

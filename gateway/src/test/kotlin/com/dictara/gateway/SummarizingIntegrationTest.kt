@@ -1,6 +1,8 @@
 package com.dictara.gateway
 
 import com.dictara.gateway.model.SummaryMode
+import com.dictara.gateway.port.Analysis
+import com.dictara.gateway.port.AnalysisInput
 import com.dictara.gateway.port.SummarizerPort
 import com.dictara.gateway.storage.AudioRef
 import com.dictara.gateway.storage.AudioStorage
@@ -36,9 +38,9 @@ class SummarizingIntegrationTest : AbstractSharedContextIntegrationTest() {
         @Bean @Primary
         fun summarizer(): SummarizerPort = object : SummarizerPort {
             override fun isAvailable() = true
-            override fun summarize(text: String, audioDurationSeconds: Double?, mode: SummaryMode, language: String): String {
+            override fun analyze(input: AnalysisInput): Analysis {
                 Thread.sleep(500) // hold 'summarizing' state long enough to observe
-                return "Test summary"
+                return Analysis("Test summary", title = "Proposed title")
             }
         }
     }
@@ -70,6 +72,23 @@ private fun <T> any(): T { ArgumentMatchers.any<T>(); @Suppress("UNCHECKED_CAST"
         @Suppress("UNCHECKED_CAST")
         val result = resp["result"] as Map<String, Any?>
         assertThat(result["summary"]).isEqualTo("Test summary")
+    }
+
+    @Test
+    fun `what the summarizer proposes is kept before the job is done`() {
+        wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
+            .willReturn(okJson("""{"job_id":"sum-prop"}""")))
+        wireMock.stubFor(get(urlEqualTo("/jobs/sum-prop"))
+            .willReturn(okJson("""{"status":"done","duration_s":1.0,"result":{"formatted_text":"Hello","audio_duration_s":2.0,"segments":[{"start":0.0,"end":1.0,"text":"Hello","speaker":null}]}}""")))
+
+        val jobId = submitFile(3004L, summaryMode = "brief")
+        waitForStatus(jobId, "done")
+
+        val titles = jdbcTemplate.queryForList(
+            "SELECT s.title FROM transcript_suggestions s JOIN transcripts t ON t.id = s.transcript_id WHERE t.submission_id = ? AND s.kind = 'title' AND s.status = 'pending'",
+            String::class.java, jobId,
+        )
+        assertThat(titles).containsExactly("Proposed title")
     }
 
     @Test

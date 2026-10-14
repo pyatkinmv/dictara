@@ -28,6 +28,11 @@ class SubmissionService(
     private val summaryRepo: SummaryRepository,
     private val orchestrator: OrchestratorService,
     private val planService: PlanService,
+    private val transcriptListQueries: TranscriptListQueries,
+    private val submissionListQuery: SubmissionListQuery,
+    private val segmentQueries: TranscriptSegmentQueries,
+    private val speakerQueries: TranscriptSpeakerQueries,
+    private val suggestionService: SuggestionService,
 ) {
     data class CreateResult(val submissionId: UUID, val dedup: Boolean)
 
@@ -37,7 +42,46 @@ class SubmissionService(
         val title: String,
         val createdAt: String,
         val status: String,
-        val tags: List<String>,
+        val tags: List<TagRef>,
+        /** Length of the audio; known once the transcriber has finished. */
+        val audioDurationS: Double? = null,
+        /** Distinct speaker labels in the transcript; null while there is no transcript. */
+        val speakerCount: Int? = null,
+        /** Percent of the audio transcribed so far; only while transcribing (see [processingProgress]). */
+        val processingPct: Int? = null,
+        /** `transcribing`, `diarizing` or `summarizing` while the job is being worked on. */
+        val processingPhase: String? = null,
+    )
+
+    /** A page of [SubmissionSummary]; [hasNext] tells whether another page follows. */
+    data class SubmissionPage(val items: List<SubmissionSummary>, val hasNext: Boolean)
+
+    /** [speaker] is the diarizer's label; [assignedSpeaker] the library speaker set on this phrase alone, if any. */
+    data class DetailSegment(val start: Double, val end: Double, val text: String, val speaker: String?, val assignedSpeaker: SpeakerRef? = null)
+
+    /** In this transcript the diarizer voice [voice] is the library speaker [speaker]. */
+    data class VoiceAssignment(val voice: String, val speaker: SpeakerRef)
+
+    /** Everything the detail page of one transcription shows (`GET /transcriptions/{id}`). */
+    data class TranscriptionDetail(
+        val jobId: UUID,
+        val fileName: String,
+        val title: String,
+        val fileSizeBytes: Long,
+        val createdAt: String,
+        val status: String,
+        val audioDurationS: Double?,
+        val language: String?,
+        val wordCount: Int,
+        val tags: List<TagRef>,
+        /** The summary as the summarizer wrote it (Markdown), or null when there is none. */
+        val summary: String?,
+        /** Empty until the transcript exists; a segment's speaker is null when the audio was not diarized. */
+        val segments: List<DetailSegment>,
+        /** Which speaker each named voice is; a voice not listed is still "Speaker N". */
+        val voices: List<VoiceAssignment>,
+        /** What the AI proposes and the user has not settled; left out when there is nothing. */
+        val suggestions: Suggestions? = null,
     )
 
     data class ExportData(
@@ -68,6 +112,17 @@ class SubmissionService(
     ): CreateResult {
         val contentHash = uploadResult.contentHash
         if (contentHash.isNotEmpty()) {
+            // Blocks here (not just checks) until any other in-flight request with the exact same dedup key
+            // has committed — otherwise this check and the INSERT below race it (see tryLockForDedup's doc).
+            // The holder only ever does a SELECT + INSERT with no external I/O in between, so contention is
+            // brief; the cap just turns a pathological stuck holder into a clear error instead of a hang.
+            val dedupKey = listOf(userId, contentHash, model, languageHint, diarize, numSpeakers ?: 0, summaryMode).joinToString(":")
+            var attempts = 0
+            while (!submissionRepo.tryLockForDedup(dedupKey)) {
+                if (++attempts > 250) throw IllegalStateException("Timed out waiting for the dedup lock ($dedupKey)")
+                Thread.sleep(20)
+            }
+
             val duplicate = submissionRepo.findDuplicate(userId, contentHash, model, languageHint, diarize, numSpeakers, summaryMode)
             if (duplicate != null) return CreateResult(duplicate.id!!, dedup = true)
         }
@@ -95,36 +150,98 @@ class SubmissionService(
         return CreateResult(submission.id!!, dedup = false)
     }
 
+    /** The whole list of the user that matches [filter], in the order [filter] asks for (newest first by default). */
     @Transactional(readOnly = true)
-    fun listForUser(userId: UUID): List<SubmissionSummary> {
-        val submissions = submissionRepo.findByUserIdOrderByCreatedAtDesc(userId)
+    fun listForUser(userId: UUID, filter: TranscriptionListFilter = TranscriptionListFilter()): List<SubmissionSummary> =
+        summarize(inOrder(submissionListQuery.findIds(userId, filter).ids))
+
+    /** One page of that list (`GET /transcriptions?page=&size=`), [page] counting from 0. */
+    @Transactional(readOnly = true)
+    fun listPageForUser(userId: UUID, filter: TranscriptionListFilter, page: Int, size: Int): SubmissionPage {
+        val found = submissionListQuery.findIds(userId, filter, page, size)
+        return SubmissionPage(summarize(inOrder(found.ids)), found.hasNext)
+    }
+
+    /** One entry of the list, as the list would show it now (a freshly accepted upload, or the one it duplicates). */
+    @Transactional(readOnly = true)
+    fun listItem(submissionId: UUID): SubmissionSummary? = summarize(inOrder(listOf(submissionId))).singleOrNull()
+
+    /** The submissions with these ids, in the order of [ids] (the database returns them in any order). */
+    private fun inOrder(ids: List<UUID>): List<SubmissionEntity> {
+        val byId = submissionRepo.findAllById(ids).associateBy { it.id }
+        return ids.mapNotNull { byId[it] }
+    }
+
+    /** The list entries for [submissions]; their files, transcripts and tags are fetched in a few batched queries. */
+    private fun summarize(submissions: List<SubmissionEntity>): List<SubmissionSummary> {
         val audioById = audioMetaRepo.findAllById(submissions.map { it.audioId }).associateBy { it.id }
         val submissionIds = submissions.mapNotNull { it.id }
         if (submissionIds.isEmpty()) return emptyList()
 
-        val transcriptBySubmissionId = transcriptRepo.findBySubmissionIdIn(submissionIds).associateBy { it.submissionId }
-        val transcriptIds = transcriptBySubmissionId.values.mapNotNull { it.id }
+        // Not the transcripts themselves: their segments can be huge and the list only needs a few facts.
+        val transcriptBySubmissionId = transcriptListQueries.findRows(submissionIds).associateBy { it.submissionId }
+        val transcriptIds = transcriptBySubmissionId.values.map { it.transcriptId }
 
-        val tagsByTranscriptId: Map<UUID, List<String>> = if (transcriptIds.isEmpty()) {
+        val tagsByTranscriptId: Map<UUID, List<TagRef>> = if (transcriptIds.isEmpty()) {
             emptyMap()
         } else {
             val transcriptTags = transcriptTagRepo.findByTranscriptIdIn(transcriptIds)
             val tagsById = tagRepository.findAllById(transcriptTags.map { it.tagId }).associateBy { it.id }
-            transcriptTags.groupBy({ it.transcriptId }, { tagsById[it.tagId]?.name ?: "" })
+            transcriptTags.groupBy({ it.transcriptId }) { tt -> tagsById[tt.tagId]?.let { TagRef(it.id!!, it.name) } }
+                .mapValues { (_, refs) -> refs.filterNotNull() }
         }
 
         return submissions.map { s ->
-            val fileName = audioById[s.audioId]?.originalName ?: "unknown"
+            val audio = audioById[s.audioId]
+            val fileName = audio?.originalName ?: "unknown"
             val transcript = transcriptBySubmissionId[s.id]
+            val (phase, pct) = processingProgress(s.status, orchestrator.getLiveProgress(s.id!!))
             SubmissionSummary(
                 jobId = s.id!!,
                 fileName = fileName,
                 title = transcript?.title ?: fileName,
                 createdAt = s.createdAt.toString(),
                 status = s.status,
-                tags = (tagsByTranscriptId[transcript?.id] ?: emptyList()).sorted(),
+                tags = (tagsByTranscriptId[transcript?.transcriptId] ?: emptyList()).sortedBy { it.label },
+                audioDurationS = audio?.durationS,
+                speakerCount = transcript?.speakerCount,
+                processingPct = pct,
+                processingPhase = phase,
             )
         }
+    }
+
+    /** One transcription of [userId] with its text, or null when there is none with this id (also someone else's). */
+    @Transactional(readOnly = true)
+    fun getDetail(userId: UUID, submissionId: UUID): TranscriptionDetail? {
+        val submission = submissionRepo.findById(submissionId).orElse(null)?.takeIf { it.userId == userId } ?: return null
+        val audio = audioMetaRepo.findById(submission.audioId).orElse(null)
+        val transcript = transcriptRepo.findBySubmissionId(submissionId)
+        val segments = transcript?.id?.let { speakerQueries.detailPhrases(it) }?.map {
+            DetailSegment(
+                start = it.start, end = it.end, text = it.text, speaker = it.voice,
+                assignedSpeaker = it.own?.let { own -> SpeakerRef(own.id, own.name) },
+            )
+        } ?: emptyList()
+        val voices = transcript?.id?.let { speakerQueries.voices(it) }
+            ?.map { VoiceAssignment(it.voice, SpeakerRef(it.speaker.id, it.speaker.name)) } ?: emptyList()
+        val fileName = audio?.originalName ?: "unknown"
+        return TranscriptionDetail(
+            jobId = submissionId,
+            fileName = fileName,
+            title = transcript?.title?.takeIf { it.isNotBlank() } ?: fileName,
+            fileSizeBytes = audio?.sizeBytes ?: 0,
+            createdAt = submission.createdAt.toString(),
+            status = submission.status,
+            audioDurationS = audio?.durationS,
+            language = transcript?.detectedLanguage,
+            wordCount = segments.sumOf { seg -> seg.text.split(Regex("\\s+")).count { it.isNotEmpty() } },
+            tags = transcript?.id?.let { tagRepository.findByTranscriptId(it).map { tag -> TagRef(tag.id!!, tag.name) } } ?: emptyList(),
+            summary = summaryRepo.findBySubmissionId(submissionId)?.text?.takeIf { it.isNotBlank() },
+            segments = segments,
+            voices = voices,
+            suggestions = transcript?.id?.let { suggestionService.pending(it) },
+        )
     }
 
     @Transactional(readOnly = true)
@@ -137,14 +254,36 @@ class SubmissionService(
             ExportData(
                 submissionId = id,
                 createdAt = s.createdAt,
-                transcriptText = transcriptRepo.findBySubmissionId(id)
-                    ?.let { TranscriptFormatter.format(it.segments) },
+                transcriptText = transcriptRepo.findBySubmissionId(id)?.id?.let { resolvedTranscriptText(it) },
                 summaryText = summaryRepo.findBySubmissionId(id)?.text,
                 originalName = audio?.originalName,
                 storageUri = audio?.storageUri,
             )
         }
     }
+
+    /**
+     * The `.txt` download, Copy, and the ZIP export: each phrase with who actually said it, matching what the
+     * page shows (a per-phrase mark, else its voice's confirmed speaker, else "Speaker N") — never the raw
+     * diarizer label ("SPEAKER_00"), which [com.dictara.gateway.util.TranscriptFormatter.format] alone gives.
+     * Empty when the transcript has no phrases (same as [TranscriptFormatter.format] on an empty list).
+     */
+    @Transactional(readOnly = true)
+    fun resolvedTranscriptText(transcriptId: UUID): String {
+        val phrases = speakerQueries.detailPhrases(transcriptId)
+        val voiceSpeakers = speakerQueries.voices(transcriptId).associate { it.voice to it.speaker.name }
+        return TranscriptFormatter.formatResolved(phrases.map { p ->
+            TranscriptFormatter.ResolvedPhrase(
+                start = p.start, end = p.end, text = p.text,
+                speakerName = p.own?.name ?: p.voice?.let { voiceSpeakers[it] ?: fallbackVoiceName(it) },
+            )
+        })
+    }
+
+    /** The diarizer names its voices `SPEAKER_00`, `SPEAKER_01`, ...; unassigned, the page calls them
+     *  "Speaker 1", "Speaker 2", ... (1-based) — this mirrors that naming for the exported text. */
+    private fun fallbackVoiceName(voice: String): String =
+        voice.removePrefix("SPEAKER_").toIntOrNull()?.let { "Speaker ${it + 1}" } ?: voice
 
     @Transactional
     fun addTag(submissionId: UUID, userId: UUID, tagName: String): List<String> {
@@ -194,4 +333,27 @@ class SubmissionService(
         }
         telegramDeliveryRepo.scheduleRetry(jobId, retryAfterTs)
     }
+}
+
+/**
+ * What the list shows of a job that is being worked on: the phase and, while transcribing, how far it is.
+ *
+ * The percentage exists for transcription only. Diarization and summarizing are shown by name alone (the
+ * client fills the bar), so nothing is invented for phases whose share of the total time is unknown.
+ * Without live progress (the gateway restarted meanwhile, or the job has just been picked up) a job that
+ * is `processing` has no phase either.
+ */
+internal fun processingProgress(status: String, live: com.dictara.gateway.dto.ProgressInfo?): Pair<String?, Int?> = when (status) {
+    "summarizing" -> "summarizing" to null
+    "processing" -> when {
+        live == null -> null to null
+        live.phase == "diarizing" -> "diarizing" to null
+        else -> {
+            val total = live.totalS
+            val done = live.processedS
+            val pct = if (total != null && total > 0 && done != null) (done / total * 100).toInt().coerceIn(0, 100) else null
+            "transcribing" to pct
+        }
+    }
+    else -> null to null
 }

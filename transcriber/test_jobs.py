@@ -29,6 +29,19 @@ def test_set_done_accepts_none_for_optional_fields():
     assert job.status == "done"
     assert job.result["language"] is None
     assert job.result["audio_duration_s"] is None
+    assert job.result["audio_metadata"] is None  # not given, and not required
+
+
+def test_set_done_carries_the_probed_audio_metadata():
+    store = JobStore()
+    job_id = store.create(tmp_path="/tmp/fake4.wav")
+    store.set_processing(job_id)
+
+    metadata = {"format_name": "mov,mp4,m4a", "bit_rate": 128000, "codec": "aac",
+                "sample_rate": 44100, "channels": 2, "tags": {"creation_time": "2026-06-22T14:41:00.000000Z"}}
+    store.set_done(job_id, segments=[], language="en", audio_duration_s=10.0, audio_metadata=metadata)
+
+    assert store.get(job_id).result["audio_metadata"] == metadata
 
 
 def test_set_done_with_speaker_segments():

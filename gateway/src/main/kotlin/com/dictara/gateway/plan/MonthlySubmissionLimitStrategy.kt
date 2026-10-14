@@ -24,4 +24,7 @@ class MonthlySubmissionLimitStrategy(
             )
         }
     }
+
+    override fun usage(userId: UUID) =
+        PlanUsage(used = submissionRepo.countCurrentMonthSubmissions(userId).toInt(), max = limit, unit = "transcriptions")
 }

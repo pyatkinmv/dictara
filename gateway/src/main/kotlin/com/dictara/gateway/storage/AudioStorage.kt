@@ -13,4 +13,8 @@ interface AudioStorage {
     fun listObjects(): List<StorageObject>
     fun delete(ref: AudioRef)
     fun uploadBytes(objectName: String, bytes: ByteArray)
+
+    /** Opens [ref] for reading starting at byte [offset] (0 = from the start), without transferring the bytes
+     *  before it — for serving HTTP `Range` requests (audio playback seeking) cheaply. Null if unavailable. */
+    fun openFrom(ref: AudioRef, offset: Long): InputStream?
 }

@@ -4,11 +4,13 @@ import com.dictara.gateway.repository.AudioMetaRepository
 import com.dictara.gateway.storage.AudioRef
 import com.dictara.gateway.storage.AudioStorage
 import org.slf4j.LoggerFactory
+import org.springframework.context.annotation.Profile
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import java.time.Duration
 import java.time.Instant
 
+@Profile("!local")
 @Service
 class StorageMaintenanceService(
     private val audioMetaRepo: AudioMetaRepository,
