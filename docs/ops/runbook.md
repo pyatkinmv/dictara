@@ -11,6 +11,8 @@ SSH key: created by `gcloud compute ssh pyatkinmv@dictara-main --zone europe-wes
 ssh -i ~/.ssh/google_compute_engine pyatkinmv@34.6.236.165 'docker ps'
 ```
 
+On Windows the key must be readable only by you or the PowerShell/Windows `ssh` (used by `scripts\grafana.ps1`) ignores it ("UNPROTECTED PRIVATE KEY FILE", "Permission denied (publickey)"): `icacls $key /inheritance:r; icacls $key /remove "*S-1-3-4"; icacls $key /grant:r "$($env:USERNAME):F"`. Git Bash's ssh does not check this.
+
 The user is in the `docker` group, i.e. root-equivalent: keep the key private. Keys live in Console → Compute Engine → Metadata → SSH Keys (project) and VM → Edit → SSH Keys. Do not edit the `ssh-keys` metadata value by hand (it is overwritten whole, CI's key would go).
 
 ## Grafana, metrics, logs
@@ -44,6 +46,10 @@ ssh ... 'docker exec dictara-postgres-1 psql -U dictara -d dictara -c "select ma
 ```
 
 Normal: schema version = latest `V*.sql`, `daily_db_backup` completed within 24 h, `dictara_jobs{status="pending|processing"}` returns to 0, 5xx rate 0, available RAM above ~0.4 GB (the VM already uses swap).
+
+## Audio storage
+
+The audio bucket has no lifecycle rule (removed 2026-10-14, it deleted files after 90 days). A recording whose file is gone shows "Audio is no longer available"; re-sending the same file (Telegram bot, any options) brings it back without a new transcription. Missing audio per month: compare `audio_meta` rows with `gcloud storage ls -r gs://<bucket>/audio/`.
 
 ## Before a release
 
