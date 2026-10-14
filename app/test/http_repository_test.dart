@@ -964,6 +964,36 @@ void main() {
       );
     });
   });
+
+  group('audioUrl', () {
+    test('a token becomes a streaming url under /api', () async {
+      final repo = _repo(MockClient((request) async {
+        expect(request.method, 'POST');
+        expect(request.url.path, '/api/transcriptions/abc/audio-token');
+        return _json({'token': 'tok en', 'expiresInSeconds': 2700});
+      }));
+
+      expect(await repo.audioUrl('abc'), '/api/transcriptions/abc/audio?token=tok+en');
+    });
+
+    test('no audio on record is null', () async {
+      final repo = _repo(MockClient((_) async => _json({'message': 'No audio'}, status: 404)));
+
+      expect(await repo.audioUrl('abc'), isNull);
+    });
+
+    test('a file that is gone from storage is told apart from no audio (410)', () async {
+      final repo = _repo(MockClient((_) async => _json({'message': 'Audio is no longer available'}, status: 410)));
+
+      expect(repo.audioUrl('abc'), throwsA(isA<AudioUnavailableException>()));
+    });
+
+    test('any other failure is still an error', () async {
+      final repo = _repo(MockClient((_) async => _json({'message': 'boom'}, status: 500)));
+
+      expect(repo.audioUrl('abc'), throwsA(isA<GatewayException>()));
+    });
+  });
 }
 
 /// `count` transcriptions in the shape of the gateway's list, newest first.

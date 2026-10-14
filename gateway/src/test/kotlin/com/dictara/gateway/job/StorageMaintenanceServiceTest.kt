@@ -39,12 +39,24 @@ class StorageMaintenanceServiceTest {
     // --- deduplicateStorageUris ---
 
     @Test
-    fun `deduplicateStorageUris delegates to repository and returns count`() {
-        `when`(audioMetaRepo.deduplicateStorageUris()).thenReturn(5)
+    fun `deduplicateStorageUris hands the repository the objects that still exist`() {
+        `when`(audioStorage.listObjects()).thenReturn(listOf(
+            StorageObject("gs://b/audio/a.mp3", Instant.now()), StorageObject("gs://b/audio/b.mp3", Instant.now()),
+        ))
+        `when`(audioMetaRepo.deduplicateStorageUris(setOf("gs://b/audio/a.mp3", "gs://b/audio/b.mp3"))).thenReturn(5)
 
         service.deduplicateStorageUris()
 
-        verify(audioMetaRepo).deduplicateStorageUris()
+        verify(audioMetaRepo).deduplicateStorageUris(setOf("gs://b/audio/a.mp3", "gs://b/audio/b.mp3"))
+    }
+
+    @Test
+    fun `deduplicateStorageUris does nothing when the bucket lists no objects`() {
+        `when`(audioStorage.listObjects()).thenReturn(emptyList())
+
+        service.deduplicateStorageUris()
+
+        verify(audioMetaRepo, never()).deduplicateStorageUris(any())
     }
 
     // --- cleanupOrphanedGcsObjects ---

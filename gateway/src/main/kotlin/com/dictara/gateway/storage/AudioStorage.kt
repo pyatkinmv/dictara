@@ -17,4 +17,9 @@ interface AudioStorage {
     /** Opens [ref] for reading starting at byte [offset] (0 = from the start), without transferring the bytes
      *  before it — for serving HTTP `Range` requests (audio playback seeking) cheaply. Null if unavailable. */
     fun openFrom(ref: AudioRef, offset: Long): InputStream?
+
+    /** True only when the object behind [ref] is known to be gone (a lifecycle rule, a manual delete, a lost upload).
+     *  Any doubt, such as a failed lookup, answers false: callers act on "gone" (tell the user, repoint records),
+     *  so they must never do that on a guess. */
+    fun isGone(ref: AudioRef): Boolean
 }

@@ -3,7 +3,7 @@ package com.dictara.gateway.controller
 import com.dictara.gateway.model.SummaryMode
 import com.dictara.gateway.service.SubmissionService
 import com.dictara.gateway.service.TagRef
-import com.dictara.gateway.storage.AudioStorage
+import com.dictara.gateway.service.AudioIngestService
 import jakarta.servlet.http.HttpServletRequest
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -19,7 +19,7 @@ import java.util.UUID
 @RestController
 class TranscriptionUploadController(
     private val submissionService: SubmissionService,
-    private val audioStorage: AudioStorage,
+    private val audioIngest: AudioIngestService,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -77,7 +77,7 @@ class TranscriptionUploadController(
         val originalName = file.originalFilename ?: "upload"
         val contentType = file.contentType ?: "application/octet-stream"
         val audioId = UUID.randomUUID()
-        val uploadResult = audioStorage.upload(audioId, originalName, file.inputStream, file.size, contentType)
+        val uploadResult = audioIngest.store(audioId, originalName, file, contentType)
 
         val result = submissionService.createSubmission(
             userId = userId, audioId = audioId, originalName = originalName,

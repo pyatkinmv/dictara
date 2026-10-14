@@ -22,6 +22,7 @@ class AudioPlayerController extends ChangeNotifier {
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   String? _error;
+  bool _unavailable = false;
 
   /// Null until [load] gives it a source — the bar has nothing to show yet.
   bool get hasSource => _backend != null;
@@ -30,6 +31,14 @@ class AudioPlayerController extends ChangeNotifier {
   Duration get duration => _duration;
   String? get error => _error;
 
+  /// The recording has audio on record but the file is gone for good: the bar says so instead of offering to play.
+  bool get unavailable => _unavailable;
+
+  void markUnavailable() {
+    _unavailable = true;
+    notifyListeners();
+  }
+
   /// Points the player at [url] (from `TranscriptionRepository.audioUrl`) and resets position, duration and
   /// any earlier error. Does not start playback on its own.
   void load(String url) {
@@ -37,6 +46,7 @@ class AudioPlayerController extends ChangeNotifier {
     _position = Duration.zero;
     _duration = Duration.zero;
     _error = null;
+    _unavailable = false;
     _playing = false;
     _backend = _createBackend(onPosition: _onPosition, onDuration: _onDuration, onEnded: _onEnded, onError: _onError)
       ..setSource(url);

@@ -106,6 +106,22 @@ void main() {
       expect(find.textContaining('Good morning everyone'), findsOneWidget);
     });
 
+    testWidgets('a recording whose audio file is gone says so on the Transcript tab', (tester) async {
+      useDesktopSize(tester);
+      await tester.pumpWidget(DictaraApp(
+        authController: signedInAuthController(),
+        repository: FakeTranscriptionRepository(audioGone: true),
+        initialLocation: '/transcriptions/0',
+      ));
+      await settle(tester);
+
+      expect(find.text('Audio is no longer available'), findsOneWidget);
+
+      await tester.tap(find.text('Overview'));
+      await settle(tester);
+      expect(find.text('Audio is no longer available'), findsNothing); // the player lives on the Transcript tab only
+    });
+
     testWidgets('a transcription that is not done or does not exist is not found', (tester) async {
       await openDetail(tester, '/transcriptions/3'); // pending
       expect(find.text('Transcription not found'), findsOneWidget);

@@ -33,6 +33,7 @@ class SubmissionService(
     private val segmentQueries: TranscriptSegmentQueries,
     private val speakerQueries: TranscriptSpeakerQueries,
     private val suggestionService: SuggestionService,
+    private val audioRestoreService: AudioRestoreService,
 ) {
     data class CreateResult(val submissionId: UUID, val dedup: Boolean)
 
@@ -112,16 +113,12 @@ class SubmissionService(
     ): CreateResult {
         val contentHash = uploadResult.contentHash
         if (contentHash.isNotEmpty()) {
-            // Blocks here (not just checks) until any other in-flight request with the exact same dedup key
-            // has committed — otherwise this check and the INSERT below race it (see tryLockForDedup's doc).
-            // The holder only ever does a SELECT + INSERT with no external I/O in between, so contention is
-            // brief; the cap just turns a pathological stuck holder into a clear error instead of a hang.
-            val dedupKey = listOf(userId, contentHash, model, languageHint, diarize, numSpeakers ?: 0, summaryMode).joinToString(":")
-            var attempts = 0
-            while (!submissionRepo.tryLockForDedup(dedupKey)) {
-                if (++attempts > 250) throw IllegalStateException("Timed out waiting for the dedup lock ($dedupKey)")
-                Thread.sleep(20)
-            }
+            // A re-send of a file whose stored copy is gone only brings the audio back (for every record with this
+            // content) and answers with the transcription that exists, whatever options came with it.
+            lockForDedup("audio:$contentHash")
+            audioRestoreService.restore(userId, contentHash, uploadResult.ref.uri)?.let { return CreateResult(it, dedup = true) }
+
+            lockForDedup(listOf(userId, contentHash, model, languageHint, diarize, numSpeakers ?: 0, summaryMode).joinToString(":"))
 
             val duplicate = submissionRepo.findDuplicate(userId, contentHash, model, languageHint, diarize, numSpeakers, summaryMode)
             if (duplicate != null) return CreateResult(duplicate.id!!, dedup = true)
@@ -148,6 +145,18 @@ class SubmissionService(
             override fun afterCommit() { orchestrator.signalPending() }
         })
         return CreateResult(submission.id!!, dedup = false)
+    }
+
+    /** Blocks (not just checks) until any other in-flight request with the same [key] has committed — otherwise the
+     *  check and the INSERT in [createSubmission] race it (see tryLockForDedup's doc). The holder only ever does a
+     *  SELECT + INSERT with no external I/O in between, so contention is brief; the cap just turns a pathological
+     *  stuck holder into a clear error instead of a hang. */
+    private fun lockForDedup(key: String) {
+        var attempts = 0
+        while (!submissionRepo.tryLockForDedup(key)) {
+            if (++attempts > 250) throw IllegalStateException("Timed out waiting for the dedup lock ($key)")
+            Thread.sleep(20)
+        }
     }
 
     /** The whole list of the user that matches [filter], in the order [filter] asks for (newest first by default). */

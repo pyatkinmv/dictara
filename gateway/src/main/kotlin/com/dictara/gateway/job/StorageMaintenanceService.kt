@@ -23,14 +23,17 @@ class StorageMaintenanceService(
         val ORPHAN_GRACE_PERIOD: Duration = Duration.ofHours(1)
     }
 
-    @Scheduled(cron = "0 0 18 * * *")  // TEMPORARY for testing: 18:00 UTC = 22:00 Yerevan
+    /** Rows with the same content share one object, the oldest that still exists. A hash whose objects are all
+     *  gone is left alone (nothing to point at); rows pointing at a dead object are healed from a live one. */
+    @Scheduled(cron = "0 0 3 * * *")
     fun deduplicateStorageUris() = jobTracker.tracked("dedup_storage_uris") {
-        val updated = audioMetaRepo.deduplicateStorageUris()
-        log.info("Dedup: {} audio_meta rows updated to canonical storage URI", updated)
+        val live = audioStorage.listObjects().map { it.uri }.toSet()
+        val updated = if (live.isEmpty()) 0 else audioMetaRepo.deduplicateStorageUris(live)
+        log.info("Dedup: {} audio_meta rows updated to canonical storage URI ({} live objects)", updated, live.size)
         updated
     }
 
-    @Scheduled(cron = "0 30 18 * * *")  // TEMPORARY for testing: 18:30 UTC = 22:30 Yerevan
+    @Scheduled(cron = "0 0 4 * * SUN")
     fun cleanupOrphanedGcsObjects() = jobTracker.tracked("cleanup_orphaned_gcs_objects") {
         val referencedUris = audioMetaRepo.findAllStorageUris().toHashSet()
         log.info("GCS orphan cleanup: {} URIs referenced in DB", referencedUris.size)

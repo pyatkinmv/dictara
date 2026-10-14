@@ -109,4 +109,17 @@ void main() {
 
     expect(find.byIcon(Icons.error_outline_rounded), findsNothing);
   });
+
+  testWidgets('a recording whose file is gone shows a notice instead of a player', (tester) async {
+    final c = makeController();
+    await pump(tester, c);
+    expect(find.byKey(const Key('audio-unavailable')), findsNothing);
+
+    c.markUnavailable();
+    await tester.pump();
+
+    expect(find.text('Audio is no longer available'), findsOneWidget);
+    expect(find.byType(Slider), findsNothing);
+    expect(find.byIcon(Icons.play_arrow_rounded), findsNothing);
+  });
 }

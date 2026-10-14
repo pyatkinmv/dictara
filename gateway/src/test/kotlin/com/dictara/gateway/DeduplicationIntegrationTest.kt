@@ -11,6 +11,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers
 import org.mockito.BDDMockito.given
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT
@@ -19,6 +21,7 @@ import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.*
 import org.springframework.util.LinkedMultiValueMap
+import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.Executors
@@ -203,5 +206,45 @@ class DeduplicationIntegrationTest : AbstractSharedContextIntegrationTest() {
         awaitTranscriberCalls(2)
         assertThat(jobId(first)).isNotEqualTo(jobId(second))
         wireMock.verify(2, postRequestedFor(urlPathEqualTo("/transcribe")))
+    }
+
+    @Test
+    fun `re-sending a file whose stored copy is gone only brings the audio back, whatever options come with it`() {
+        val first = submit(model = "small", diarize = false)
+        val firstId = jobId(first)
+        awaitTranscriberCalls(1) // the dispatch is asynchronous; do not let it spill into the next test
+        val restoredUri = "gs://test-bucket/audio/2026-10-15/restored.m4a"
+        given(audioStorage.isGone(AudioRef(FAKE_URI))).willReturn(true)
+        given(audioStorage.upload(any(), any(), any(), ArgumentMatchers.anyLong(), any()))
+            .willReturn(UploadResult(AudioRef(restoredUri), HASH_A))
+
+        val second = submit(model = "turbo", diarize = true) // not the options the record was made with
+
+        assertThat(second.statusCode).isEqualTo(HttpStatus.ACCEPTED)
+        assertThat(second.body!!["dedup"]).isEqualTo(true)
+        assertThat(jobId(second)).isEqualTo(firstId)
+        assertThat(submissionRepo.count()).isEqualTo(1L) // nothing transcribed again, no second record
+        assertThat(audioMetaRepo.findAll().map { it.storageUri }).containsOnly(restoredUri)
+    }
+
+    @Test
+    fun `a file whose content is already stored is not uploaded again, even when another user stored it`() {
+        val realHash = MessageDigest.getInstance("SHA-256").digest(ByteArray(8)).joinToString("") { "%02x".format(it) }
+        val liveUri = "gs://test-bucket/audio/2026-10-01/live.m4a"
+        val other = UUID.randomUUID()
+        jdbcTemplate.update("INSERT INTO users(id) VALUES (?)", other)
+        jdbcTemplate.update(
+            "INSERT INTO audio_meta(id, user_id, original_name, content_type, size_bytes, storage_uri, content_hash) VALUES (?, ?, 'x.m4a', 'audio/mp4', 8, ?, ?)",
+            UUID.randomUUID(), other, liveUri, realHash,
+        )
+
+        val response = submit()
+
+        assertThat(response.statusCode).isEqualTo(HttpStatus.ACCEPTED)
+        assertThat(response.body!!["dedup"]).isEqualTo(false) // a record of its own for this user
+        verify(audioStorage, never()).upload(any(), any(), any(), ArgumentMatchers.anyLong(), any())
+        val submission = submissionRepo.findById(jobId(response)).orElseThrow()
+        assertThat(audioMetaRepo.findById(submission.audioId).orElseThrow().storageUri).isEqualTo(liveUri)
+        awaitTranscriberCalls(1)
     }
 }

@@ -65,8 +65,8 @@ Cloud Run enforces a hard 32 MiB HTTP request body limit. Streaming large audio 
 ### Bucket
 
 - **Name**: `gen-lang-client-0721625814-uploads`
-- **Path pattern**: `gs://<bucket>/audio/<uuid>/<filename>`
-- **Lifecycle rule**: objects auto-deleted after **90 days** (configured on the bucket, not in application code)
+- **Path pattern**: `gs://<bucket>/audio/<date>/<uuid>/<filename>`
+- **Lifecycle rule**: none. Audio used to be auto-deleted after 90 days; the rule was removed on 2026-10-14 after 819 of 1002 recordings had lost their file (transcripts are in the database and were never affected). Objects are only removed by `cleanup_orphaned_gcs_objects`, and only when no record points at them. GCS soft delete keeps a deleted object for 7 days. Check: `gcloud storage buckets describe gs://<bucket> --format="json(lifecycle_config,soft_delete_policy)"`.
 
 ### Enabling
 
@@ -86,7 +86,7 @@ Two background jobs keep the GCS bucket lean. Every run is recorded in the `job_
 
 | Job | Schedule (UTC) | What it does |
 |-----|---------------|--------------|
-| `dedup_storage_uris` | Daily 03:00 | Finds `audio_meta` rows with the same `content_hash` and rewrites them all to the oldest `storage_uri`, so duplicate GCS objects become unreferenced and are eventually deleted by the bucket lifecycle rule |
+| `dedup_storage_uris` | Daily 03:00 | Points `audio_meta` rows with the same `content_hash` at the oldest object that still exists (also heals rows whose object is gone), so duplicate GCS objects become unreferenced and `cleanup_orphaned_gcs_objects` removes them |
 | `cleanup_orphaned_gcs_objects` | Weekly Sunday 04:00 | Lists all objects in the bucket, deletes any not referenced by `audio_meta.storage_uri`. Skips objects younger than 1 hour (grace period for in-flight uploads) |
 
 These are no-ops when `GCS_UPLOADS_BUCKET` is not set.
@@ -95,9 +95,13 @@ These are no-ops when `GCS_UPLOADS_BUCKET` is not set.
 
 ## Upload Deduplication
 
-When a file is uploaded, the gateway computes a SHA-256 hash of its content and stores it in `audio_meta.content_hash`. On subsequent uploads of the same file (same hash, same model/diarize settings), the existing `job_id` is returned immediately — no re-transcription, no new GCS object.
+The audio file and the transcription are deduplicated separately (details in `gateway/CLAUDE.md`):
 
-The daily `dedup_storage_uris` job further consolidates any rows that share a `content_hash` but ended up with different `storage_uri` values (e.g. uploaded before dedup was in place), pointing them all to the oldest URI.
+- **The file** is stored once per content: the gateway takes the SHA-256 first (`audio_meta.content_hash`) and, if any record of any user already has an existing object with that content, the new record points at it and nothing is uploaded.
+- **A re-send after the stored copy is gone** (old files deleted by the former 90-day rule) brings the audio back for every record with that content and answers with the existing transcription, whatever options the uploader's bot or form had. No new transcription.
+- **The transcription** is reused only for the same user, content and options (model, language, diarize, speakers, summary mode); other options are a different result.
+
+The daily `dedup_storage_uris` job consolidates older rows that still point at different objects, to the oldest one that exists.
 
 ---
 

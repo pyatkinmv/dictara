@@ -219,13 +219,16 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   /// [hasAudio]: false by default, so [audioUrl] answers null and the detail page never reaches for the real
   /// (browser-only) audio backend — tests that exercise the player construct their own `AudioPlayerController`
   /// directly with a fake backend instead of going through the full app for that.
-  FakeTranscriptionRepository({this.latency, this.jobTiming, DateTime Function()? clock, this.hasAudio = false})
+  FakeTranscriptionRepository({this.latency, this.jobTiming, DateTime Function()? clock, this.hasAudio = false, this.audioGone = false})
       : _clock = clock ?? DateTime.now;
 
   final Duration Function()? latency;
   final JobTiming? jobTiming;
   final DateTime Function() _clock;
   final bool hasAudio;
+
+  /// The recording has audio on record but its file is gone: [audioUrl] throws [AudioUnavailableException].
+  final bool audioGone;
 
   /// Uploads that have not finished yet, by transcription id.
   final Map<String, _Job> _jobs = {};
@@ -413,6 +416,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
 
   @override
   Future<String?> audioUrl(String id) async {
+    if (audioGone) throw const AudioUnavailableException();
     if (!hasAudio) return null;
     final detail = await get(id);
     if (detail == null) return null;

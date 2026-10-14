@@ -28,11 +28,15 @@ Two generations of API live side by side and must both keep working while the ol
 
 ### Audio storage
 
-Cloud Run enforces a hard 32 MiB HTTP request body limit, so audio is not streamed to the transcriber. `dictara.storage.gcs.bucket` (`GCS_UPLOADS_BUCKET`) is **required**: `GcsAudioStorage` uploads the file to that bucket and the gateway submits the job by `gs://` reference (`TranscriberClient.submitByReference`, `audio_meta.storage_uri`); the transcriber downloads it directly. Uploaded objects are not deleted by the application; a 90-day bucket lifecycle rule expires them (see [docs/deployment.md](../docs/deployment.md)). Under the `local` profile `LocalDbAudioStorage` keeps the file in the database instead.
+Cloud Run enforces a hard 32 MiB HTTP request body limit, so audio is not streamed to the transcriber. `dictara.storage.gcs.bucket` (`GCS_UPLOADS_BUCKET`) is **required**: `GcsAudioStorage` uploads the file to that bucket and the gateway submits the job by `gs://` reference (`TranscriberClient.submitByReference`, `audio_meta.storage_uri`); the transcriber downloads it directly. Uploaded objects are not deleted by the application and the bucket has **no lifecycle rule** (it used to delete audio after 90 days, which left ~80% of the old history with a transcript but no file; removed in October 2026, see [docs/deployment.md](../docs/deployment.md)). A record whose file is gone answers `410` on `POST /transcriptions/{id}/audio-token` and the player says "Audio is no longer available". Under the `local` profile `LocalDbAudioStorage` keeps the file in the database instead.
 
 `audio_meta.metadata` (JSONB) holds whatever the transcriber's `ffprobe` found on the original file — codec, bit rate, sample rate, channels and its raw container tags (`tags.creation_time` is the actual recording date on most phone-recorded M4A/MP4, distinct from `audio_meta.created_at`, which is upload time). The gateway never inspects the file itself for this — it only stores what `TranscriberJobSnapshot.audioMetadata` reports (`result.audio_metadata` in the transcriber's job response), since the gateway's own upload path deliberately never buffers the file (`GcsAudioStorage.upload` streams straight through) and has no ffmpeg/ffprobe in its image; the transcriber is the only place in the pipeline that ever has the original bytes on local disk. Null when `ffprobe` found nothing or the transcript has no phrases yet. Not surfaced anywhere yet — stored for future use.
 
-Duplicates: the same user + SHA-256 of the file + model + language + diarize + number of speakers + summary mode (failed jobs excluded) is not transcribed again; the existing job is returned. The file is uploaded to storage before that check.
+Audio is an object of its own, independent of user and options; a transcription is a result that depends on the options. Three layers on every upload (`AudioIngestService`, `AudioRestoreService`, `SubmissionService.createSubmission`):
+
+1. **Stored once per content.** The SHA-256 is taken first; if any record (any user, any options) has that content and its object still exists (`AudioStorage.isGone`), the new record points at it and nothing is uploaded.
+2. **Restore first.** Records with this content whose object is gone are repointed to a live copy, else to the file just uploaded (any user, any options). If the uploader has such a record the upload only restores the audio and answers with that existing submission (`dedup=true`): no new transcription, whatever options came with it. `isGone` is true only on a confirmed 404; any doubt means "exists".
+3. **Same result is not made twice.** Same user + SHA-256 + model + language + diarize + number of speakers + summary mode (failed jobs excluded) returns the existing job. This is about results, so the options matter.
 
 ### Transcripts, speakers, suggestions (data model)
 
@@ -75,7 +79,7 @@ Background jobs that run automatically:
 
 | Job | Schedule | What it does |
 |-----|----------|--------------|
-| `dedup_storage_uris` | Daily at 03:00 | Finds `audio_meta` rows with the same `content_hash` and updates them all to share the oldest `storage_uri`, making duplicate GCS objects unreferenced |
+| `dedup_storage_uris` | Daily at 03:00 | Points `audio_meta` rows with the same `content_hash` at the oldest object that still exists in the bucket (rows pointing at a gone object are healed this way; a hash with no live object is left alone), making duplicate GCS objects unreferenced |
 | `cleanup_orphaned_gcs_objects` | Weekly Sunday at 04:00 | Lists all objects in the GCS bucket, deletes any not referenced by `audio_meta.storage_uri`. Skips objects younger than 1 hour (grace period to avoid race with in-flight uploads) |
 | `daily_db_backup` | Daily at 16:45 UTC | Queries all tables from `information_schema` (excluding `flyway_schema_history`), serializes each to gzipped JSON, uploads to `gs://{bucket}/backups/{date}/{table}.json.gz`. New tables added via Flyway are picked up automatically. Each table is read through a cursor straight into the gzip stream, so only the compressed bytes are held in memory (the earlier version read whole tables into a list and ran out of heap on the 2 GB prod VM once `transcript_segments` held ~374k rows; measured peak now ~150 MB). It is a JSON dump, not `pg_dump`: restoring is manual. |
 
@@ -90,6 +94,7 @@ Every run is recorded in the `job_runs` table (`status`: `running` → `complete
 | `service/SubmissionService.kt` | Reading and listing transcriptions, detail page data |
 | `service/SuggestionService.kt` | Checks and stores AI proposals; accept / reject / accept all / dismiss all |
 | `service/TagService.kt`, `SpeakerService.kt`, `TranscriptSpeakerService.kt` | Libraries and speaker assignment |
+| `service/AudioIngestService.kt`, `AudioRestoreService.kt` | Hash first / store once per content; repoint records whose file is gone when the same bytes come again |
 | `controller/TranscribeController.kt` | Old `POST /transcribe`, `GET /jobs/{id}`; shared `validateUpload` |
 | `controller/TranscriptionUploadController.kt` | New `POST /transcriptions` |
 | `controller/ExportController.kt` | GET /export — streams ZIP of all user transcriptions (transcript + summary + optional audio) |
