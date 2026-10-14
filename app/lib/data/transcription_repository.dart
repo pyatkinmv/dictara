@@ -56,6 +56,16 @@ class TranscriptionQuery {
   }
 }
 
+/// The transcription has audio on record, but the file is gone from storage (the bucket used to delete audio
+/// after 90 days, and a file can also be lost). Not the same as "no audio": [TranscriptionRepository.audioUrl]
+/// answers null for that.
+class AudioUnavailableException implements Exception {
+  const AudioUnavailableException();
+
+  @override
+  String toString() => 'AudioUnavailableException';
+}
+
 /// Where screens get their data. The mock implementation is used until the
 /// gateway grows the endpoints listed in `docs/api-gaps.md`.
 abstract class TranscriptionRepository {
@@ -74,7 +84,8 @@ abstract class TranscriptionRepository {
 
   /// A ready-to-use, short-lived URL to stream this transcription's audio for playback (`<audio src>`), or
   /// null when there is no audio to play. Expires a while after being fetched — ask again if playback is
-  /// resumed much later (the audio player does this itself on a 403).
+  /// resumed much later (the audio player does this itself on a 403). Throws [AudioUnavailableException] when
+  /// the recording has audio on record but the file is no longer in storage.
   Future<String?> audioUrl(String id);
 
   /// Sends a file for transcription (`POST /transcriptions`) and returns the entry it became, which starts out

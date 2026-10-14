@@ -17,6 +17,7 @@ class AudioPlayerBar extends StatelessWidget {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
+        if (controller.unavailable) return const _UnavailableNotice();
         if (!controller.hasSource) return const SizedBox.shrink();
         final duration = controller.duration;
         final position = controller.position;
@@ -68,6 +69,34 @@ class AudioPlayerBar extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Stands where the player would be when the recording's file no longer exists (nothing to play, nothing to retry).
+class _UnavailableNotice extends StatelessWidget {
+  const _UnavailableNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Container(
+      key: const Key('audio-unavailable'),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: p.surface,
+        border: Border.all(color: p.border),
+        borderRadius: BorderRadius.circular(100),
+        boxShadow: [BoxShadow(color: p.accent.withValues(alpha: .10), blurRadius: 20, offset: const Offset(0, 4))],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.volume_off_rounded, size: 16, color: p.text3),
+          const SizedBox(width: 8),
+          Text('Audio is no longer available', style: TextStyle(fontSize: 12, color: p.text2)),
+        ],
+      ),
     );
   }
 }

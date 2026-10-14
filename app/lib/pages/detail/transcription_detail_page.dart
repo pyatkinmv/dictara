@@ -60,7 +60,9 @@ class _TranscriptionDetailPageState extends State<TranscriptionDetailPage> {
     context.read<TranscriptionRepository>().audioUrl(id).then((url) {
       // A newer id may have replaced this one, or the page may be gone, by the time this answers.
       if (mounted && widget.id == id && url != null) _audioPlayer.load(url);
-    });
+    }).catchError((Object _) {
+      if (mounted && widget.id == id) _audioPlayer.markUnavailable();
+    }, test: (e) => e is AudioUnavailableException);
   }
 
   @override

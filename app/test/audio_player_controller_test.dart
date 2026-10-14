@@ -135,4 +135,18 @@ void main() {
 
     expect(backend.disposed, isTrue);
   });
+
+  test('markUnavailable flags the recording as having no playable file, and a new load clears it', () {
+    final c = makeController();
+    var notified = 0;
+    c.addListener(() => notified++);
+    expect(c.unavailable, isFalse);
+
+    c.markUnavailable();
+    expect(c.unavailable, isTrue);
+    expect(notified, 1);
+
+    c.load('u');
+    expect(c.unavailable, isFalse);
+  });
 }

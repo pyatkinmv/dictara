@@ -157,6 +157,7 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
           '?token=${Uri.encodeQueryComponent(token)}';
     } on GatewayException catch (e) {
       if (e.statusCode == 404) return null;
+      if (e.statusCode == 410) throw const AudioUnavailableException();
       rethrow;
     }
   }
