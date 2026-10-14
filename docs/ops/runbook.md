@@ -1,6 +1,6 @@
 # Production runbook
 
-Prod: one VM `dictara-main` (GCP project `gen-lang-client-0721625814`, zone `europe-west4-a`, `34.6.236.165`, 2 GB RAM, docker compose under `~/dictara`), transcriber on Cloud Run. Deploy = push to `master` (`docs/deployment.md`).
+Prod: one VM `dictara-main` (GCP project `gen-lang-client-0721625814`, zone `europe-west4-a`, `34.6.236.165`, 2 GB RAM, docker compose under `~/dictara`), transcriber on Cloud Run. Deploy = push to `master` (`docs/deployment.md`). Request path: CloudFlare → Caddy on the VM (443, `/etc/caddy/Caddyfile`) → nginx in `app-material` (:3000) → gateway. The origin also answers directly, bypassing CloudFlare.
 
 ## Access
 
