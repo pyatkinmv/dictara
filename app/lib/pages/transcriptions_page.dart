@@ -89,12 +89,8 @@ class _TranscriptionsPageState extends State<TranscriptionsPage> {
                 }
                 return TranscriptionRow(
                   item: item,
-                  // Only finished transcriptions have a detail page.
-                  onTap: () {
-                    if (item.status == TranscriptionStatus.done) {
-                      context.go('/transcriptions/${item.id}');
-                    }
-                  },
+                  // Only finished transcriptions have a detail page; the others are not clickable at all.
+                  onTap: item.status == TranscriptionStatus.done ? () => context.go('/transcriptions/${item.id}') : null,
                 );
               },
             ),

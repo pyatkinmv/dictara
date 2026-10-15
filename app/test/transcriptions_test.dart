@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dictara_web/app.dart';
@@ -300,6 +301,34 @@ void main() {
       await settle(tester);
       expect(find.byType(TranscriptionRow), findsNothing);
       expect(find.text('Overview'), findsOneWidget); // the detail page's tab
+    });
+
+    testWidgets('only a finished row looks clickable: the others have no hand cursor and no hover highlight', (tester) async {
+      await open(tester);
+
+      MouseCursor cursorOf(String title) {
+        final row = find.ancestor(of: find.text(title), matching: find.byType(TranscriptionRow));
+        return tester.widget<MouseRegion>(find.descendant(of: row, matching: find.byType(MouseRegion)).first).cursor;
+      }
+
+      expect(cursorOf('Quarterly Review Meeting'), SystemMouseCursors.click);
+      expect(cursorOf('Podcast Episode #47'), SystemMouseCursors.basic); // processing
+
+      // Hovering a row that is not ready does not light it up either.
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: Offset.zero);
+      addTearDown(mouse.removePointer);
+      await mouse.moveTo(tester.getCenter(find.text('Podcast Episode #47')));
+      await tester.pump(const Duration(milliseconds: 200));
+      final row = find.ancestor(of: find.text('Podcast Episode #47'), matching: find.byType(TranscriptionRow));
+      final box = tester.widget<AnimatedContainer>(find.descendant(of: row, matching: find.byType(AnimatedContainer)).first).decoration as BoxDecoration;
+      expect(box.boxShadow ?? const <BoxShadow>[], isEmpty);
+
+      await mouse.moveTo(tester.getCenter(find.text('Quarterly Review Meeting')));
+      await tester.pump(const Duration(milliseconds: 200));
+      final done = find.ancestor(of: find.text('Quarterly Review Meeting'), matching: find.byType(TranscriptionRow));
+      final doneBox = tester.widget<AnimatedContainer>(find.descendant(of: done, matching: find.byType(AnimatedContainer)).first).decoration as BoxDecoration;
+      expect(doneBox.boxShadow, isNotEmpty); // a finished row does
     });
 
     testWidgets('filters survive leaving and returning to the page', (tester) async {

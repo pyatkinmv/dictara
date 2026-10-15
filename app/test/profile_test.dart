@@ -99,9 +99,9 @@ void main() {
     });
 
     testWidgets('an unlimited plan shows a count with no denominator, no bar and no Upgrade', (tester) async {
-      await pumpWith(tester, const UserProfile(planName: 'Unlimited', usage: UsageInfo(used: 14, unit: 'transcriptions')));
+      await pumpWith(tester, const UserProfile(planName: 'Ultra', usage: UsageInfo(used: 14, unit: 'transcriptions')));
 
-      expect(find.text('Unlimited'), findsOneWidget);
+      expect(find.text('Ultra'), findsOneWidget);
       expect(find.text('14 transcriptions this month'), findsOneWidget);
       expect(find.text('Upgrade'), findsNothing);
     });

@@ -45,6 +45,9 @@ class _BrowserAudioBackend implements AudioBackend {
   void seek(Duration position) => _element.currentTime = position.inMilliseconds / 1000;
 
   @override
+  void setVolume(double volume) => _element.volume = volume.clamp(0.0, 1.0);
+
+  @override
   void dispose() {
     _element.pause();
     _element.src = '';

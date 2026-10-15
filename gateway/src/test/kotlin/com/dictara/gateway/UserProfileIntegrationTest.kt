@@ -68,7 +68,7 @@ class UserProfileIntegrationTest : AbstractSharedContextIntegrationTest() {
 
         val body = me(user)
 
-        assertThat(body["plan_name"].asText()).isEqualTo("Try it")
+        assertThat(body["plan_name"].asText()).isEqualTo("Guest")
         assertThat(body["usage"]["used"].asInt()).isEqualTo(2)
         assertThat(body["usage"]["max"].asInt()).isEqualTo(2)
     }
@@ -80,7 +80,7 @@ class UserProfileIntegrationTest : AbstractSharedContextIntegrationTest() {
 
         val body = me(user)
 
-        assertThat(body["plan_name"].asText()).isEqualTo("Unlimited")
+        assertThat(body["plan_name"].asText()).isEqualTo("Ultra")
         assertThat(body["usage"]["used"].asInt()).isEqualTo(14)
         assertThat(body["usage"].has("max")).describedAs("NON_NULL Jackson config drops it entirely").isFalse()
     }
