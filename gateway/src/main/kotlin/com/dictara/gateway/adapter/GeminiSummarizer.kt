@@ -6,6 +6,7 @@ import com.dictara.gateway.port.AnalysisInput
 import com.dictara.gateway.port.LibraryHint
 import com.dictara.gateway.port.SpeakerGuess
 import com.dictara.gateway.port.SummarizerPort
+import com.dictara.gateway.util.SummaryFormat
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import okhttp3.MediaType.Companion.toMediaType
@@ -99,7 +100,7 @@ class GeminiSummarizer(
          */
         internal fun parse(json: String): Analysis {
             val root = mapper.readTree(json)
-            val summary = root?.get("summary")?.takeIf { it.isTextual }?.asText()?.trim()
+            val summary = root?.get("summary")?.takeIf { it.isTextual }?.asText()?.trim()?.let(SummaryFormat::repair)
             if (summary.isNullOrEmpty()) throw RuntimeException("Gemini answered without a summary")
             if (!looksComplete.containsMatchIn(summary))
                 throw RuntimeException("Gemini's summary looks cut off (no ending punctuation): \"${summary.takeLast(60)}\"")
@@ -132,7 +133,9 @@ Conclusions:
 ✅ Action items: — include ONLY if specific tasks or follow-ups were explicitly mentioned; one bullet per person: who, what, by when if said"""
 
         private const val DETAIL_RULE = "Cover everything of substance: leave out only small talk and repetition. " +
-            "Name people by the names used in the transcript, not by SPEAKER_xx labels, whenever the transcript makes the name clear."
+            "Name people by the names used in the transcript, not by SPEAKER_xx labels, whenever the transcript makes the name clear. " +
+            "Write it with real line breaks: every section header and every bullet on its own line, and a blank line before each header " +
+            "(never the whole summary as one line). Start each bullet with its topic or the person's name in **bold**."
 
         internal fun buildPrompt(input: AnalysisInput): String {
             val durationHint = input.audioDurationSeconds?.let {

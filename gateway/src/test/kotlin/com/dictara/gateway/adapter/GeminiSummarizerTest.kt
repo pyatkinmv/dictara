@@ -145,6 +145,30 @@ class GeminiSummarizerTest {
     }
 
     @Test
+    fun `a long summary asks for line breaks and a bold lead-in for each bullet`() {
+        for (mode in listOf(SummaryMode.AUTO, SummaryMode.FULL)) {
+            assertThat(GeminiSummarizer.buildPrompt(input.copy(mode = mode)))
+                .contains("every section header and every bullet on its own line")
+                .contains("never the whole summary as one line")
+                .contains("in **bold**")
+        }
+    }
+
+    @Test
+    fun `a summary that came back without its line breaks is put back in shape`() {
+        val flat = "📝 Summary — Overview of the call.Key points:• One: a.• Two: b.Conclusions:• Done.✅ Action items:• Anna: c."
+
+        val analysis = GeminiSummarizer.parse("""{"summary": "$flat", "title": "t", "tags": [], "speakers": []}""")
+
+        assertThat(analysis.summary).isEqualTo(
+            listOf(
+                "📝 Summary — Overview of the call.", "", "Key points:", "• One: a.", "• Two: b.", "",
+                "Conclusions:", "• Done.", "", "✅ Action items:", "• Anna: c.",
+            ).joinToString("\n"),
+        )
+    }
+
+    @Test
     fun `the quote asked for as evidence is without the timestamps and labels of its line`() {
         assertThat(GeminiSummarizer.buildPrompt(input)).contains("WITHOUT the [timestamps] and [SPEAKER_xx] labels")
     }
