@@ -199,6 +199,10 @@ Conclusions:
                 "Include a voice only when one of these holds:",
                 "  - the person is named in the transcript itself: they introduce themselves, or another speaker addresses them by name;",
                 "  - the voice clearly is a person from the SPEAKER LIST (copy their name exactly as listed).",
+                *(if (input.namesConfirmed) arrayOf(
+                    "Some lines already carry a real name instead of a SPEAKER_xx label: the user has confirmed those speakers. " +
+                        "Use those names in the summary. Give \"speakers\" only for voices that are still labelled SPEAKER_xx, never for a named one.",
+                ) else emptyArray()),
                 "For each give \"voice\" (the label), \"name\" (as it is said in the transcript, or as listed) and \"evidence\": the exact words",
                 "of the transcript that show it, copied as they are, at most 200 characters, WITHOUT the [timestamps] and [SPEAKER_xx] labels in front of the lines. Never guess a name from a role, a topic or a voice.",
                 "A person from the SPEAKER LIST is the same person whatever the language, alphabet, spelling or short form of the name in the transcript " +

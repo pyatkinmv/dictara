@@ -169,6 +169,17 @@ class GeminiSummarizerTest {
     }
 
     @Test
+    fun `when some speakers are confirmed the model is told so and asked for proposals only for the rest`() {
+        val withNames = GeminiSummarizer.buildPrompt(input.copy(namesConfirmed = true))
+        val without = GeminiSummarizer.buildPrompt(input)
+
+        assertThat(withNames)
+            .contains("the user has confirmed those speakers")
+            .contains("only for voices that are still labelled SPEAKER_xx, never for a named one")
+        assertThat(without).doesNotContain("the user has confirmed those speakers")
+    }
+
+    @Test
     fun `the quote asked for as evidence is without the timestamps and labels of its line`() {
         assertThat(GeminiSummarizer.buildPrompt(input)).contains("WITHOUT the [timestamps] and [SPEAKER_xx] labels")
     }

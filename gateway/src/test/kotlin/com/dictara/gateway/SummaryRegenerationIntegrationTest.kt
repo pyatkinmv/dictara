@@ -448,6 +448,65 @@ class SummaryRegenerationIntegrationTest : AbstractSharedContextIntegrationTest(
         assertThat(regenState()).isEqualTo("available")
     }
 
+    // ── What the user has settled about the speakers goes in with the transcript ──
+
+    private fun assign(body: String) = call(HttpMethod.PUT, "/transcriptions/$submission/speakers", body = body).status
+
+    @Test
+    fun `a transcription nobody has named is sent as it is, with the diarizer's labels`() {
+        regenerateWith(Analysis("A new summary."))
+
+        val input = asked.single()
+        assertThat(input.text).contains("[SPEAKER_00] Привет, меня зовут Анна").contains("[SPEAKER_01]").contains("[SPEAKER_02]")
+        assertThat(input.namesConfirmed).isFalse()
+    }
+
+    @Test
+    fun `a voice the user named is sent under that name, and the voices nobody named keep their labels`() {
+        librarySpeaker("Анна")
+        suggestionService.record(submission, Analysis("First.", speakers = listOf(SpeakerGuess("SPEAKER_00", "Анна", "меня зовут Анна"))))
+        settle("speakers/SPEAKER_00/accept")
+
+        regenerateWith(Analysis("A new summary."))
+
+        val input = asked.single()
+        assertThat(input.text).contains("[Анна] Привет, меня зовут Анна")
+        assertThat(input.text).doesNotContain("SPEAKER_00")
+        assertThat(input.text).contains("[SPEAKER_01] Спасибо, Анна").contains("[SPEAKER_02] Я Борис") // proposals still say which voice
+        assertThat(input.namesConfirmed).isTrue()
+    }
+
+    @Test
+    fun `a speaker set on a single phrase is sent under that name, and wins over the voice's`() {
+        librarySpeaker("Анна")
+        librarySpeaker("Борис")
+        suggestionService.record(submission, Analysis("First.", speakers = listOf(SpeakerGuess("SPEAKER_00", "Анна", "меня зовут Анна"))))
+        settle("speakers/SPEAKER_00/accept")
+        // Phrase 2 ("Я Борис...") is by the unnamed voice 2, and the user marked it by hand; phrase 0 by voice 0 is Анна.
+        assertThat(assign("""{"scope": "segment", "segment_indexes": [2], "name": "Борис"}""")).isEqualTo(HttpStatus.OK)
+
+        regenerateWith(Analysis("A new summary."))
+
+        val input = asked.single()
+        assertThat(input.text).contains("[Борис] Я Борис")
+        assertThat(input.text).contains("[Анна] Привет").contains("[SPEAKER_01] Спасибо")
+    }
+
+    @Test
+    fun `a proposal for a voice that is already named is still left alone`() {
+        librarySpeaker("Анна")
+        suggestionService.record(submission, Analysis("First.", speakers = listOf(SpeakerGuess("SPEAKER_00", "Анна", "меня зовут Анна"))))
+        settle("speakers/SPEAKER_00/accept")
+
+        regenerateWith(Analysis("A new summary.", speakers = listOf(
+            SpeakerGuess("SPEAKER_00", "Другой", "меня зовут Анна"),
+            SpeakerGuess("SPEAKER_02", "Борис", "Я Борис"),
+        )))
+
+        assertThat(namedVoices()).isEqualTo(mapOf("SPEAKER_00" to "Анна"))
+        assertThat(pendingSpeakers()).isEqualTo(mapOf("SPEAKER_02" to "Борис"))
+    }
+
     // ── The plan decides how many times ────────────────────────────────────────
 
     private fun userOnPlan(plan: String): UUID = newUser().also { jdbcTemplate.update("UPDATE users SET plan = ? WHERE id = ?", plan, it) }
