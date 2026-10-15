@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Spring Boot's default logging, plus one filter: see ClientDisconnectLogFilter. -->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/base.xml"/>
+    <turboFilter class="com.dictara.gateway.config.ClientDisconnectLogFilter"/>
+</configuration>
