@@ -7,12 +7,14 @@ import '../util/format.dart';
 import 'mini_tag.dart';
 import 'status_badge.dart';
 
-/// One row of the transcriptions list (`.row` in the design).
+/// One row of the transcriptions list (`.row` in the design). With no [onTap] the row is only informative: no
+/// hand cursor and no hover highlight, so it does not look like something that opens (a transcription that is
+/// still being made, or failed, has no page to open).
 class TranscriptionRow extends StatefulWidget {
-  const TranscriptionRow({super.key, required this.item, required this.onTap});
+  const TranscriptionRow({super.key, required this.item, this.onTap});
 
   final Transcription item;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   State<TranscriptionRow> createState() => _TranscriptionRowState();
@@ -25,9 +27,10 @@ class _TranscriptionRowState extends State<TranscriptionRow> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final item = widget.item;
+    final interactive = widget.onTap != null;
     return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hover = true),
+      cursor: interactive ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      onEnter: (_) => interactive ? setState(() => _hover = true) : null,
       onExit: (_) => setState(() => _hover = false),
       child: GestureDetector(
         onTap: widget.onTap,
