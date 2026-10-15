@@ -179,4 +179,35 @@ void main() {
       expect(find.byKey(const Key('regenerated')), findsNothing);
     });
   });
+
+  group('When it fails', () {
+    testWidgets('the card says why, and the message is gone as soon as the next attempt starts', (tester) async {
+      useDesktopSize(tester);
+      await openOverview(tester);
+      await confirm(tester);
+
+      repo.failRegeneration('0', 'The summary service has run out of credits.');
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.byKey(const Key('regeneration-error')), findsOneWidget);
+      expect(find.textContaining("Couldn't regenerate the summary. The summary service has run out of credits."), findsOneWidget);
+      expect(find.byKey(const Key('regenerating')), findsNothing);
+      expect(find.byKey(const Key('regenerate-summary')), findsOneWidget); // it can be tried again
+      expect(find.textContaining('Q2 closed strong'), findsOneWidget); // and the old summary is still there
+
+      await confirm(tester);
+
+      expect(find.byKey(const Key('regeneration-error')), findsNothing);
+      expect(find.byKey(const Key('regenerating')), findsOneWidget);
+    });
+
+    testWidgets('a page opened after a failure shows it too', (tester) async {
+      useDesktopSize(tester);
+      final fake = FakeTranscriptionRepository()..failRegeneration('0', 'The summary service is busy. Try again in a minute.');
+      await openOverview(tester, fake: fake);
+
+      expect(find.textContaining('The summary service is busy. Try again in a minute.'), findsOneWidget);
+    });
+  });
 }

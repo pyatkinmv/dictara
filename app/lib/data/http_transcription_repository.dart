@@ -366,6 +366,7 @@ TranscriptionDetail _detailFromJson(Map<String, dynamic> json) {
     regeneratedAt: DateTime.tryParse(((json['summary_regeneration'] as Map<String, dynamic>?)?['at'] as String?) ?? '')?.toLocal(),
     regenerationsUsed: ((json['summary_regeneration'] as Map<String, dynamic>?)?['used'] as num?)?.toInt() ?? 0,
     regenerationsMax: ((json['summary_regeneration'] as Map<String, dynamic>?)?['max'] as num?)?.toInt(),
+    regenerationError: (json['summary_regeneration'] as Map<String, dynamic>?)?['error'] as String?,
   );
 }
 

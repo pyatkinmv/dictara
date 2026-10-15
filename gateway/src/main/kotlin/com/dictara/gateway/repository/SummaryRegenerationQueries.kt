@@ -15,7 +15,7 @@ import java.util.UUID
 @Repository
 class SummaryRegenerationQueries(private val jdbc: NamedParameterJdbcTemplate) {
 
-    data class State(val running: Boolean, val count: Int, val at: Instant?)
+    data class State(val running: Boolean, val count: Int, val at: Instant?, val error: String? = null)
 
     /**
      * Takes one regeneration of a finished transcription; false when a run is going or the [limit] of its plan
@@ -23,7 +23,7 @@ class SummaryRegenerationQueries(private val jdbc: NamedParameterJdbcTemplate) {
      */
     fun claim(submissionId: UUID, limit: Int?): Boolean = jdbc.update(
         """
-        UPDATE submissions SET summary_regeneration = 'running'
+        UPDATE submissions SET summary_regeneration = 'running', summary_regeneration_error = NULL
         WHERE id = :id AND status = 'done' AND summary_regeneration IS NULL
           AND (CAST(:limit AS integer) IS NULL OR summary_regenerations < CAST(:limit AS integer))
         """.trimIndent(),
@@ -49,6 +49,14 @@ class SummaryRegenerationQueries(private val jdbc: NamedParameterJdbcTemplate) {
         )
     }
 
+    /** The user's own run failed: it is not counted, and [message] (for the user, no technical details) stays until the next attempt. */
+    fun fail(submissionId: UUID, message: String) {
+        jdbc.update(
+            "UPDATE submissions SET summary_regeneration = NULL, summary_regeneration_error = :message WHERE id = :id AND summary_regeneration = 'running'",
+            mapOf("id" to submissionId, "message" to message.take(300)),
+        )
+    }
+
     /** The run failed: it is not counted. */
     fun release(submissionId: UUID) {
         jdbc.update(
@@ -61,8 +69,10 @@ class SummaryRegenerationQueries(private val jdbc: NamedParameterJdbcTemplate) {
     fun releaseAllRunning(): Int = jdbc.update("UPDATE submissions SET summary_regeneration = NULL WHERE summary_regeneration = 'running'", emptyMap<String, Any>())
 
     fun stateOf(submissionId: UUID): State = jdbc.query(
-        "SELECT summary_regeneration, summary_regenerations, summary_regenerated_at FROM submissions WHERE id = :id",
+        "SELECT summary_regeneration, summary_regenerations, summary_regenerated_at, summary_regeneration_error FROM submissions WHERE id = :id",
         mapOf("id" to submissionId),
-    ) { rs, _ -> State(rs.getString("summary_regeneration") == "running", rs.getInt("summary_regenerations"), rs.getTimestamp("summary_regenerated_at")?.toInstant()) }
+    ) { rs, _ ->
+        State(rs.getString("summary_regeneration") == "running", rs.getInt("summary_regenerations"), rs.getTimestamp("summary_regenerated_at")?.toInstant(), rs.getString("summary_regeneration_error"))
+    }
         .firstOrNull() ?: State(false, 0, null)
 }

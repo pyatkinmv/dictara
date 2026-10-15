@@ -440,6 +440,52 @@ class SummaryRegenerationIntegrationTest : AbstractSharedContextIntegrationTest(
     }
 
     @Test
+    fun `a failed run says why in plain words, and the reason stays until the next attempt`() {
+        failWith = RuntimeException("Gemini error (503): {\"error\": {\"message\": \"The model is overloaded\"}}")
+
+        regenerate()
+        waitForState("available")
+
+        val failed = detail()["summary_regeneration"]
+        assertThat(failed["error"].asText()).isEqualTo("The summary service is not available right now. Try again later.")
+        assertThat(failed["error"].asText()).doesNotContain("overloaded").doesNotContain("{") // never the raw reply
+        assertThat(detail()["summary_regeneration"]["error"].asText()).isNotBlank() // it is still there when the page is opened again
+
+        failWith = null
+        gate = CountDownLatch(1)
+        regenerate()
+        assertThat(detail()["summary_regeneration"].has("error")).isFalse() // an attempt that is running has no old complaint
+        gate!!.countDown()
+        waitForState("used")
+        assertThat(detail()["summary_regeneration"].has("error")).isFalse()
+    }
+
+    @Test
+    fun `out of credits is said as that`() {
+        failWith = RuntimeException("Gemini error (402): {\"error\": {\"message\": \"Your prepayment credits are depleted. Please go to AI Studio\"}}")
+
+        regenerate()
+        waitForState("available")
+
+        val error = detail()["summary_regeneration"]["error"].asText()
+        assertThat(error).isEqualTo("The summary service has run out of credits.")
+        assertThat(error).doesNotContain("AI Studio")
+    }
+
+    @Test
+    fun `a busy service and an unusable answer are said as such`() {
+        failWith = RuntimeException("Gemini error (429): quota")
+        regenerate()
+        waitForState("available")
+        assertThat(detail()["summary_regeneration"]["error"].asText()).isEqualTo("The summary service is busy. Try again in a minute.")
+
+        failWith = RuntimeException("Gemini answered without a summary")
+        regenerate()
+        waitForState("available")
+        assertThat(detail()["summary_regeneration"]["error"].asText()).isEqualTo("The summary service did not give a usable answer. Try again.")
+    }
+
+    @Test
     fun `a run cut short by a restart is given back`() {
         jdbcTemplate.update("UPDATE submissions SET summary_regeneration = 'running' WHERE id = ?", submission)
 

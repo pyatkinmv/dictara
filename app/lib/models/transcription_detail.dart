@@ -57,6 +57,7 @@ class TranscriptionDetail {
     this.regeneratedAt,
     this.regenerationsUsed = 0,
     this.regenerationsMax,
+    this.regenerationError,
   });
 
   /// The list-level data (title, tags, status, duration, date...).
@@ -95,6 +96,10 @@ class TranscriptionDetail {
   final DateTime? regeneratedAt;
   final int regenerationsUsed;
   final int? regenerationsMax;
+
+  /// Why the last attempt failed, in words for the user ("The summary service has run out of credits."); null when it did
+  /// not fail. The gateway keeps it until the next attempt.
+  final String? regenerationError;
 
   /// How many more times it can be done; null when there is no limit.
   int? get regenerationsLeft {
@@ -155,7 +160,12 @@ class TranscriptionDetail {
     return runs;
   }
 
-  TranscriptionDetail copyWith({Transcription? item, Map<int, Speaker>? segmentSpeakers, SummaryRegeneration? regeneration}) {
+  TranscriptionDetail copyWith({
+    Transcription? item,
+    Map<int, Speaker>? segmentSpeakers,
+    SummaryRegeneration? regeneration,
+    bool clearRegenerationError = false,
+  }) {
     return TranscriptionDetail(
       item: item ?? this.item,
       segments: segments,
@@ -171,6 +181,7 @@ class TranscriptionDetail {
       regeneratedAt: regeneratedAt,
       regenerationsUsed: regenerationsUsed,
       regenerationsMax: regenerationsMax,
+      regenerationError: clearRegenerationError ? null : regenerationError,
     );
   }
 }

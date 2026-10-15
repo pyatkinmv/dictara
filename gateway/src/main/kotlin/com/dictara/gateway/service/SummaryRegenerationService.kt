@@ -51,7 +51,7 @@ class SummaryRegenerationService(
      * `running`, `used` (the plan's limit is reached), `unavailable` (no summary service, or the plan has none).
      * [used] is how many times it was done, [max] how many the plan allows (null: no limit), [at] when it was last done.
      */
-    data class Regeneration(val state: String, val used: Int, val max: Int?, val at: String? = null)
+    data class Regeneration(val state: String, val used: Int, val max: Int?, val at: String? = null, val error: String? = null)
 
     private val log = LoggerFactory.getLogger(javaClass)
     private val tx = TransactionTemplate(txManager)
@@ -73,7 +73,7 @@ class SummaryRegenerationService(
             max != null && s.count >= max -> "used"
             else -> "available"
         }
-        return Regeneration(state, s.count, max, s.at?.toString())
+        return Regeneration(state, s.count, max, s.at?.toString(), s.error)
     }
 
     /** Starts the regeneration of [userId]'s transcription in the background; 404 / 409 when it cannot be done. */
@@ -107,7 +107,7 @@ class SummaryRegenerationService(
             queries.finish(submissionId)
             log.info("Summary regenerated for submission $submissionId (${analysis.summary.length} chars)")
         } catch (e: Exception) {
-            queries.release(submissionId)
+            queries.fail(submissionId, describeFailure(e))
             log.error("Summary regeneration failed for submission $submissionId: ${e.message}")
         }
     }
@@ -178,5 +178,19 @@ class SummaryRegenerationService(
 
     private companion object {
         const val ATTEMPTS = 3
+
+        /** What the user is told about a failed regeneration: the cause in plain words, never the raw reply of the service. */
+        fun describeFailure(e: Exception): String {
+            val text = e.message.orEmpty()
+            val code = Regex("""Gemini error \((\d{3})\)""").find(text)?.groupValues?.get(1)?.toInt()
+            return when {
+                code == 402 || text.contains("prepayment", ignoreCase = true) || text.contains("credits", ignoreCase = true) ->
+                    "The summary service has run out of credits."
+                code == 429 -> "The summary service is busy. Try again in a minute."
+                code != null && code >= 500 -> "The summary service is not available right now. Try again later."
+                code != null -> "The summary service refused the request."
+                else -> "The summary service did not give a usable answer. Try again."
+            }
+        }
     }
 }

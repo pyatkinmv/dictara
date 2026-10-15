@@ -76,6 +76,7 @@ class _SummaryCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (text == null && hasControl) _SectionHeader(label: 'Summary', trailing: control),
+            if (detail.regenerationError != null) _RegenerationError(message: detail.regenerationError!),
             if (text == null)
               Padding(
                 padding: EdgeInsets.only(top: hasControl ? 8 : 0),
@@ -85,6 +86,37 @@ class _SummaryCard extends StatelessWidget {
               _Section(label: 'Summary', trailing: hasControl ? control : null, child: SummaryMarkdown(data: text)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Why the last "Regenerate" did not work, under the header of the summary card.
+class _RegenerationError extends StatelessWidget {
+  const _RegenerationError({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Container(
+      key: const Key('regeneration-error'),
+      margin: const EdgeInsets.only(top: 8, bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(color: p.dangerBg, borderRadius: BorderRadius.circular(8)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline_rounded, size: 16, color: p.danger),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              "Couldn't regenerate the summary. $message",
+              style: TextStyle(fontSize: 12.5, height: 1.4, color: p.danger),
+            ),
+          ),
+        ],
       ),
     );
   }
