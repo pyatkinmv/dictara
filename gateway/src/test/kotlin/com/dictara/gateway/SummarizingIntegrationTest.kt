@@ -33,12 +33,18 @@ class SummarizingIntegrationTest : AbstractSharedContextIntegrationTest() {
 
     /** Replaces the real summarizer with a stub that reports available and sleeps briefly,
      *  making the 'summarizing' status window observable in tests. */
+    companion object {
+        /** The language each summarizer call was asked to write in. */
+        val languagesAsked: MutableList<String> = java.util.concurrent.CopyOnWriteArrayList()
+    }
+
     @TestConfiguration
     class StubSummarizerConfig {
         @Bean @Primary
         fun summarizer(): SummarizerPort = object : SummarizerPort {
             override fun isAvailable() = true
             override fun analyze(input: AnalysisInput): Analysis {
+                languagesAsked.add(input.language)
                 Thread.sleep(500) // hold 'summarizing' state long enough to observe
                 return Analysis("Test summary", title = "Proposed title")
             }
@@ -89,6 +95,20 @@ private fun <T> any(): T { ArgumentMatchers.any<T>(); @Suppress("UNCHECKED_CAST"
             String::class.java, jobId,
         )
         assertThat(titles).containsExactly("Proposed title")
+    }
+
+    @Test
+    fun `on auto the summarizer is asked to write in the language the transcriber found`() {
+        wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
+            .willReturn(okJson("""{"job_id":"sum-lang"}""")))
+        wireMock.stubFor(get(urlEqualTo("/jobs/sum-lang"))
+            .willReturn(okJson("""{"status":"done","duration_s":1.0,"result":{"formatted_text":"Привет","language":"ru","audio_duration_s":2.0,"segments":[{"start":0.0,"end":1.0,"text":"Привет","speaker":null}]}}""")))
+
+        val jobId = submitFile(3005L, summaryMode = "brief")
+        waitForStatus(jobId, "done")
+
+        // other tests' jobs may still be summarizing and add their own "auto": only "ru" can come from this one
+        assertThat(languagesAsked).contains("ru")
     }
 
     @Test

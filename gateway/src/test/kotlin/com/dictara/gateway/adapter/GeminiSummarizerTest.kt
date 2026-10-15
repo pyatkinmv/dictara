@@ -106,6 +106,27 @@ class GeminiSummarizerTest {
     }
 
     @Test
+    fun `the language rule names the language, comes before and after the transcript, and is not left to a vague phrase`() {
+        val prompt = GeminiSummarizer.buildPrompt(input.copy(language = "ru"))
+        val rule = "LANGUAGE: write \"summary\" and \"title\""
+
+        assertThat(prompt).contains("$rule (and every header or label inside the summary) in Russian")
+        assertThat(prompt.indexOf(rule)).isLessThan(prompt.indexOf("Transcript:"))
+        assertThat(prompt.lastIndexOf(rule)).isGreaterThan(prompt.indexOf("Hi, I'm Anna."))
+        assertThat(GeminiSummarizer.buildPrompt(input)).contains("in the language the transcript is written in")
+    }
+
+    @Test
+    fun `tags and speakers of the library are matched across languages, new names keep the transcript's language`() {
+        val prompt = GeminiSummarizer.buildPrompt(input)
+
+        assertThat(prompt)
+            .contains("Match by meaning, not by language or alphabet")
+            .contains("never a second spelling of it")
+            .contains("in the transcript's own language and alphabet")
+    }
+
+    @Test
     fun `the schema asks for all four parts, so the model never leaves one out`() {
         assertThat(GeminiSummarizer.RESPONSE_SCHEMA["required"]).isEqualTo(listOf("summary", "title", "tags", "speakers"))
     }
