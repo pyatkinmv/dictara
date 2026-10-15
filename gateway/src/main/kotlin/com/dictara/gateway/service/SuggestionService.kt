@@ -65,6 +65,14 @@ class SuggestionService(
         /** A title as it is kept: no quotes around it, one space between words. */
         private fun cleanTitle(raw: String): String = raw.trim().trim('"', '\'', '«', '»', '“', '”').replace(Regex("\\s+"), " ")
 
+        /**
+         * A quote as the person said it. The transcript the model reads has a marker in front of every phrase
+         * (`[0:12:03 --> 0:12:09] [SPEAKER_02] ...`) and a model that copies a line copies the markers too; they are
+         * not part of the words, so the check would fail on a quote that is really there.
+         */
+        private fun withoutMarkers(quote: String): String =
+            quote.replace(Regex("\\[[^\\]]*]"), " ").replace(Regex("\\s+"), " ").trim()
+
         private fun normalize(text: String): String =
             text.lowercase(Locale.ROOT).replace(Regex("[^\\p{L}\\p{N}]+"), " ").trim()
 
@@ -114,13 +122,13 @@ class SuggestionService(
         val usedNames = HashSet<String>()
         for (guess in analysis.speakers) {
             val name = runCatching { SpeakerService.normalizeName(guess.name) }.getOrNull() ?: continue
-            val evidence = guess.evidence?.trim()?.replace(Regex("\\s+"), " ")?.takeIf { it.isNotEmpty() }
+            val evidence = guess.evidence?.let(::withoutMarkers)?.takeIf { it.isNotEmpty() }
             if (guess.voice !in voices) {
                 log.info("Suggestion dropped for $submissionId: there is no voice ${guess.voice}")
                 continue
             }
             if (evidence == null || " ${normalize(evidence)} " !in said) {
-                log.info("Suggestion dropped for $submissionId: the quote for ${guess.voice} is not in the transcript")
+                log.info("Suggestion dropped for $submissionId: the quote for ${guess.voice} is not in the transcript: '${guess.evidence?.take(120)}'")
                 continue
             }
             val known = speakerRepository.findByUserIdAndNameIgnoringCase(userId, name)

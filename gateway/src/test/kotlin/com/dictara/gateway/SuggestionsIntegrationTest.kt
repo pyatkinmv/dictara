@@ -157,6 +157,29 @@ class SuggestionsIntegrationTest : AbstractSharedContextIntegrationTest() {
     }
 
     @Test
+    fun `a quote copied with the timestamp and the voice label of its line is still found, and kept without them`() {
+        record(Analysis("s", speakers = listOf(
+            SpeakerGuess("SPEAKER_00", "Anna", "[0:00:00 --> 0:00:10] [SPEAKER_00] Hello everyone, I'm Anna and I run this meeting."),
+            SpeakerGuess("SPEAKER_01", "Boris Petrov", "[SPEAKER_01] My name is Boris Petrov"),
+        )))
+
+        val s = suggestions()!!["speakers"]
+        assertThat(s.map { it["voice"].asText() }).containsExactly("SPEAKER_00", "SPEAKER_01")
+        assertThat(s[0]["evidence"].asText()).isEqualTo("Hello everyone, I'm Anna and I run this meeting.")
+        assertThat(s[1]["evidence"].asText()).isEqualTo("My name is Boris Petrov")
+    }
+
+    @Test
+    fun `a quote that is only markers, or whose words are not there, is still dropped`() {
+        record(Analysis("s", speakers = listOf(
+            SpeakerGuess("SPEAKER_00", "Anna", "[0:00:00 --> 0:00:10] [SPEAKER_00]"),
+            SpeakerGuess("SPEAKER_01", "Boris Petrov", "[SPEAKER_01] I am Boris and I sing opera"),
+        )))
+
+        assertThat(suggestions()).isNull()
+    }
+
+    @Test
     fun `proposals that do not hold up are dropped`() {
         tag("budget")
         val analysis = Analysis(
