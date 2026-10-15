@@ -1,3 +1,4 @@
+import '../app_version.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -59,6 +60,10 @@ class Sidebar extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.only(top: 4),
             child: ProfileMenu(),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 10),
+            child: Text('v$appVersion', key: const Key('app-version'), style: TextStyle(fontSize: 11, color: p.text3)),
           ),
         ],
       ),

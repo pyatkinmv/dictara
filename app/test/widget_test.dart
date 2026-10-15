@@ -2,6 +2,7 @@ import 'dart:ui' show Size;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dictara_web/app.dart';
+import 'package:dictara_web/app_version.dart';
 
 import 'support/fake_transcription_repository.dart';
 import 'test_utils.dart';
@@ -21,6 +22,14 @@ void main() {
       expect(find.text(label), findsOneWidget);
     }
     expect(find.text('Upload'), findsOneWidget);
+  });
+
+  testWidgets('the sidebar shows the frontend version', (tester) async {
+    useDesktopSize(tester);
+    await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: FakeTranscriptionRepository()));
+    await settle(tester);
+
+    expect(find.text('v$appVersion'), findsOneWidget);
   });
 
   testWidgets('navigating updates the topbar title', (tester) async {
