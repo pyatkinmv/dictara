@@ -5,25 +5,44 @@ import '../theme/app_palette.dart';
 const topbarHeight = 56.0;
 
 class Topbar extends StatelessWidget {
-  const Topbar({super.key, required this.title, required this.onUpload});
+  const Topbar({super.key, required this.title, required this.onUpload, this.onMenu});
 
   final String title;
   final VoidCallback onUpload;
 
+  /// Phone layout only: opens the navigation drawer. Null on wide screens, where the sidebar is always there.
+  final VoidCallback? onMenu;
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final menu = onMenu;
     return Container(
       height: topbarHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: EdgeInsets.symmetric(horizontal: menu == null ? 24 : 8),
       decoration: BoxDecoration(
         color: p.surface,
         border: Border(bottom: BorderSide(color: p.border)),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          if (menu != null)
+            IconButton(
+              key: const Key('open-menu'),
+              tooltip: 'Menu',
+              onPressed: menu,
+              icon: Icon(Icons.menu_rounded, color: p.text2),
+            ),
+          // A long transcription title is cut, so it can never push the Upload button off a narrow screen.
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(width: 12),
           _UploadButton(onPressed: onUpload),
         ],
       ),

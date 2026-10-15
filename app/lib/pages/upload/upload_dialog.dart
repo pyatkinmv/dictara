@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../data/gateway_client.dart';
 import '../../models/upload.dart';
 import '../../services/file_chooser.dart';
+import '../../shell/breakpoints.dart';
 import '../../theme/app_palette.dart';
 import '../../util/format.dart';
 import '../../widgets/dashed_border.dart';
@@ -127,6 +128,29 @@ class _UploadDialogState extends State<_UploadDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final fields = <Widget>[
+      _SelectField<UploadLanguage>(
+        label: 'Language',
+        value: _language,
+        values: UploadLanguage.values,
+        labelOf: (v) => v.label,
+        onChanged: (v) => setState(() => _language = v),
+      ),
+      _SelectField<SummaryMode>(
+        label: 'Summary',
+        value: _summary,
+        values: SummaryMode.values,
+        labelOf: (v) => v.label,
+        onChanged: (v) => setState(() => _summary = v),
+      ),
+      _SelectField<SpeakerCount>(
+        label: 'Speakers',
+        value: _speakers,
+        values: SpeakerCount.values,
+        labelOf: (v) => v.label,
+        onChanged: (v) => setState(() => _speakers = v),
+      ),
+    ];
     return ModalCard(
       width: 500,
       radius: 20,
@@ -154,42 +178,28 @@ class _UploadDialogState extends State<_UploadDialog> {
             ignoring: _sending,
             child: Padding(
               padding: const EdgeInsets.only(bottom: 18),
-              child: IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: _SelectField<UploadLanguage>(
-                        label: 'Language',
-                        value: _language,
-                        values: UploadLanguage.values,
-                        labelOf: (v) => v.label,
-                        onChanged: (v) => setState(() => _language = v),
+              // Three fields side by side need a wide dialog; on a phone they go one under another.
+              child: isMobileWidth(context)
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (var i = 0; i < fields.length; i++) ...[
+                          if (i > 0) const SizedBox(height: 10),
+                          fields[i],
+                        ],
+                      ],
+                    )
+                  : IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (var i = 0; i < fields.length; i++) ...[
+                            if (i > 0) const SizedBox(width: 10),
+                            Expanded(child: fields[i]),
+                          ],
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _SelectField<SummaryMode>(
-                        label: 'Summary',
-                        value: _summary,
-                        values: SummaryMode.values,
-                        labelOf: (v) => v.label,
-                        onChanged: (v) => setState(() => _summary = v),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _SelectField<SpeakerCount>(
-                        label: 'Speakers',
-                        value: _speakers,
-                        values: SpeakerCount.values,
-                        labelOf: (v) => v.label,
-                        onChanged: (v) => setState(() => _speakers = v),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ),
           ),
           ModalFooter(

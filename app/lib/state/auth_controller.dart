@@ -9,6 +9,9 @@ import '../services/token_store.dart';
 /// Which screen of the login card is showing.
 enum LoginStage { input, notified, unknownUser }
 
+/// Shown when the server refuses another guest session for now (429).
+const tooManyAttemptsMessage = 'Too many attempts. Please wait a minute and try again.';
+
 /// Drives the login screen and holds the signed-in session (`docs/local-backend-integration.md`, "Итерация
 /// 10"). `main_material.dart` gives it the real [AuthApi] and [TokenStore] and wires [onToken] to the
 /// [GatewayClient] the rest of the app shares, so every request after a login carries the bearer token; widget
@@ -105,7 +108,8 @@ class AuthController extends ChangeNotifier {
     } on GatewayException catch (e) {
       if (_disposed) return;
       _busy = false;
-      _error = e.message;
+      // The server's limit on new guests answers a bare "429" page that means nothing to a person.
+      _error = e.statusCode == 429 ? tooManyAttemptsMessage : e.message;
       notifyListeners();
     }
   }

@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/transcription_detail.dart';
 import '../../services/text_saver.dart';
+import '../../shell/breakpoints.dart';
 import '../../state/transcription_detail_controller.dart';
 import '../../theme/app_palette.dart';
 import '../../util/format.dart';
@@ -26,8 +27,46 @@ class DetailHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final item = detail.item;
+    final phone = isMobileWidth(context);
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _TitleEditor(title: item.title),
+        const SuggestionsBanner(),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(6, 0, 6, 10),
+          child: _MetaRow(detail: detail),
+        ),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(6, 0, 6, 10),
+          child: DetailTagsRow(),
+        ),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(6, 0, 6, 6),
+          child: DetailSpeakersRow(),
+        ),
+      ],
+    );
+    final actions = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _HeaderButton(
+          icon: Icons.download_rounded,
+          label: '.txt',
+          doneLabel: 'Saved',
+          onTap: () => _download(context),
+        ),
+        const SizedBox(width: 7),
+        _HeaderButton(
+          icon: Icons.content_copy_rounded,
+          label: 'Copy',
+          doneLabel: 'Copied',
+          onTap: () => _copy(context),
+        ),
+      ],
+    );
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 14, 24, 14),
+      padding: EdgeInsets.fromLTRB(phone ? 12 : 24, 14, phone ? 12 : 24, 14),
       decoration: BoxDecoration(
         color: p.surface,
         border: Border(bottom: BorderSide(color: p.border)),
@@ -37,50 +76,19 @@ class DetailHeader extends StatelessWidget {
         children: [
           _Breadcrumb(title: item.title),
           const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _TitleEditor(title: item.title),
-                    const SuggestionsBanner(),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(6, 0, 6, 10),
-                      child: _MetaRow(detail: detail),
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(6, 0, 6, 10),
-                      child: DetailTagsRow(),
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(6, 0, 6, 6),
-                      child: DetailSpeakersRow(),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Row(
-                children: [
-                  _HeaderButton(
-                    icon: Icons.download_rounded,
-                    label: '.txt',
-                    doneLabel: 'Saved',
-                    onTap: () => _download(context),
-                  ),
-                  const SizedBox(width: 7),
-                  _HeaderButton(
-                    icon: Icons.content_copy_rounded,
-                    label: 'Copy',
-                    doneLabel: 'Copied',
-                    onTap: () => _copy(context),
-                  ),
-                ],
-              ),
-            ],
-          ),
+          if (phone) ...[
+            // The buttons go under the content: beside it they would leave the title and the tags a sliver.
+            content,
+            Padding(padding: const EdgeInsets.only(left: 6, top: 4), child: actions),
+          ] else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: content),
+                const SizedBox(width: 16),
+                actions,
+              ],
+            ),
         ],
       ),
     );

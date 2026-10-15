@@ -269,6 +269,16 @@ void main() {
       expect(auth.isLoggedIn, isFalse);
       expect(auth.error, 'Could not reach the server');
     });
+
+    test('a 429 from the server says to wait, instead of showing the raw reply', () async {
+      final api = FakeAuthApi()..failAnonymousWith = const GatewayException('Too Many Requests', statusCode: 429);
+      final auth = AuthController(api, InMemoryTokenStore());
+
+      await auth.continueAnonymously();
+
+      expect(auth.isLoggedIn, isFalse);
+      expect(auth.error, 'Too many attempts. Please wait a minute and try again.');
+    });
   });
 }
 

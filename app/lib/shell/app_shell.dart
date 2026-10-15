@@ -7,6 +7,7 @@ import '../pages/upload/upload_dialog.dart';
 import '../services/file_chooser.dart';
 import '../state/transcription_detail_controller.dart';
 import '../state/transcription_list_controller.dart';
+import 'breakpoints.dart';
 import 'nav_destinations.dart';
 import 'sidebar.dart';
 import 'topbar.dart';
@@ -43,18 +44,38 @@ class AppShell extends StatelessWidget {
     final isDetail = destination != null && location != destination.path;
     final title = (isDetail ? openTitle : null) ?? destination?.label ?? 'Dictara';
 
+    final page = Column(
+      children: [
+        Builder(
+          builder: (context) => Topbar(
+            title: title,
+            onUpload: () => _upload(context),
+            // Phone layout: the sidebar lives in a drawer that this button opens.
+            onMenu: isMobileWidth(context) ? () => Scaffold.of(context).openDrawer() : null,
+          ),
+        ),
+        Expanded(child: child),
+      ],
+    );
+
+    if (isMobileWidth(context)) {
+      return Scaffold(
+        drawer: Drawer(
+          width: sidebarWidth,
+          shape: const RoundedRectangleBorder(),
+          child: Builder(
+            builder: (drawerContext) => Sidebar(location: location, onNavigate: () => Navigator.of(drawerContext).pop()),
+          ),
+        ),
+        body: SafeArea(child: page),
+      );
+    }
+
     return Scaffold(
       body: Row(
         children: [
           Sidebar(location: location),
-          Expanded(
-            child: Column(
-              children: [
-                Topbar(title: title, onUpload: () => _upload(context)),
-                Expanded(child: child),
-              ],
-            ),
-          ),
+          Expanded(child: page),
         ],
       ),
     );
