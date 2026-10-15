@@ -11,10 +11,13 @@ import 'profile_menu.dart';
 const sidebarWidth = 220.0;
 
 class Sidebar extends StatelessWidget {
-  const Sidebar({super.key, required this.location});
+  const Sidebar({super.key, required this.location, this.onNavigate});
 
   /// Current route path, used to highlight the active item.
   final String location;
+
+  /// Called after a navigation item is chosen; the phone layout closes its drawer with it.
+  final VoidCallback? onNavigate;
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +52,10 @@ class Sidebar extends StatelessWidget {
                     _NavItem(
                       destination: navDestinations[i],
                       active: navDestinations[i] == active,
-                      onTap: () => context.go(navDestinations[i].path),
+                      onTap: () {
+                        context.go(navDestinations[i].path);
+                        onNavigate?.call();
+                      },
                     ),
                   ],
                 ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../shell/breakpoints.dart';
 import '../../state/audio_player_controller.dart';
 import '../../theme/app_palette.dart';
 import '../../util/format.dart';
@@ -104,13 +105,15 @@ class _VolumeControl extends StatelessWidget {
             child: Padding(padding: const EdgeInsets.all(4), child: Icon(icon, size: 18, color: p.text2)),
           ),
         ),
-        SizedBox(
-          width: 72,
-          child: SliderTheme(
-            data: _sliderTheme(p),
-            child: Slider(key: const Key('audio-volume'), value: volume, onChanged: controller.setVolume),
+        // On a phone the level is the device's own volume; the slider would only take the seek bar's room.
+        if (!isMobileWidth(context))
+          SizedBox(
+            width: 72,
+            child: SliderTheme(
+              data: _sliderTheme(p),
+              child: Slider(key: const Key('audio-volume'), value: volume, onChanged: controller.setVolume),
+            ),
           ),
-        ),
       ],
     );
   }

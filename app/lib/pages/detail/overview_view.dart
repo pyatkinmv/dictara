@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../models/transcription_detail.dart';
+import '../../shell/breakpoints.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
@@ -21,16 +22,27 @@ class OverviewView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final phone = isMobileWidth(context);
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: _SummaryCard(summary: detail.summary)),
-          const SizedBox(width: 18),
-          SizedBox(width: 224, child: _DetailsPanel(detail: detail)),
-        ],
-      ),
+      padding: EdgeInsets.symmetric(horizontal: phone ? 12 : 24, vertical: 20),
+      // On a phone the file facts go under the summary instead of squeezing it into a sliver.
+      child: phone
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _SummaryCard(summary: detail.summary),
+                const SizedBox(height: 14),
+                _DetailsPanel(detail: detail),
+              ],
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _SummaryCard(summary: detail.summary)),
+                const SizedBox(width: 18),
+                SizedBox(width: 224, child: _DetailsPanel(detail: detail)),
+              ],
+            ),
     );
   }
 }

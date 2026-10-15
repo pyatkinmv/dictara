@@ -166,4 +166,18 @@ void main() {
     expect(backend.lastVolume, 0.3);
     expect(find.byIcon(Icons.volume_down_rounded), findsOneWidget);
   });
+
+  testWidgets('on a phone the player keeps the mute button but drops the volume slider, and the seek bar stays usable', (tester) async {
+    final c = makeController();
+    c.load('u');
+    tester.view.physicalSize = const Size(375, 812);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await pump(tester, c);
+
+    expect(find.byKey(const Key('audio-mute')), findsOneWidget);
+    expect(find.byKey(const Key('audio-volume')), findsNothing);
+    expect(tester.getSize(find.byKey(const Key('audio-seek')).first).width, greaterThan(100));
+    expect(tester.takeException(), isNull);
+  });
 }
