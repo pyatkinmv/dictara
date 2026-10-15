@@ -129,6 +129,27 @@ class GeminiSummarizerTest {
     }
 
     @Test
+    fun `a long summary asks for a bullet per topic with names, numbers and one action item per person`() {
+        val auto = GeminiSummarizer.buildPrompt(input.copy(mode = SummaryMode.AUTO))
+        val full = GeminiSummarizer.buildPrompt(input.copy(mode = SummaryMode.FULL))
+
+        for (prompt in listOf(auto, full)) {
+            assertThat(prompt)
+                .contains("one bullet for every distinct topic")
+                .contains("one bullet per person: who, what, by when if said")
+                .contains("Name people by the names used in the transcript, not by SPEAKER_xx labels")
+        }
+        assertThat(auto).contains("- Under 2 minutes: 1–2 sentences only").contains("- 2 to 15 minutes: a concise paragraph")
+        // The short summaries stay short.
+        assertThat(GeminiSummarizer.buildPrompt(input.copy(mode = SummaryMode.BRIEF))).doesNotContain("one bullet for every distinct topic")
+    }
+
+    @Test
+    fun `the quote asked for as evidence is without the timestamps and labels of its line`() {
+        assertThat(GeminiSummarizer.buildPrompt(input)).contains("WITHOUT the [timestamps] and [SPEAKER_xx] labels")
+    }
+
+    @Test
     fun `the schema asks for all four parts, so the model never leaves one out`() {
         assertThat(GeminiSummarizer.RESPONSE_SCHEMA["required"]).isEqualTo(listOf("summary", "title", "tags", "speakers"))
     }

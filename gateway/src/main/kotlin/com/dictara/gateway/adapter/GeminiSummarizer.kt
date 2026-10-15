@@ -118,6 +118,22 @@ class GeminiSummarizer(
             )
         }
 
+        /**
+         * The structure of a long summary. Asking only for "key points" and to "be concise" gave summaries that varied
+         * from 1,400 to 3,000 characters on the same recording and often left out who does what; asking for a bullet per
+         * topic with names, numbers and one action item per person gave 3,000–5,000 consistently (tried on three real
+         * recordings, six runs each).
+         */
+        private const val STRUCTURE = """📝 Summary — 3–4 sentence overview
+Key points:
+• one bullet for every distinct topic, update or decision discussed (a long recording usually has 8–15), each with the concrete facts: who reported or owns it, names, numbers, dates, reasons
+Conclusions:
+• ...
+✅ Action items: — include ONLY if specific tasks or follow-ups were explicitly mentioned; one bullet per person: who, what, by when if said"""
+
+        private const val DETAIL_RULE = "Cover everything of substance: leave out only small talk and repetition. " +
+            "Name people by the names used in the transcript, not by SPEAKER_xx labels, whenever the transcript makes the name clear."
+
         internal fun buildPrompt(input: AnalysisInput): String {
             val durationHint = input.audioDurationSeconds?.let {
                 val mins = (it / 60).toInt()
@@ -134,30 +150,22 @@ class GeminiSummarizer(
 
             val formatInstruction = when (input.mode) {
                 SummaryMode.OFF -> ""
-                SummaryMode.AUTO -> """
-                    - Under 2 minutes: 1–2 sentences only. No headers, no structure.
-                    - 2 to 15 minutes: a concise paragraph (3–5 sentences) covering the main topic, key points, and conclusions.
-                    - Over 15 minutes: structured format:
-                      📝 Summary — 2–3 sentence overview
-                      Key points:
-                      • ...
-                      Conclusions:
-                      • ...
-                      ✅ Action items: — include ONLY if specific tasks or follow-ups were explicitly mentioned
-                    Be concise and proportional to the content. Do not pad short content.
-                """.trimIndent()
+                SummaryMode.AUTO -> listOf(
+                    "- Under 2 minutes: 1–2 sentences only. No headers, no structure.",
+                    "- 2 to 15 minutes: a concise paragraph (3–5 sentences) covering the main topic, key points, and conclusions.",
+                    "- Over 15 minutes: structured format:",
+                    STRUCTURE.prependIndent("  "),
+                    DETAIL_RULE,
+                    "Do not pad short content.",
+                ).joinToString("\n")
                 SummaryMode.BRIEF -> "Summarize in 1–2 sentences only. No headers, no structure. Be concise."
                 SummaryMode.CONCISE -> "Write a concise paragraph of 3–5 sentences covering the main topic, key points, and conclusions. No headers, no bullet points."
-                SummaryMode.FULL -> """
-                    Always use this structured format regardless of length:
-                    📝 Summary — 2–3 sentence overview
-                    Key points:
-                    • ...
-                    Conclusions:
-                    • ...
-                    ✅ Action items: — include ONLY if specific tasks or follow-ups were explicitly mentioned
-                    Be thorough but concise. Translate all section headers to the response language.
-                """.trimIndent()
+                SummaryMode.FULL -> listOf(
+                    "Always use this structured format regardless of length:",
+                    STRUCTURE,
+                    DETAIL_RULE,
+                    "Translate all section headers to the response language.",
+                ).joinToString("\n")
             }
 
             fun list(entries: List<LibraryHint>, empty: String) =
@@ -189,7 +197,7 @@ class GeminiSummarizer(
                 "  - the person is named in the transcript itself: they introduce themselves, or another speaker addresses them by name;",
                 "  - the voice clearly is a person from the SPEAKER LIST (copy their name exactly as listed).",
                 "For each give \"voice\" (the label), \"name\" (as it is said in the transcript, or as listed) and \"evidence\": the exact words",
-                "of the transcript that show it, copied as they are, at most 200 characters. Never guess a name from a role, a topic or a voice.",
+                "of the transcript that show it, copied as they are, at most 200 characters, WITHOUT the [timestamps] and [SPEAKER_xx] labels in front of the lines. Never guess a name from a role, a topic or a voice.",
                 "A person from the SPEAKER LIST is the same person whatever the language, alphabet, spelling or short form of the name in the transcript " +
                     "(\"Nastya\" in the list, \"Настя\" or \"Анастасия\" said in the audio): give the name exactly as listed and never a second spelling of it.",
                 "Only a person who is not in the list gets the name as it is said in the transcript, in the transcript's own language and alphabet.",

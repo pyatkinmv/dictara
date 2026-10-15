@@ -157,6 +157,32 @@ class SuggestionsIntegrationTest : AbstractSharedContextIntegrationTest() {
     }
 
     @Test
+    fun `a quote copied with the timestamp and the voice label of its line is still found, and kept without them`() {
+        record(Analysis("s", speakers = listOf(
+            SpeakerGuess("SPEAKER_00", "Anna", "[0:00:00 --> 0:00:10] [SPEAKER_00] Hello everyone, I'm Anna and I run this meeting."),
+            SpeakerGuess("SPEAKER_01", "Boris Petrov", "[SPEAKER_01] My name is Boris Petrov"),
+        )))
+
+        val s = suggestions()!!["speakers"]
+        assertThat(s.map { it["voice"].asText() }).containsExactly("SPEAKER_00", "SPEAKER_01")
+        assertThat(s[0]["evidence"].asText()).isEqualTo("Hello everyone, I'm Anna and I run this meeting.")
+        assertThat(s[1]["evidence"].asText()).isEqualTo("My name is Boris Petrov")
+    }
+
+    @Test
+    fun `a quote that is missing, only markers, or not in the transcript does not stop a proposal, and is not kept`() {
+        record(Analysis("s", speakers = listOf(
+            SpeakerGuess("SPEAKER_00", "Anna", "[0:00:00 --> 0:00:10] [SPEAKER_00]"),
+            SpeakerGuess("SPEAKER_01", "Boris Petrov", "[SPEAKER_01] I am Boris and I sing opera"),
+            SpeakerGuess("SPEAKER_02", "Anna", null),
+        )))
+
+        val s = suggestions()!!["speakers"]
+        assertThat(s.map { it["voice"].asText() }).containsExactly("SPEAKER_00", "SPEAKER_01") // one name per voice and per name
+        assertThat(s.any { it.has("evidence") }).isFalse() // nothing is kept that is not in the transcript
+    }
+
+    @Test
     fun `proposals that do not hold up are dropped`() {
         tag("budget")
         val analysis = Analysis(
@@ -165,8 +191,6 @@ class SuggestionsIntegrationTest : AbstractSharedContextIntegrationTest() {
             tags = listOf("budget", "invented", "not a tag!"), // the library has only 'budget'
             speakers = listOf(
                 SpeakerGuess("SPEAKER_09", "Anna", "I'm Anna"),                    // no such voice
-                SpeakerGuess("SPEAKER_00", "Anna", "I am Anna and I sing opera"), // the quote is not in the transcript
-                SpeakerGuess("SPEAKER_00", "Anna", null),                          // no quote at all
                 SpeakerGuess("SPEAKER_02", "Carla", "We discuss the budget today"), // new name that is not in the transcript
                 SpeakerGuess("SPEAKER_02", "  ", "We discuss the budget today"),    // not a name
                 boris.copy(name = "Bor"),                                            // "Bor" is only part of a word... of "Boris"
