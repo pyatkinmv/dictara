@@ -32,7 +32,12 @@ data class Analysis(
     val title: String? = null,
     val tags: List<String> = emptyList(),
     val speakers: List<SpeakerGuess> = emptyList(),
+    /** What the call cost in tokens, when the model reports it. */
+    val usage: TokenUsage? = null,
 )
+
+/** The tokens of one call: what was sent, what was written and what the model "thought" (billed like the answer). */
+data class TokenUsage(val prompt: Int, val output: Int, val thoughts: Int)
 
 interface SummarizerPort {
     fun isAvailable(): Boolean

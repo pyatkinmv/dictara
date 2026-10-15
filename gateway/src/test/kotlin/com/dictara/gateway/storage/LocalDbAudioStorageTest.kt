@@ -2,12 +2,14 @@ package com.dictara.gateway.storage
 
 import com.dictara.gateway.SharedTestInfrastructure
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.springframework.core.io.ClassPathResource
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 import java.io.ByteArrayInputStream
+import java.sql.DriverManager
 import java.security.MessageDigest
 import java.time.Instant
 import java.util.UUID
@@ -16,19 +18,35 @@ class LocalDbAudioStorageTest {
 
     companion object {
         private lateinit var jdbc: JdbcTemplate
+        private val scratchDb = "local_audio_" + UUID.randomUUID().toString().replace("-", "")
 
+        private fun adminConnection() = DriverManager.getConnection(
+            SharedTestInfrastructure.jdbcUrl, SharedTestInfrastructure.dbUsername, SharedTestInfrastructure.dbPassword,
+        )
+
+        /**
+         * A database of its own: this table is not Flyway's, and in the shared database it made the Spring contexts that
+         * start after this class fail with "non-empty schema but no schema history table".
+         */
         @BeforeAll
         @JvmStatic
         fun createTable() {
+            adminConnection().use { it.createStatement().execute("CREATE DATABASE $scratchDb") }
             jdbc = JdbcTemplate(
                 DriverManagerDataSource(
-                    SharedTestInfrastructure.jdbcUrl,
+                    SharedTestInfrastructure.jdbcUrl.replace(Regex("(jdbc:postgresql://[^/]+/)([^?]+)"), "$1$scratchDb"),
                     SharedTestInfrastructure.dbUsername,
                     SharedTestInfrastructure.dbPassword,
                 )
             )
             // The same script Flyway runs under the local profile.
             jdbc.execute(ClassPathResource("db/local/R__local_audio.sql").inputStream.readBytes().decodeToString())
+        }
+
+        @AfterAll
+        @JvmStatic
+        fun dropDatabase() {
+            adminConnection().use { it.createStatement().execute("DROP DATABASE IF EXISTS $scratchDb WITH (FORCE)") }
         }
     }
 

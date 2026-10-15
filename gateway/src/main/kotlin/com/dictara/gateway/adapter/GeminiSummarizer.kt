@@ -6,6 +6,7 @@ import com.dictara.gateway.port.AnalysisInput
 import com.dictara.gateway.port.LibraryHint
 import com.dictara.gateway.port.SpeakerGuess
 import com.dictara.gateway.port.SummarizerPort
+import com.dictara.gateway.port.TokenUsage
 import com.dictara.gateway.util.SummaryFormat
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
@@ -31,6 +32,8 @@ class GeminiSummarizer(
         .readTimeout(120, TimeUnit.SECONDS)
         .build()
 
+    private val log = org.slf4j.LoggerFactory.getLogger(javaClass)
+
     override fun isAvailable() = apiKey.isNotBlank()
 
     override fun analyze(input: AnalysisInput): Analysis {
@@ -54,7 +57,12 @@ class GeminiSummarizer(
         val response = http.newCall(request).execute()
         val body = response.body?.string() ?: ""
         if (!response.isSuccessful) throw RuntimeException("Gemini error (${response.code}): $body")
-        return parse(mapper.readTree(body)["candidates"][0]["content"]["parts"][0]["text"].asText())
+        val root = mapper.readTree(body)
+        val usage = root["usageMetadata"]?.let {
+            TokenUsage(it["promptTokenCount"]?.asInt() ?: 0, it["candidatesTokenCount"]?.asInt() ?: 0, it["thoughtsTokenCount"]?.asInt() ?: 0)
+        }
+        usage?.let { log.info("Gemini call: {} tokens in, {} out, {} thinking", it.prompt, it.output, it.thoughts) }
+        return parse(root["candidates"][0]["content"]["parts"][0]["text"].asText()).copy(usage = usage)
     }
 
     companion object {

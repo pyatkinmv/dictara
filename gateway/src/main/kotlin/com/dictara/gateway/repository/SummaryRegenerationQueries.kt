@@ -41,6 +41,14 @@ class SummaryRegenerationQueries(private val jdbc: NamedParameterJdbcTemplate) {
         )
     }
 
+    /** The backlog run is done with the transcription: it is marked, and it is not counted as the user's own regeneration. */
+    fun finishBackfill(submissionId: UUID) {
+        jdbc.update(
+            "UPDATE submissions SET summary_regeneration = NULL, analysis_backfilled_at = now() WHERE id = :id AND summary_regeneration = 'running'",
+            mapOf("id" to submissionId),
+        )
+    }
+
     /** The run failed: it is not counted. */
     fun release(submissionId: UUID) {
         jdbc.update(

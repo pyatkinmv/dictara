@@ -16,7 +16,12 @@ object SharedTestInfrastructure {
     private val testDbUrl: String? = System.getenv("TEST_DB_URL")
 
     private val postgres: PostgreSQLContainer<Nothing> by lazy {
-        PostgreSQLContainer<Nothing>("postgres:16").also { it.start() }
+        // Every Spring context the tests keep (one per distinct set of properties) holds a pool of connections; the
+        // default of 100 was used up by the time the last test classes ran.
+        PostgreSQLContainer<Nothing>("postgres:16").also {
+            it.withCommand("postgres", "-c", "max_connections=400")
+            it.start()
+        }
     }
 
     val jdbcUrl: String get() = testDbUrl ?: postgres.jdbcUrl
