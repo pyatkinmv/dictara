@@ -36,9 +36,10 @@ data class Suggestions(val title: String?, val tags: List<TagRef>, val speakers:
  * What the model says is only a proposal, and it is checked before it is kept ([record]):
  *  - a tag has to be one of the user's tags;
  *  - a voice has to exist in the transcript, and its name has to be a valid speaker name;
- *  - the quote the model gives ("evidence") has to be in the transcript;
- *  - a name that is not in the speaker library has to be written in the transcript itself.
- * Whatever fails is left out. Nothing changes in the user's data until they accept: a speaker is not put in
+ *  - a name that is not in the speaker library has to be written in the transcript itself (a name of the library
+ *    may be proposed without being said: the descriptions are there so that a voice can be told from what it talks about).
+ * The quote ("evidence") the model gives with a speaker is not checked strictly: it is kept when it is in the
+ * transcript and logged when it is not. Whatever fails the checks is left out. Nothing changes in the user's data until they accept: a speaker is not put in
  * the library until then, and rejecting leaves no trace besides the row that says it was rejected.
  */
 @Service
@@ -122,15 +123,15 @@ class SuggestionService(
         val usedNames = HashSet<String>()
         for (guess in analysis.speakers) {
             val name = runCatching { SpeakerService.normalizeName(guess.name) }.getOrNull() ?: continue
-            val evidence = guess.evidence?.let(::withoutMarkers)?.takeIf { it.isNotEmpty() }
             if (guess.voice !in voices) {
                 log.info("Suggestion dropped for $submissionId: there is no voice ${guess.voice}")
                 continue
             }
-            if (evidence == null || " ${normalize(evidence)} " !in said) {
-                log.info("Suggestion dropped for $submissionId: the quote for ${guess.voice} is not in the transcript: '${guess.evidence?.take(120)}'")
-                continue
-            }
+            // The quote does not decide anything: models rarely copy a line exactly, and the user settles every proposal
+            // anyway. It is kept (when it really is in the transcript) and logged (when it is not), to see how the model does.
+            val quote = guess.evidence?.let(::withoutMarkers)?.takeIf { it.isNotEmpty() }
+            val evidence = quote?.takeIf { " ${normalize(it)} " in said }
+            if (evidence == null) log.info("Quote of ${guess.voice} ('$name') for $submissionId is not in the transcript, proposal kept: '${guess.evidence?.take(120)}'")
             val known = speakerRepository.findByUserIdAndNameIgnoringCase(userId, name)
             if (known == null && " ${normalize(name)} " !in said) {
                 log.info("Suggestion dropped for $submissionId: '$name' is not in the library and not in the transcript")
@@ -138,7 +139,7 @@ class SuggestionService(
             }
             if (guess.voice in usedVoices || !usedNames.add((known?.name ?: name).lowercase(Locale.ROOT))) continue
             usedVoices += guess.voice
-            queries.insertSpeaker(transcriptId, guess.voice, known?.name ?: name, known?.id, evidence.take(MAX_EVIDENCE_LENGTH))
+            queries.insertSpeaker(transcriptId, guess.voice, known?.name ?: name, known?.id, evidence?.take(MAX_EVIDENCE_LENGTH))
         }
     }
 

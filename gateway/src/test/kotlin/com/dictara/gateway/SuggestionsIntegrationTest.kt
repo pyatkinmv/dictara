@@ -170,13 +170,16 @@ class SuggestionsIntegrationTest : AbstractSharedContextIntegrationTest() {
     }
 
     @Test
-    fun `a quote that is only markers, or whose words are not there, is still dropped`() {
+    fun `a quote that is missing, only markers, or not in the transcript does not stop a proposal, and is not kept`() {
         record(Analysis("s", speakers = listOf(
             SpeakerGuess("SPEAKER_00", "Anna", "[0:00:00 --> 0:00:10] [SPEAKER_00]"),
             SpeakerGuess("SPEAKER_01", "Boris Petrov", "[SPEAKER_01] I am Boris and I sing opera"),
+            SpeakerGuess("SPEAKER_02", "Anna", null),
         )))
 
-        assertThat(suggestions()).isNull()
+        val s = suggestions()!!["speakers"]
+        assertThat(s.map { it["voice"].asText() }).containsExactly("SPEAKER_00", "SPEAKER_01") // one name per voice and per name
+        assertThat(s.any { it.has("evidence") }).isFalse() // nothing is kept that is not in the transcript
     }
 
     @Test
@@ -188,8 +191,6 @@ class SuggestionsIntegrationTest : AbstractSharedContextIntegrationTest() {
             tags = listOf("budget", "invented", "not a tag!"), // the library has only 'budget'
             speakers = listOf(
                 SpeakerGuess("SPEAKER_09", "Anna", "I'm Anna"),                    // no such voice
-                SpeakerGuess("SPEAKER_00", "Anna", "I am Anna and I sing opera"), // the quote is not in the transcript
-                SpeakerGuess("SPEAKER_00", "Anna", null),                          // no quote at all
                 SpeakerGuess("SPEAKER_02", "Carla", "We discuss the budget today"), // new name that is not in the transcript
                 SpeakerGuess("SPEAKER_02", "  ", "We discuss the budget today"),    // not a name
                 boris.copy(name = "Bor"),                                            // "Bor" is only part of a word... of "Boris"
