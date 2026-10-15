@@ -394,7 +394,8 @@ class _MetaRow extends StatelessWidget {
       spacing: 10,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        entry(Icons.schedule_rounded, formatDuration(item.duration ?? Duration.zero)),
+        // Unknown is not zero: the length of old recordings was lost in a migration, so show nothing for it (as the list does).
+        if (item.duration != null) entry(Icons.schedule_rounded, formatDuration(item.duration!)),
         entry(Icons.calendar_today_rounded, formatDay(item.uploadedAt)),
         StatusBadge(item.status),
       ],

@@ -32,6 +32,19 @@ TranscriptionDetail _detail(List<Segment> segments, {Map<int, Speaker> speakers 
   );
 }
 
+/// A repository whose detail does not know the recording's length, as for everything made before the V24 migration.
+class _UnknownLengthRepository extends FakeTranscriptionRepository {
+  @override
+  Future<TranscriptionDetail?> get(String id) async {
+    final detail = await super.get(id);
+    if (detail == null) return null;
+    final i = detail.item;
+    return detail.copyWith(
+      item: Transcription(id: i.id, title: i.title, uploadedAt: i.uploadedAt, status: i.status, tags: i.tags, speakerCount: i.speakerCount),
+    );
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(loadInter);
@@ -120,6 +133,24 @@ void main() {
       await tester.tap(find.text('Overview'));
       await settle(tester);
       expect(find.text('Audio is no longer available'), findsNothing); // the player lives on the Transcript tab only
+    });
+
+    testWidgets('a recording whose length is unknown shows no "0 min" in the header and a dash in Overview', (tester) async {
+      useDesktopSize(tester);
+      await tester.pumpWidget(DictaraApp(
+        authController: signedInAuthController(),
+        repository: _UnknownLengthRepository(),
+        initialLocation: '/transcriptions/0',
+      ));
+      await settle(tester);
+
+      expect(find.text('0 min'), findsNothing);
+      expect(find.text('14 min'), findsNothing);
+
+      await tester.tap(find.text('Overview'));
+      await settle(tester);
+      expect(find.text('0:00'), findsNothing);
+      expect(find.text('DURATION'), findsOneWidget); // the chip stays, with a dash instead of a made-up 0:00
     });
 
     testWidgets('a transcription that is not done or does not exist is not found', (tester) async {
