@@ -15,6 +15,8 @@ data class AnalysisInput(
     val tags: List<LibraryHint> = emptyList(),
     /** The user's speakers: proposed as they are; a new one only when the transcript itself gives the name. */
     val speakers: List<LibraryHint> = emptyList(),
+    /** Some lines of [text] carry the real name of a speaker the user has already confirmed, not a `SPEAKER_xx` label. */
+    val namesConfirmed: Boolean = false,
 )
 
 /** "This voice is [name]", with the words of the transcript that show it. */

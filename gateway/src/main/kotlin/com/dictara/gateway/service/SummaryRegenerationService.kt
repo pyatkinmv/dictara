@@ -12,6 +12,7 @@ import com.dictara.gateway.repository.SummaryRegenerationQueries
 import com.dictara.gateway.repository.SummaryRepository
 import com.dictara.gateway.repository.TranscriptRepository
 import com.dictara.gateway.repository.TranscriptSegmentQueries
+import com.dictara.gateway.repository.TranscriptSpeakerQueries
 import com.dictara.gateway.util.TranscriptFormatter
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
@@ -36,6 +37,7 @@ class SummaryRegenerationService(
     private val summaryRepo: SummaryRepository,
     private val audioMetaRepo: AudioMetaRepository,
     private val segmentQueries: TranscriptSegmentQueries,
+    private val speakerQueries: TranscriptSpeakerQueries,
     private val suggestionService: SuggestionService,
     private val summarizer: SummarizerPort,
     private val queries: SummaryRegenerationQueries,
@@ -118,7 +120,15 @@ class SummaryRegenerationService(
     private fun askGemini(submissionId: UUID): Analysis {
         val submission = submissionRepo.findById(submissionId).orElseThrow()
         val transcript = transcriptRepo.findBySubmissionId(submissionId) ?: error("No transcript for $submissionId")
-        val text = TranscriptFormatter.format(segmentQueries.findByTranscriptId(transcript.id!!))
+        // What the user has settled goes in with the transcript: a voice they named (or a phrase they marked) shows as that
+        // person, not as SPEAKER_xx, so the summary can name people and the model only has the rest left to guess.
+        // A voice nobody named keeps its label: a proposal has to say which voice it is about.
+        val phrases = speakerQueries.detailPhrases(transcript.id!!)
+        val named = speakerQueries.voices(transcript.id!!).associate { it.voice to it.speaker.name }
+        val text = TranscriptFormatter.formatResolved(
+            phrases.map { p -> TranscriptFormatter.ResolvedPhrase(p.start, p.end, p.own?.name ?: p.voice?.let { named[it] ?: it }, p.text) },
+        )
+        val namesConfirmed = phrases.any { it.own != null || (it.voice != null && it.voice in named) }
         val library = suggestionService.libraryOf(submissionId)
         // The mode chosen at upload may have been "off"; the person asked for a summary now, so it is "auto" then.
         val mode = SummaryMode.fromString(submission.summaryMode).takeIf { it != SummaryMode.OFF } ?: SummaryMode.AUTO
@@ -129,6 +139,7 @@ class SummaryRegenerationService(
             language = summaryLanguage(submission.languageHint, transcript.detectedLanguage, text),
             tags = library.tags,
             speakers = library.speakers,
+            namesConfirmed = namesConfirmed,
         )
         var last: Exception? = null
         repeat(ATTEMPTS) { attempt ->
