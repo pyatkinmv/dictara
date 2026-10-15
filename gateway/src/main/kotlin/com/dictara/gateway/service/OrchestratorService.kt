@@ -120,7 +120,7 @@ class OrchestratorService(
             )
             liveProgress.remove(submissionId)
             log.info("Transcription complete for submission $submissionId (duration=${snapshot.audioDurationS?.let { "%.1fs".format(it) } ?: "unknown"}, language=${snapshot.detectedLanguage ?: "unknown"}, segments=${snapshot.segments?.size ?: 0})")
-            advanceToSummarization(submission, formattedText, snapshot.audioDurationS)
+            advanceToSummarization(submission, formattedText, snapshot.audioDurationS, snapshot.detectedLanguage)
 
         } catch (e: Exception) {
             stateService.failAttempt(attempt.id!!, e.message)
@@ -164,7 +164,7 @@ class OrchestratorService(
             liveProgress.remove(submissionId)
             log.info("Resumed transcription complete for submission $submissionId (duration=${snapshot.audioDurationS?.let { "%.1fs".format(it) } ?: "unknown"}, language=${snapshot.detectedLanguage ?: "unknown"}, segments=${snapshot.segments?.size ?: 0})")
 
-            advanceToSummarization(freshSubmission, formattedText, snapshot.audioDurationS)
+            advanceToSummarization(freshSubmission, formattedText, snapshot.audioDurationS, snapshot.detectedLanguage)
 
         } catch (e: Exception) {
             stateService.failAttempt(attempt.id!!, e.message)
@@ -183,7 +183,7 @@ class OrchestratorService(
 
     // ── Summarization Stage ─────────────────────────────────────────────────
 
-    private fun advanceToSummarization(submission: SubmissionEntity, formattedText: String, audioDurationS: Double?) {
+    private fun advanceToSummarization(submission: SubmissionEntity, formattedText: String, audioDurationS: Double?, detectedLanguage: String?) {
         val summaryMode = SummaryMode.valueOf(submission.summaryMode.uppercase())
         if (summaryMode == SummaryMode.OFF) {
             log.info("Summarization skipped for submission ${submission.id} (mode=off)")
@@ -197,10 +197,11 @@ class OrchestratorService(
             dispatchNext()  // transcriber is now free
             return
         }
-        log.info("Starting summarization for submission ${submission.id} (mode=$summaryMode, languageHint=${submission.languageHint})")
+        val language = summaryLanguage(submission.languageHint, detectedLanguage)
+        log.info("Starting summarization for submission ${submission.id} (mode=$summaryMode, languageHint=${submission.languageHint}, language=$language)")
         stateService.startSummarizing(submission.id!!)
         dispatchNext()  // transcriber is now free — next job starts while summarization runs
-        executor.submit { runSummarization(submission.id!!, submission.languageHint, formattedText, audioDurationS, summaryMode) }
+        executor.submit { runSummarization(submission.id!!, language, formattedText, audioDurationS, summaryMode) }
     }
 
     private fun runSummarization(submissionId: UUID, languageHint: String, formattedText: String, audioDurationS: Double?, mode: SummaryMode) {
@@ -262,6 +263,16 @@ class OrchestratorService(
         throw RuntimeException("Timeout: transcription did not complete within ${props.transcriber.timeoutHours} hours")
     }
 
+}
+
+/**
+ * The language the AI writes in: the one the user chose, else the one the transcriber found in the audio, so the
+ * prompt can name it ("Russian") instead of asking the model to guess "the language of the transcript".
+ * "auto" is left only when the transcriber reported nothing usable.
+ */
+internal fun summaryLanguage(languageHint: String, detectedLanguage: String?): String {
+    if (languageHint != "auto") return languageHint
+    return detectedLanguage?.trim()?.lowercase()?.takeIf { Regex("[a-z]{2,3}").matches(it) } ?: "auto"
 }
 
 /** Thrown when the transcriber reports a non-retryable failure (e.g. bad file format). */
