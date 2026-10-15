@@ -25,6 +25,21 @@ class SpeakerRun {
   final List<Segment> segments;
 }
 
+/// Where "Regenerate summary" stands for a transcription: it may be done once.
+enum SummaryRegeneration {
+  /// Not used yet: the button is there.
+  available,
+
+  /// Gemini is being asked again; the old summary stays until the new one is ready.
+  running,
+
+  /// Used: [TranscriptionDetail.regeneratedAt] says when.
+  used,
+
+  /// Nothing to ask (no summary service), so no button.
+  unavailable,
+}
+
 /// A finished transcription opened on its own page.
 class TranscriptionDetail {
   const TranscriptionDetail({
@@ -38,6 +53,8 @@ class TranscriptionDetail {
     this.summary,
     this.language,
     this.wordCount,
+    this.regeneration = SummaryRegeneration.unavailable,
+    this.regeneratedAt,
   });
 
   /// The list-level data (title, tags, status, duration, date...).
@@ -69,6 +86,10 @@ class TranscriptionDetail {
 
   /// Counted by the gateway when the page is opened.
   final int? wordCount;
+
+  /// The state of "Regenerate summary", and when it was used.
+  final SummaryRegeneration regeneration;
+  final DateTime? regeneratedAt;
 
   /// The speaker of a diarizer slot: the confirmed mapping, else "Speaker N" -
   /// tinted with the color of a pending AI suggestion for that slot, else grey.
@@ -121,7 +142,7 @@ class TranscriptionDetail {
     return runs;
   }
 
-  TranscriptionDetail copyWith({Transcription? item, Map<int, Speaker>? segmentSpeakers}) {
+  TranscriptionDetail copyWith({Transcription? item, Map<int, Speaker>? segmentSpeakers, SummaryRegeneration? regeneration}) {
     return TranscriptionDetail(
       item: item ?? this.item,
       segments: segments,
@@ -133,6 +154,8 @@ class TranscriptionDetail {
       fileSizeBytes: fileSizeBytes,
       language: language,
       wordCount: wordCount,
+      regeneration: regeneration ?? this.regeneration,
+      regeneratedAt: regeneratedAt,
     );
   }
 }

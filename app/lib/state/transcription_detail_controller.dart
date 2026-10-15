@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../data/transcription_repository.dart';
@@ -18,7 +20,14 @@ abstract final class SuggestionAction {
 /// The transcription that is open on the detail page. Lives above the router
 /// so the topbar can show its title.
 class TranscriptionDetailController extends ChangeNotifier {
-  TranscriptionDetailController(this._repository, {VoidCallback? onChanged}) : _onChanged = onChanged;
+  TranscriptionDetailController(
+    this._repository, {
+    VoidCallback? onChanged,
+    this.regenerationPollInterval = const Duration(seconds: 3),
+  }) : _onChanged = onChanged;
+
+  /// How often an open transcription is read again while its summary is being regenerated.
+  final Duration regenerationPollInterval;
 
   final TranscriptionRepository _repository;
 
@@ -31,6 +40,7 @@ class TranscriptionDetailController extends ChangeNotifier {
   bool _notFound = false;
   int _requestId = 0;
   bool _disposed = false;
+  Timer? _regenerationTimer;
 
   /// The open transcription; null while loading or when there is none.
   TranscriptionDetail? get current => _current;
@@ -46,6 +56,7 @@ class TranscriptionDetailController extends ChangeNotifier {
 
   Future<void> open(String id) async {
     if (_current?.item.id != id) {
+      _regenerationTimer?.cancel();
       _current = null;
       _notFound = false;
       notifyListeners();
@@ -61,6 +72,54 @@ class TranscriptionDetailController extends ChangeNotifier {
     _speakers = speakers;
     _notFound = detail == null;
     notifyListeners();
+    // Opened while a regeneration is running (started before, or in another tab): wait for it here too.
+    _watchRegeneration(id);
+  }
+
+  /// Asks the AI again about the open transcription (once per transcription). The summary is replaced when it
+  /// is done; meanwhile the old one stays and the page shows that it is running.
+  Future<void> regenerateSummary() async {
+    final current = _current;
+    if (current == null || current.regeneration != SummaryRegeneration.available) return;
+    final id = current.item.id;
+
+    _current = current.copyWith(regeneration: SummaryRegeneration.running);
+    notifyListeners();
+    try {
+      await _repository.regenerateSummary(id);
+    } on Object {
+      // Not started (already used, no service...): show what the gateway says is true now.
+      final detail = await _repository.get(id);
+      if (!_disposed && _current?.item.id == id && detail != null) {
+        _current = detail;
+        notifyListeners();
+      }
+      rethrow;
+    }
+    _watchRegeneration(id);
+  }
+
+  void _watchRegeneration(String id) {
+    _regenerationTimer?.cancel();
+    if (_disposed || _current?.item.id != id || _current?.regeneration != SummaryRegeneration.running) return;
+    _regenerationTimer = Timer.periodic(regenerationPollInterval, (timer) async {
+      final detail = await _repository.get(id);
+      if (_disposed || _current?.item.id != id) {
+        timer.cancel();
+        return;
+      }
+      if (detail == null || detail.regeneration == SummaryRegeneration.running) return;
+      timer.cancel();
+      // The new summary, and new proposals (a title, tags, speakers) that the page shows.
+      final library = await _repository.tags();
+      final speakers = await _repository.speakers();
+      if (_disposed || _current?.item.id != id) return;
+      _current = detail;
+      _library = library;
+      _speakers = speakers;
+      notifyListeners();
+      _onChanged?.call();
+    });
   }
 
   /// The open transcription's transcript as plain text; null when there is none.
@@ -193,6 +252,7 @@ class TranscriptionDetailController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _regenerationTimer?.cancel();
     super.dispose();
   }
 }

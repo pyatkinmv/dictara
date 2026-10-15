@@ -9,6 +9,7 @@ import 'package:dictara_web/data/gateway_client.dart';
 import 'package:dictara_web/data/http_transcription_repository.dart';
 import 'package:dictara_web/data/transcription_repository.dart';
 import 'package:dictara_web/models/transcription.dart';
+import 'package:dictara_web/models/transcription_detail.dart';
 import 'package:dictara_web/models/upload.dart';
 import 'package:dictara_web/services/multipart_uploader.dart';
 
@@ -962,6 +963,49 @@ void main() {
         repo.acceptTagSuggestion('t1', 'idea'),
         throwsA(isA<GatewayException>().having((e) => e.message, 'message', 'No such suggestion')),
       );
+    });
+  });
+
+  group('regenerate summary', () {
+    Map<String, dynamic> detailWith(Object? regeneration) => {
+          'job_id': 't1',
+          'file_name': 'call.mp3',
+          'title': 'Call',
+          'created_at': '2026-09-20T16:36:21Z',
+          'status': 'done',
+          'tags': <Map<String, String>>[],
+          'segments': <Object>[],
+          'summary_regeneration': ?regeneration,
+        };
+
+    test("it is a POST to its own address, and the gateway's refusal comes through", () async {
+      final seen = <http.Request>[];
+      await _repo(MockClient((request) async {
+        seen.add(request);
+        return _json({'state': 'running'}, status: 202);
+      })).regenerateSummary('t 1');
+
+      expect(seen.single.method, 'POST');
+      expect(seen.single.url.path, '/api/transcriptions/t%201/regenerate-summary');
+
+      await expectLater(
+        _repo(MockClient((_) async => _json({'message': 'The summary was already regenerated'}, status: 409))).regenerateSummary('t1'),
+        throwsA(isA<GatewayException>().having((e) => e.statusCode, 'statusCode', 409)),
+      );
+    });
+
+    test('the detail tells the state, and the day it was used', () async {
+      Future<TranscriptionDetail> read(Object? regeneration) async =>
+          (await _repo(MockClient((_) async => _json(detailWith(regeneration)))).get('t1'))!;
+
+      expect((await read({'state': 'available'})).regeneration, SummaryRegeneration.available);
+      expect((await read({'state': 'running'})).regeneration, SummaryRegeneration.running);
+      final used = await read({'state': 'used', 'at': '2026-10-15T10:00:00Z'});
+      expect(used.regeneration, SummaryRegeneration.used);
+      expect(used.regeneratedAt!.toUtc(), DateTime.utc(2026, 10, 15, 10));
+      expect((await read({'state': 'unavailable'})).regeneration, SummaryRegeneration.unavailable);
+      // An older gateway says nothing: no button.
+      expect((await read(null)).regeneration, SummaryRegeneration.unavailable);
     });
   });
 

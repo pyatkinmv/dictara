@@ -2,12 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'package:provider/provider.dart';
+
 import '../../models/transcription_detail.dart';
+import '../../state/transcription_detail_controller.dart';
+import '../../widgets/button_spinner.dart';
 import '../../shell/breakpoints.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
 import '../../widgets/summary_markdown.dart';
+import 'regenerate_dialog.dart';
 
 /// The Overview tab: the AI summary on the left, file facts on the right
 /// (`.ov-pane`).
@@ -30,7 +35,7 @@ class OverviewView extends StatelessWidget {
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _SummaryCard(summary: detail.summary),
+                _SummaryCard(detail: detail),
                 const SizedBox(height: 14),
                 _DetailsPanel(detail: detail),
               ],
@@ -38,7 +43,7 @@ class OverviewView extends StatelessWidget {
           : Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: _SummaryCard(summary: detail.summary)),
+                Expanded(child: _SummaryCard(detail: detail)),
                 const SizedBox(width: 18),
                 SizedBox(width: 224, child: _DetailsPanel(detail: detail)),
               ],
@@ -48,15 +53,17 @@ class OverviewView extends StatelessWidget {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.summary});
+  const _SummaryCard({required this.detail});
 
-  /// Markdown, as the summarizer wrote it; null when there is none.
-  final String? summary;
+  final TranscriptionDetail detail;
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final text = summary;
+    // Markdown, as the summarizer wrote it; null when there is none.
+    final text = detail.summary;
+    final control = _RegenerateControl(detail: detail);
+    final hasControl = detail.regeneration != SummaryRegeneration.unavailable;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       decoration: BoxDecoration(
@@ -68,10 +75,14 @@ class _SummaryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (text == null && hasControl) _SectionHeader(label: 'Summary', trailing: control),
             if (text == null)
-              Text('No summary available.', style: TextStyle(fontSize: 13.5, color: p.text3))
+              Padding(
+                padding: EdgeInsets.only(top: hasControl ? 8 : 0),
+                child: Text('No summary available.', style: TextStyle(fontSize: 13.5, color: p.text3)),
+              )
             else
-              _Section(label: 'Summary', child: SummaryMarkdown(data: text)),
+              _Section(label: 'Summary', trailing: hasControl ? control : null, child: SummaryMarkdown(data: text)),
           ],
         ),
       ),
@@ -79,22 +90,94 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _Section extends StatelessWidget {
-  const _Section({required this.label, required this.child});
+/// The label of a section, with something at its right end.
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.label, this.trailing});
 
   final String label;
-  final Widget child;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label.toUpperCase(),
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: .8, color: p.accent),
+          ),
+        ),
+        ?trailing,
+      ],
+    );
+  }
+}
+
+/// "Regenerate" while it can be done, a spinner while it runs, the date once it is used. Asks first: it
+/// replaces the summary and cannot be repeated.
+class _RegenerateControl extends StatelessWidget {
+  const _RegenerateControl({required this.detail});
+
+  final TranscriptionDetail detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final small = TextStyle(fontSize: 12, color: p.text3);
+    switch (detail.regeneration) {
+      case SummaryRegeneration.unavailable:
+        return const SizedBox.shrink();
+      case SummaryRegeneration.running:
+        return Row(
+          key: const Key('regenerating'),
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ButtonSpinner(color: p.accent, size: 12),
+            const SizedBox(width: 6),
+            Text('Regenerating…', style: small),
+          ],
+        );
+      case SummaryRegeneration.used:
+        final at = detail.regeneratedAt;
+        return Text(at == null ? 'Regenerated' : 'Regenerated ${formatDay(at)}', key: const Key('regenerated'), style: small);
+      case SummaryRegeneration.available:
+        return InkWell(
+          key: const Key('regenerate-summary'),
+          borderRadius: BorderRadius.circular(8),
+          onTap: () async {
+            final controller = context.read<TranscriptionDetailController>();
+            if (await showRegenerateDialog(context)) await controller.regenerateSummary();
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.refresh_rounded, size: 15, color: p.text2),
+                const SizedBox(width: 4),
+                Text('Regenerate', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: p.text2)),
+              ],
+            ),
+          ),
+        );
+    }
+  }
+}
+
+class _Section extends StatelessWidget {
+  const _Section({required this.label, required this.child, this.trailing});
+
+  final String label;
+  final Widget child;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label.toUpperCase(),
-          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: .8, color: p.accent),
-        ),
+        _SectionHeader(label: label, trailing: trailing),
         const SizedBox(height: 8),
         child,
       ],

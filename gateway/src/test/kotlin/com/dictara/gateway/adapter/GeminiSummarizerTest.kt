@@ -113,7 +113,9 @@ class GeminiSummarizerTest {
         assertThat(prompt).contains("$rule (and every header or label inside the summary) in Russian")
         assertThat(prompt.indexOf(rule)).isLessThan(prompt.indexOf("Transcript:"))
         assertThat(prompt.lastIndexOf(rule)).isGreaterThan(prompt.indexOf("Hi, I'm Anna."))
-        assertThat(GeminiSummarizer.buildPrompt(input)).contains("in the language the transcript is written in")
+        assertThat(GeminiSummarizer.buildPrompt(input))
+            .contains("in the language the transcript is written in")
+            .contains("never English")
     }
 
     @Test

@@ -62,6 +62,9 @@ class SuggestionService(
         const val MAX_LIBRARY_HINTS = 200
 
         /** Lower case, everything but letters and digits made a single space: "Hi, I'm Anna!" → "hi i m anna". */
+        /** A title as it is kept: no quotes around it, one space between words. */
+        private fun cleanTitle(raw: String): String = raw.trim().trim('"', '\'', '«', '»', '“', '”').replace(Regex("\\s+"), " ")
+
         private fun normalize(text: String): String =
             text.lowercase(Locale.ROOT).replace(Regex("[^\\p{L}\\p{N}]+"), " ").trim()
 
@@ -129,6 +132,21 @@ class SuggestionService(
             usedVoices += guess.voice
             queries.insertSpeaker(transcriptId, guess.voice, known?.name ?: name, known?.id, evidence.take(MAX_EVIDENCE_LENGTH))
         }
+    }
+
+    /**
+     * A new analysis of a transcription that has been analysed before ("regenerate summary"): what the user has
+     * not settled is replaced by the new proposals, and so is the title; tags and speakers the user accepted or
+     * rejected stay as they are, so a rejected one is not proposed again.
+     */
+    @Transactional
+    fun refresh(submissionId: UUID, analysis: Analysis) {
+        val transcriptId = transcriptRepo.findBySubmissionId(submissionId)?.id ?: return
+        // A title the user turned down is not offered again; a different one is (there is one title row, so it is replaced).
+        val rejected = queries.rejectedTitle(transcriptId)
+        queries.deleteUnsettledAndTitle(transcriptId)
+        val title = analysis.title?.takeUnless { rejected != null && cleanTitle(it).equals(rejected, ignoreCase = true) }
+        record(submissionId, analysis.copy(title = title))
     }
 
     /** What is still proposed for the transcript, or null when nothing is. */

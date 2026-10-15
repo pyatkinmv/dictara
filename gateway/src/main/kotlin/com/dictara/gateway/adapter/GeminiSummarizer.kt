@@ -126,7 +126,7 @@ class GeminiSummarizer(
             } ?: "unknown duration"
 
             val responseLanguage = if (input.language == "auto")
-                "the language the transcript is written in"
+                "the language the transcript is written in (a Russian transcript gets a Russian summary and title, never English)"
             else
                 java.util.Locale.forLanguageTag(input.language).getDisplayLanguage(java.util.Locale.ENGLISH).ifBlank { input.language }
             val languageRule = "LANGUAGE: write \"summary\" and \"title\" (and every header or label inside the summary) in $responseLanguage, " +

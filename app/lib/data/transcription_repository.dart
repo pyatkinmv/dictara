@@ -162,6 +162,11 @@ abstract class TranscriptionRepository {
   // resolves part of the suggestions of a transcription; the record disappears
   // once nothing is left. Read the outcome back with [get].
 
+  /// Asks the AI again about a finished transcription (`POST /transcriptions/{id}/regenerate-summary`): the
+  /// summary is replaced and what the user has not settled is proposed again. Allowed once per transcription;
+  /// it runs in the background, so read [get] for the state (`TranscriptionDetail.regeneration`).
+  Future<void> regenerateSummary(String id);
+
   /// Accepts everything that is left: the new title, every tag, every speaker.
   Future<void> acceptAllSuggestions(String id);
 
