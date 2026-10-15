@@ -36,22 +36,35 @@ param(
 $ErrorActionPreference = 'Stop'
 $key = Join-Path $env:USERPROFILE '.ssh\google_compute_engine'
 $vm = 'pyatkinmv@34.6.236.165'
-# The admin key is read on the VM from the gateway's own environment, so it never passes through this machine.
-$header = '-H "X-Admin-Key: $(docker exec dictara-gateway-1 printenv ADMIN_KEY)"'
-$curl = 'curl -s -w "\nHTTP %{http_code}\n" -H "Content-Type: application/json"'
 
-function Invoke-Remote([string]$command, [string]$body) {
-    if ($body) { $body | ssh -i $key $vm $command } else { ssh -i $key $vm $command }
+# The commands go to the VM as a script on stdin, so that no quoting of ssh gets between us and curl. The admin key is
+# read there, from the gateway's own environment, and never passes through this machine.
+$prelude = @'
+KEY=$(docker exec dictara-gateway-1 printenv ADMIN_KEY)
+CURL() { curl -s -w '\nHTTP %{http_code}\n' -H "X-Admin-Key: $KEY" "$@"; }
+'@
+
+function Invoke-Remote([string]$commands) {
+    # A file with LF line endings and no byte-order mark: piping a string would add a BOM before the first line (bash then
+    # takes `KEY=...` for a command and prints it, key included) and CRLF line endings.
+    $script = (($prelude + "`n" + $commands + "`n") -replace "`r`n", "`n")
+    $tmp = [System.IO.Path]::GetTempFileName()
+    try {
+        [System.IO.File]::WriteAllText($tmp, $script, (New-Object System.Text.UTF8Encoding($false)))
+        cmd /c "ssh -i `"$key`" $vm bash -s < `"$tmp`""
+    } finally {
+        Remove-Item $tmp -ErrorAction SilentlyContinue
+    }
 }
 
 switch ($Action) {
-    'status' { Invoke-Remote "$curl $header http://localhost:8080/admin/reanalyze/status" $null }
-    'stop' { Invoke-Remote "$curl $header -X POST http://localhost:8080/admin/reanalyze/stop" $null }
+    'status' { Invoke-Remote 'CURL http://localhost:8080/admin/reanalyze/status' }
+    'stop' { Invoke-Remote 'CURL -X POST http://localhost:8080/admin/reanalyze/stop' }
     default {
         if (-not $UserId -or -not $IdsFile) { throw '-UserId and -IdsFile are required for dryrun and run' }
-        $ids = Get-Content $IdsFile | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-        $body = @{ user_id = $UserId; ids = @($ids); dry_run = ($Action -eq 'dryrun'); force = [bool]$Force } | ConvertTo-Json -Compress
-        Write-Host "$Action : $(@($ids).Count) ids"
-        Invoke-Remote "$curl $header -X POST --data-binary @- http://localhost:8080/admin/reanalyze" $body
+        $ids = @(Get-Content $IdsFile | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+        $body = @{ user_id = $UserId; ids = $ids; dry_run = ($Action -eq 'dryrun'); force = [bool]$Force } | ConvertTo-Json -Compress
+        Write-Host "$Action : $($ids.Count) ids"
+        Invoke-Remote ("CURL -X POST -H 'Content-Type: application/json' --data-binary @- http://localhost:8080/admin/reanalyze <<'JSON'`n$body`nJSON")
     }
 }

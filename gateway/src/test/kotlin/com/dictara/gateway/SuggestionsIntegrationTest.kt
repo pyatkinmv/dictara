@@ -182,6 +182,52 @@ class SuggestionsIntegrationTest : AbstractSharedContextIntegrationTest() {
         assertThat(s.any { it.has("evidence") }).isFalse() // nothing is kept that is not in the transcript
     }
 
+    private fun tagWith(label: String, description: String): UUID =
+        UUID.fromString(post("/tags", """{"label": "$label", "description": "$description"}""").body!!["id"].asText())
+
+    @Test
+    fun `a tag that says it is never used together with another is dropped when the other is proposed too`() {
+        tag("daily")
+        tagWith("project", "A project. NEVER together with daily: a daily mentions it among many others.")
+
+        record(Analysis("s", tags = listOf("daily", "project")))
+
+        assertThat(suggestions()!!["tags"].map { it["label"].asText() }).containsExactly("daily")
+    }
+
+    @Test
+    fun `such a tag is kept when the one it excludes is not proposed`() {
+        tag("daily")
+        tagWith("project", "A project. NEVER together with daily.")
+
+        record(Analysis("s", tags = listOf("project")))
+
+        assertThat(suggestions()!!["tags"].map { it["label"].asText() }).containsExactly("project")
+    }
+
+    @Test
+    fun `a name that is part of a library name is that library speaker, so a person is not proposed under two spellings`() {
+        val patricia = speaker("Anna Petrova")
+
+        record(Analysis("s", speakers = listOf(SpeakerGuess("SPEAKER_00", "Anna", "I'm Anna and I run this meeting"))))
+
+        val s = suggestions()!!["speakers"].single()
+        assertThat(s["name"].asText()).isEqualTo("Anna Petrova") // as the library spells it
+        assertThat(s["speaker_id"].asText()).isEqualTo(patricia.toString())
+    }
+
+    @Test
+    fun `a first name that fits two library speakers is not guessed`() {
+        speaker("Anna Petrova")
+        speaker("Anna Sidorova")
+
+        record(Analysis("s", speakers = listOf(SpeakerGuess("SPEAKER_00", "Anna", "I'm Anna and I run this meeting"))))
+
+        val s = suggestions()!!["speakers"].single()
+        assertThat(s["name"].asText()).isEqualTo("Anna") // a new name, said in the transcript
+        assertThat(s.has("speaker_id")).isFalse()
+    }
+
     @Test
     fun `proposals that do not hold up are dropped`() {
         tag("budget")
