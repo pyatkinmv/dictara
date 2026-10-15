@@ -47,6 +47,12 @@ Audio is an object of its own, independent of user and options; a transcription 
 - Tags and speakers belong to a user; names are unique per user (speakers ignoring case). Their colors are computed from the name (`NameColors`), not stored.
 - `transcript_suggestions`: what the AI proposes (title, tags of the library, a speaker for a voice), `status` pending/accepted/rejected. **Nothing is applied until the user accepts**; a speaker is created in the library only on accept. The model's answer is checked before it is kept (tag in the library, voice exists, the quoted evidence is in the transcript, a new name is a whole word of the transcript). `Summary: Off` skips the whole AI call.
 
+### Regenerate summary
+
+`POST /transcriptions/{id}/regenerate-summary` (`SummaryRegenerationService`) asks Gemini again about a finished transcription, once; the transcript is not touched. 202 when it started, 404 for someone else's transcription, 409 when it is not ready, was already regenerated, is running, there is nothing to summarize or no summary service. `GET /transcriptions/{id}` carries `summary_regeneration: {state, at?}`; `state` is `available`, `running`, `used` or `unavailable`. It is `submissions.summary_regeneration` (NULL / `running` / `done`) with `summary_regenerated_at`, changed by one conditional UPDATE (`SummaryRegenerationQueries.claim`), so two clicks cannot both start a run; a failed run (three attempts, as on the first analysis) gives it back, and so does a restart (`@PostConstruct`). The submission's `status` stays `done` throughout.
+
+What a run does: asks with the transcript, the user's tag and speaker libraries (with their descriptions) and the language (`summaryLanguage`: the user's choice, else `detected_language`, else Cyrillic-dominant text means Russian, else the prompt says to answer in the text's language); a summary mode of `off` is asked as `auto`. Then, in one transaction, replaces the `summaries` row's text and refreshes the proposals (`SuggestionService.refresh`): unsettled (`pending`) proposals and the title row are deleted and the new ones recorded; **accepted and rejected tags and speakers stay** (so a rejected one is not proposed again, and a voice already named is not asked about), a rejected title is not proposed again, and an accepted title stays the transcription's title until the user accepts a different one. Tested over histories of accepted, rejected and waiting proposals in `SummaryRegenerationIntegrationTest`.
+
 ## Submission status lifecycle
 
 ```

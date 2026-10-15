@@ -269,6 +269,11 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
     return _speakerFromJson(body as Map<String, dynamic>);
   }
 
+  @override
+  Future<void> regenerateSummary(String id) async {
+    await _client.postJson('/transcriptions/${Uri.encodeComponent(id)}/regenerate-summary', const <String, Object>{});
+  }
+
   // What the AI proposed is settled with `POST /transcriptions/{id}/suggestions/...`. The gateway answers what
   // is still proposed; the controller reads the transcription again, so the answer is not used.
 
@@ -357,8 +362,17 @@ TranscriptionDetail _detailFromJson(Map<String, dynamic> json) {
     fileSizeBytes: (json['file_size_bytes'] as num?)?.toInt() ?? 0,
     language: (json['language'] as String?)?.toUpperCase(),
     wordCount: (json['word_count'] as num?)?.toInt(),
+    regeneration: _regenerationFromJson(json['summary_regeneration']),
+    regeneratedAt: DateTime.tryParse(((json['summary_regeneration'] as Map<String, dynamic>?)?['at'] as String?) ?? '')?.toLocal(),
   );
 }
+
+SummaryRegeneration _regenerationFromJson(Object? json) => switch ((json as Map<String, dynamic>?)?['state']) {
+      'available' => SummaryRegeneration.available,
+      'running' => SummaryRegeneration.running,
+      'used' => SummaryRegeneration.used,
+      _ => SummaryRegeneration.unavailable,
+    };
 
 /// The diarizer names its voices `SPEAKER_00`, `SPEAKER_01`, ...; the page counts slots from 1.
 /// Null for a segment without a speaker (no diarization) or with a label of another shape.

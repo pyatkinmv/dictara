@@ -84,6 +84,18 @@ class TranscriptSuggestionQueries(private val jdbc: NamedParameterJdbcTemplate) 
         "transcript_id = :t AND kind = 'speaker' AND voice = :voice", mapOf("t" to transcriptId, "voice" to voice), status,
     ) > 0
 
+    /** The title the user rejected, if they did. */
+    fun rejectedTitle(transcriptId: UUID): String? = jdbc.query(
+        "SELECT title FROM transcript_suggestions WHERE transcript_id = :t AND kind = 'title' AND status = 'rejected'",
+        mapOf("t" to transcriptId),
+    ) { rs, _ -> rs.getString("title") }.firstOrNull()
+
+    /** Drops what is still proposed, and the title row whatever its status (there is only one, a new proposal replaces it); accepted and rejected tags and speakers stay. */
+    fun deleteUnsettledAndTitle(transcriptId: UUID): Int = jdbc.update(
+        "DELETE FROM transcript_suggestions WHERE transcript_id = :t AND (status = 'pending' OR kind = 'title')",
+        mapOf("t" to transcriptId),
+    )
+
     /** Settles everything still pending on the transcript. */
     fun resolveAll(transcriptId: UUID, status: String): Int = resolve("transcript_id = :t", mapOf("t" to transcriptId), status)
 

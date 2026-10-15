@@ -197,7 +197,7 @@ class OrchestratorService(
             dispatchNext()  // transcriber is now free
             return
         }
-        val language = summaryLanguage(submission.languageHint, detectedLanguage)
+        val language = summaryLanguage(submission.languageHint, detectedLanguage, formattedText)
         log.info("Starting summarization for submission ${submission.id} (mode=$summaryMode, languageHint=${submission.languageHint}, language=$language)")
         stateService.startSummarizing(submission.id!!)
         dispatchNext()  // transcriber is now free — next job starts while summarization runs
@@ -268,11 +268,20 @@ class OrchestratorService(
 /**
  * The language the AI writes in: the one the user chose, else the one the transcriber found in the audio, so the
  * prompt can name it ("Russian") instead of asking the model to guess "the language of the transcript".
- * "auto" is left only when the transcriber reported nothing usable.
+ * Old transcriptions have no detected language; for them mostly-Cyrillic text counts as Russian. Anything else
+ * stays "auto" and the prompt says to answer in the language of the text.
  */
-internal fun summaryLanguage(languageHint: String, detectedLanguage: String?): String {
+internal fun summaryLanguage(languageHint: String, detectedLanguage: String?, text: String = ""): String {
     if (languageHint != "auto") return languageHint
-    return detectedLanguage?.trim()?.lowercase()?.takeIf { Regex("[a-z]{2,3}").matches(it) } ?: "auto"
+    detectedLanguage?.trim()?.lowercase()?.takeIf { Regex("[a-z]{2,3}").matches(it) }?.let { return it }
+    return if (mostlyCyrillic(text)) "ru" else "auto"
+}
+
+/** More than half of the letters are Cyrillic; the `[0:01 --> 0:04] [SPEAKER_00]` markers of the formatted transcript are not counted. */
+internal fun mostlyCyrillic(text: String): Boolean {
+    val letters = text.replace(Regex("\\[[^]]*]"), " ").filter { it.isLetter() }
+    if (letters.isEmpty()) return false
+    return letters.count { Character.UnicodeScript.of(it.code) == Character.UnicodeScript.CYRILLIC } * 2 > letters.length
 }
 
 /** Thrown when the transcriber reports a non-retryable failure (e.g. bad file format). */

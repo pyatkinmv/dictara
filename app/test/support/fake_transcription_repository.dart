@@ -396,7 +396,9 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
       segmentSpeakers: Map.unmodifiable(_segmentSpeakers[id] ?? const {}),
       suggestions: _suggestions[id],
       // The design shows the same summary and file details for every item.
-      summary: _summary,
+      summary: _summaries[id] ?? _summary,
+      regeneration: _regeneration[id] ?? SummaryRegeneration.available,
+      regeneratedAt: _regeneratedAt[id],
       originalFilename: 'product_sync_2025_06_23.mp4',
       fileSizeBytes: 23488102, // 22.4 MB
       language: 'EN',
@@ -704,6 +706,37 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
       for (final t in _items[index].tags)
         if (t.label != label) t,
     ]);
+  }
+
+  // "Regenerate summary": the call starts it; a test ends it with [finishRegeneration] (the real one takes a
+  // while on the gateway).
+  final Map<String, SummaryRegeneration> _regeneration = {};
+  final Map<String, DateTime> _regeneratedAt = {};
+  final Map<String, String> _summaries = {};
+
+  /// The ids [regenerateSummary] was called with.
+  final List<String> regenerateCalls = [];
+
+  /// Thrown by the next [regenerateSummary], once (the gateway refusing: already used, no service...).
+  Object? regenerateError;
+
+  @override
+  Future<void> regenerateSummary(String id) async {
+    await _wait();
+    regenerateCalls.add(id);
+    final error = regenerateError;
+    if (error != null) {
+      regenerateError = null;
+      throw error;
+    }
+    _regeneration[id] = SummaryRegeneration.running;
+  }
+
+  /// The gateway is done with a regeneration: the new [summary] is in, and the button is used up.
+  void finishRegeneration(String id, String summary) {
+    _regeneration[id] = SummaryRegeneration.used;
+    _regeneratedAt[id] = DateTime(2025, 6, 24, 10, 0);
+    _summaries[id] = summary;
   }
 
   @override

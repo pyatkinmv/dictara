@@ -34,6 +34,7 @@ class SubmissionService(
     private val speakerQueries: TranscriptSpeakerQueries,
     private val suggestionService: SuggestionService,
     private val audioRestoreService: AudioRestoreService,
+    private val regenerationService: SummaryRegenerationService,
 ) {
     data class CreateResult(val submissionId: UUID, val dedup: Boolean)
 
@@ -83,6 +84,8 @@ class SubmissionService(
         val voices: List<VoiceAssignment>,
         /** What the AI proposes and the user has not settled; left out when there is nothing. */
         val suggestions: Suggestions? = null,
+        /** The state of "regenerate summary": available, running, used (with `at`) or unavailable. */
+        val summaryRegeneration: SummaryRegenerationService.Regeneration? = null,
     )
 
     data class ExportData(
@@ -250,6 +253,7 @@ class SubmissionService(
             segments = segments,
             voices = voices,
             suggestions = transcript?.id?.let { suggestionService.pending(it) },
+            summaryRegeneration = regenerationService.stateOf(submissionId),
         )
     }
 
