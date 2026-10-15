@@ -2,6 +2,8 @@ import 'package:dictara_web/services/audio_backend.dart';
 import 'package:dictara_web/state/audio_player_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/in_memory_volume_store.dart';
+
 /// A backend the test can drive directly — calling `onPosition`/`onDuration`/`onEnded`/`onError` simulates
 /// what a real `<audio>` element would report.
 class _FakeAudioBackend implements AudioBackend {
@@ -16,6 +18,7 @@ class _FakeAudioBackend implements AudioBackend {
   bool playing = false;
   bool disposed = false;
   Duration? lastSeek;
+  double? lastVolume;
 
   @override
   void setSource(String url) => source = url;
@@ -30,13 +33,19 @@ class _FakeAudioBackend implements AudioBackend {
   void seek(Duration position) => lastSeek = position;
 
   @override
+  void setVolume(double volume) => lastVolume = volume;
+
+  @override
   void dispose() => disposed = true;
 }
 
 void main() {
   late _FakeAudioBackend backend;
 
-  AudioPlayerController makeController() => AudioPlayerController(
+  late InMemoryVolumeStore store;
+
+  AudioPlayerController makeController({double? saved}) => AudioPlayerController(
+    volumeStore: store = InMemoryVolumeStore(saved),
     createBackend: ({required onPosition, required onDuration, required onEnded, required onError}) {
       backend = _FakeAudioBackend(onPosition, onDuration, onEnded, onError);
       return backend;
@@ -148,5 +157,51 @@ void main() {
 
     c.load('u');
     expect(c.unavailable, isFalse);
+  });
+
+  group('volume', () {
+    test('starts at full volume, or at the last level the user chose', () {
+      expect(makeController().volume, 1.0);
+      expect(makeController(saved: 0.4).volume, 0.4);
+    });
+
+    test('the level is applied to a new source and remembered', () {
+      final c = makeController(saved: 0.4);
+      c.load('u');
+      expect(backend.lastVolume, 0.4);
+
+      c.setVolume(0.7);
+      expect(backend.lastVolume, 0.7);
+      expect(store.saved, 0.7);
+    });
+
+    test('muting keeps the level, unmuting brings it back, dragging to 0 mutes', () {
+      final c = makeController(saved: 0.6);
+      c.load('u');
+
+      c.toggleMute();
+      expect(c.muted, isTrue);
+      expect(backend.lastVolume, 0.0);
+      expect(store.saved, 0.6); // muting is not remembered as the level
+
+      c.toggleMute();
+      expect(c.volume, 0.6);
+
+      c.setVolume(0);
+      expect(c.muted, isTrue);
+      expect(store.saved, 0.6); // the last audible level stays
+
+      c.toggleMute(); // unmuting from a dragged-to-zero slider does not leave silence
+      expect(c.volume, 0.6);
+    });
+
+    test('unmuting when the saved level was zero goes to half, not silence', () {
+      final c = makeController(saved: 0.0);
+      c.load('u');
+      expect(c.muted, isTrue);
+
+      c.toggleMute();
+      expect(c.volume, 0.5);
+    });
   });
 }

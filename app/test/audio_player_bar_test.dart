@@ -6,6 +6,8 @@ import 'package:dictara_web/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/in_memory_volume_store.dart';
+
 class _FakeAudioBackend implements AudioBackend {
   _FakeAudioBackend(this.onPosition, this.onDuration, this.onEnded, this.onError);
 
@@ -15,6 +17,7 @@ class _FakeAudioBackend implements AudioBackend {
   final void Function(String) onError;
 
   bool playing = false;
+  double? lastVolume;
 
   @override
   void setSource(String url) {}
@@ -25,6 +28,8 @@ class _FakeAudioBackend implements AudioBackend {
   @override
   void seek(Duration position) {}
   @override
+  void setVolume(double volume) => lastVolume = volume;
+  @override
   void dispose() {}
 }
 
@@ -32,6 +37,7 @@ void main() {
   late _FakeAudioBackend backend;
 
   AudioPlayerController makeController() => AudioPlayerController(
+    volumeStore: InMemoryVolumeStore(),
     createBackend: ({required onPosition, required onDuration, required onEnded, required onError}) {
       backend = _FakeAudioBackend(onPosition, onDuration, onEnded, onError);
       return backend;
@@ -60,7 +66,7 @@ void main() {
 
     expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
     expect(find.text('0:00'), findsWidgets); // position and duration both start at 0:00
-    expect(find.byType(Slider), findsOneWidget);
+    expect(find.byKey(const Key('audio-seek')), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.play_arrow_rounded));
     await tester.pump();
@@ -121,5 +127,43 @@ void main() {
     expect(find.text('Audio is no longer available'), findsOneWidget);
     expect(find.byType(Slider), findsNothing);
     expect(find.byIcon(Icons.play_arrow_rounded), findsNothing);
+  });
+
+  testWidgets('the player takes the width it is given, up to 640, instead of a fixed narrow pill', (tester) async {
+    final c = makeController();
+    c.load('u');
+    await tester.binding.setSurfaceSize(const Size(1000, 600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await pump(tester, c);
+
+    final pill = tester.getSize(find.byKey(const Key('audio-seek')).first);
+    expect(pill.width, greaterThan(300)); // the seek slider used to be a fixed 220
+
+    await tester.binding.setSurfaceSize(const Size(500, 600));
+    await tester.pump();
+    expect(tester.takeException(), isNull); // and it still fits a narrow window
+  });
+
+  testWidgets('the speaker mutes and unmutes, the slider sets the level, and the backend follows', (tester) async {
+    final c = makeController();
+    c.load('u');
+    await pump(tester, c);
+    expect(backend.lastVolume, 1.0);
+
+    await tester.tap(find.byKey(const Key('audio-mute')));
+    await tester.pump();
+    expect(find.byIcon(Icons.volume_off_rounded), findsOneWidget);
+    expect(backend.lastVolume, 0.0);
+
+    await tester.tap(find.byKey(const Key('audio-mute')));
+    await tester.pump();
+    expect(find.byIcon(Icons.volume_up_rounded), findsOneWidget);
+    expect(backend.lastVolume, 1.0);
+
+    final slider = tester.widget<Slider>(find.byKey(const Key('audio-volume')));
+    slider.onChanged!(0.3);
+    await tester.pump();
+    expect(backend.lastVolume, 0.3);
+    expect(find.byIcon(Icons.volume_down_rounded), findsOneWidget);
   });
 }

@@ -7,6 +7,9 @@ abstract class AudioBackend {
   Future<void> play();
   void pause();
   void seek(Duration position);
+
+  /// 0..1, applied to the element straight away and kept across [setSource].
+  void setVolume(double volume);
   void dispose();
 }
 

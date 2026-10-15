@@ -25,7 +25,7 @@ class AudioPlayerBar extends StatelessWidget {
         final valueMs = position.inMilliseconds.clamp(0, maxMs.round()).toDouble();
         final seekable = duration > Duration.zero;
         return Container(
-          constraints: const BoxConstraints(maxWidth: 460),
+          constraints: const BoxConstraints(maxWidth: 640),
           padding: const EdgeInsets.fromLTRB(7, 7, 16, 7),
           decoration: BoxDecoration(
             color: p.surface,
@@ -34,7 +34,6 @@ class AudioPlayerBar extends StatelessWidget {
             boxShadow: [BoxShadow(color: p.accent.withValues(alpha: .16), blurRadius: 20, offset: const Offset(0, 4))],
           ),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
               _PlayButton(controller: controller),
               if (controller.error != null) ...[
@@ -44,18 +43,11 @@ class AudioPlayerBar extends StatelessWidget {
               const SizedBox(width: 8),
               Text(formatTimestamp(position), style: TextStyle(fontSize: 11, color: p.text3)),
               const SizedBox(width: 8),
-              SizedBox(
-                width: 220,
+              Expanded(
                 child: SliderTheme(
-                  data: SliderThemeData(
-                    trackHeight: 3,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                    overlayShape: SliderComponentShape.noOverlay,
-                    activeTrackColor: p.accent,
-                    inactiveTrackColor: p.border,
-                    thumbColor: p.accent,
-                  ),
+                  data: _sliderTheme(p),
                   child: Slider(
+                    key: const Key('audio-seek'),
                     value: valueMs,
                     min: 0,
                     max: maxMs,
@@ -65,10 +57,61 @@ class AudioPlayerBar extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(formatTimestamp(duration), style: TextStyle(fontSize: 11, color: p.text3)),
+              const SizedBox(width: 12),
+              _VolumeControl(controller: controller),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+SliderThemeData _sliderTheme(AppPalette p) => SliderThemeData(
+      trackHeight: 3,
+      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+      overlayShape: SliderComponentShape.noOverlay,
+      activeTrackColor: p.accent,
+      inactiveTrackColor: p.border,
+      thumbColor: p.accent,
+    );
+
+/// The speaker (click = mute / unmute) and a short slider for the level, always visible: nothing to hover for,
+/// so it works the same on a touch screen.
+class _VolumeControl extends StatelessWidget {
+  const _VolumeControl({required this.controller});
+
+  final AudioPlayerController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final volume = controller.volume;
+    final icon = volume == 0
+        ? Icons.volume_off_rounded
+        : volume < 0.5
+            ? Icons.volume_down_rounded
+            : Icons.volume_up_rounded;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Tooltip(
+          message: controller.muted ? 'Unmute' : 'Mute',
+          child: InkWell(
+            key: const Key('audio-mute'),
+            customBorder: const CircleBorder(),
+            onTap: controller.toggleMute,
+            child: Padding(padding: const EdgeInsets.all(4), child: Icon(icon, size: 18, color: p.text2)),
+          ),
+        ),
+        SizedBox(
+          width: 72,
+          child: SliderTheme(
+            data: _sliderTheme(p),
+            child: Slider(key: const Key('audio-volume'), value: volume, onChanged: controller.setVolume),
+          ),
+        ),
+      ],
     );
   }
 }
