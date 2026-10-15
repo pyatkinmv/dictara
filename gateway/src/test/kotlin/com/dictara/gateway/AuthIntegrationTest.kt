@@ -163,7 +163,7 @@ class AuthIntegrationTest {
             Map::class.java,
         )
 
-        assertThat(me.body!!["plan_name"]).isEqualTo("Try it")
+        assertThat(me.body!!["plan_name"]).isEqualTo("Guest")
     }
 
     @Test
