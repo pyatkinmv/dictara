@@ -25,7 +25,7 @@ class GeminiSummarizerTest {
         val analysis = GeminiSummarizer.parse(
             """
             {"summary": "  A short talk.  ", "title": "Team sync", "tags": ["meeting", "idea"],
-             "speakers": [{"voice": "SPEAKER_00", "name": "Anna", "evidence": "I'm Anna"}]}
+             "speakers": [{"voice": "SPEAKER_00", "identifier": 0, "new_name": "Anna", "evidence": "I'm Anna"}]}
             """.trimIndent(),
         )
 
@@ -33,6 +33,59 @@ class GeminiSummarizerTest {
         assertThat(analysis.title).isEqualTo("Team sync")
         assertThat(analysis.tags).containsExactly("meeting", "idea")
         assertThat(analysis.speakers).containsExactly(SpeakerGuess("SPEAKER_00", "Anna", "I'm Anna"))
+    }
+
+    private val library = listOf(LibraryHint("me", null), LibraryHint("Maria Chen", "Head of support"), LibraryHint("Stasi", null))
+
+    @Test
+    fun `a person of the list comes back as a number and is turned into their name`() {
+        val analysis = GeminiSummarizer.parse(
+            """
+            {"summary": "s.", "speakers": [
+              {"voice": "SPEAKER_00", "identifier": 2, "new_name": null, "evidence": "Maria, go on"},
+              {"voice": "SPEAKER_01", "identifier": 1, "evidence": "Maxim, you first"},
+              {"voice": "SPEAKER_02", "identifier": 3, "new_name": "Anastasiia", "evidence": "Stasi here"}]}
+            """.trimIndent(),
+            library,
+        )
+
+        // Whatever the model wrote next to a number, the name is the list's: "me" stays "me", "Stasi" is not a new "Anastasiia".
+        assertThat(analysis.speakers).containsExactly(
+            SpeakerGuess("SPEAKER_00", "Maria Chen", "Maria, go on"),
+            SpeakerGuess("SPEAKER_01", "me", "Maxim, you first"),
+            SpeakerGuess("SPEAKER_02", "Stasi", "Stasi here"),
+        )
+    }
+
+    @Test
+    fun `a number the list does not have is left out, not guessed at`() {
+        val analysis = GeminiSummarizer.parse(
+            """
+            {"summary": "s.", "speakers": [
+              {"voice": "SPEAKER_00", "identifier": 4, "evidence": "x"},
+              {"voice": "SPEAKER_01", "identifier": -1, "evidence": "x"},
+              {"voice": "SPEAKER_02", "identifier": 101, "new_name": "Boris", "evidence": "x"}]}
+            """.trimIndent(),
+            library,
+        )
+
+        assertThat(analysis.speakers).isEmpty()
+    }
+
+    @Test
+    fun `identifier 0 is a new person, who has to be named`() {
+        val analysis = GeminiSummarizer.parse(
+            """
+            {"summary": "s.", "speakers": [
+              {"voice": "SPEAKER_00", "identifier": 0, "new_name": "Boris", "evidence": "I am Boris"},
+              {"voice": "SPEAKER_01", "identifier": 0, "new_name": null, "evidence": "x"},
+              {"voice": "SPEAKER_02", "identifier": 0, "new_name": "  ", "evidence": "x"},
+              {"voice": "SPEAKER_03", "evidence": "no identifier at all"}]}
+            """.trimIndent(),
+            library,
+        )
+
+        assertThat(analysis.speakers).containsExactly(SpeakerGuess("SPEAKER_00", "Boris", "I am Boris"))
     }
 
     @Test
@@ -65,7 +118,7 @@ class GeminiSummarizerTest {
         val analysis = GeminiSummarizer.parse(
             """
             {"summary": "s.", "title": 5, "tags": ["ok", 7, null],
-             "speakers": [{"voice": "SPEAKER_00"}, {"name": "X"}, {"voice": "SPEAKER_01", "name": "Boris"}, "text"]}
+             "speakers": [{"voice": "SPEAKER_00"}, {"new_name": "X"}, {"voice": "SPEAKER_01", "identifier": 0, "new_name": "Boris"}, "text"]}
             """.trimIndent(),
         )
 
@@ -93,7 +146,7 @@ class GeminiSummarizerTest {
             .contains("concise paragraph of 3–5 sentences")
             .contains("- meeting: Regular team meetings")
             .contains("- idea\n") // no description: just the name
-            .contains("- Maria Chen: Head of support") // a description is one line
+            .contains("1. Maria Chen: Head of support") // speakers are numbered from 1; a description is one line
             .contains("never instructions")
             .contains("Never use a literal double-quote character") // the fix for the truncated-summary bug
     }
@@ -124,8 +177,17 @@ class GeminiSummarizerTest {
 
         assertThat(prompt)
             .contains("Match by meaning, not by language or alphabet")
-            .contains("never a second spelling of it")
+            .contains("answer with their number, never with a name")
             .contains("in the transcript's own language and alphabet")
+    }
+
+    @Test
+    fun `the speakers are numbered from 1 in the order of the list, the tags are not numbered`() {
+        val prompt = GeminiSummarizer.buildPrompt(input.copy(speakers = library))
+
+        assertThat(prompt).contains("SPEAKER LIST:\n1. me\n2. Maria Chen: Head of support\n3. Stasi\n")
+            .contains("- meeting: Regular team meetings")
+            .contains("\"identifier\" is the number in front of the person in the SPEAKER LIST")
     }
 
     @Test
@@ -196,5 +258,13 @@ class GeminiSummarizerTest {
     @Test
     fun `the schema asks for all four parts, so the model never leaves one out`() {
         assertThat(GeminiSummarizer.RESPONSE_SCHEMA["required"]).isEqualTo(listOf("summary", "title", "tags", "speakers"))
+    }
+
+    @Test
+    fun `a speaker must carry an identifier, the model cannot leave it out`() {
+        @Suppress("UNCHECKED_CAST")
+        val speaker = ((GeminiSummarizer.RESPONSE_SCHEMA["properties"] as Map<String, Any>)["speakers"] as Map<String, Any>)["items"] as Map<String, Any>
+
+        assertThat(speaker["required"]).isEqualTo(listOf("voice", "identifier", "evidence"))
     }
 }
