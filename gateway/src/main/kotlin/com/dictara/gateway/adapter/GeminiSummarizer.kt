@@ -200,6 +200,9 @@ Conclusions:
                 "\"tags\": names from the TAG LIST that clearly describe the recording, at most 5. Copy each name exactly as listed.",
                 "Match by meaning, not by language or alphabet: a listed tag fits even if it is written in another language or script than the " +
                     "transcript (\"Nastya\" fits a talk about Настя), and then it is copied as listed.",
+                "A tag fits only when its description fits the recording as a whole: what the recording mostly is about, or who takes part in it. " +
+                    "Merely mentioning a topic or a name is not enough (a conversation among colleagues that mentions a vendor is not a meeting with that vendor), " +
+                    "and a meeting of two people is not a \"one-to-one\" unless it is that kind of meeting.",
                 "Never invent a tag. Use [] when none fits.",
                 "",
                 "\"speakers\": who a voice is. The transcript labels its voices SPEAKER_00, SPEAKER_01, ... " +
