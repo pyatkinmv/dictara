@@ -31,6 +31,15 @@ class PlanService(
         return UserPlanInfo(plan.displayName, strategyFor(plan).usage(userId))
     }
 
+    /**
+     * How many times a user may regenerate the summary of one transcription (`regenerations_per_transcription` in the
+     * plan's constraints): null for no limit, 0 for none. Like the other constraints, a plan without the key has no limit.
+     */
+    fun regenerationLimit(userId: UUID): Int? {
+        val plan = planRepo.findByUserId(userId) ?: throw NoSuchElementException("No such user: $userId")
+        return plan.constraints["regenerations_per_transcription"]?.takeIf { it.isInt }?.asInt()
+    }
+
     private fun strategyFor(plan: PlanEntity): PlanStrategy {
         plan.constraints["lifetime_submissions"]?.asInt()?.let { return LifetimeSubmissionLimitStrategy(it, submissionRepo) }
         val limit = plan.constraints["monthly_submissions"]?.asInt() ?: return NoLimitStrategy(submissionRepo)

@@ -3,15 +3,23 @@ import 'package:flutter/material.dart';
 import '../../theme/app_palette.dart';
 import '../../widgets/modal.dart';
 
-/// "Regenerate the summary?": says what will happen before the one regeneration is spent. Returns true if the
-/// user confirmed.
-Future<bool> showRegenerateDialog(BuildContext context) async {
-  final confirmed = await showAppModal<bool>(context, builder: (context) => const _RegenerateDialog());
+/// "Regenerate the summary?": says what will happen, and how many times it can still be done on the user's plan
+/// ([left]: null when there is no limit), before a regeneration is spent. Returns true if the user confirmed.
+Future<bool> showRegenerateDialog(BuildContext context, {int? left}) async {
+  final confirmed = await showAppModal<bool>(context, builder: (context) => _RegenerateDialog(left: left));
   return confirmed ?? false;
 }
 
 class _RegenerateDialog extends StatelessWidget {
-  const _RegenerateDialog();
+  const _RegenerateDialog({required this.left});
+
+  final int? left;
+
+  String get _limit => switch (left) {
+        null => '',
+        1 => ' You can do this once for this recording.',
+        final n => ' You can do this $n more times for this recording.',
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +46,7 @@ class _RegenerateDialog extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             'The summary is replaced, and a new title, tags and speakers are suggested. '
-            'Anything you accepted or rejected stays. You can do this once for this recording.',
+            'Anything you accepted or rejected stays.$_limit',
             style: TextStyle(fontSize: 14, height: 1.55, color: p.text2),
           ),
           const SizedBox(height: 20),

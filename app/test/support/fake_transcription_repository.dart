@@ -219,7 +219,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   /// [hasAudio]: false by default, so [audioUrl] answers null and the detail page never reaches for the real
   /// (browser-only) audio backend — tests that exercise the player construct their own `AudioPlayerController`
   /// directly with a fake backend instead of going through the full app for that.
-  FakeTranscriptionRepository({this.latency, this.jobTiming, DateTime Function()? clock, this.hasAudio = false, this.audioGone = false})
+  FakeTranscriptionRepository({this.latency, this.jobTiming, DateTime Function()? clock, this.hasAudio = false, this.audioGone = false, this.regenerationLimit = 1})
       : _clock = clock ?? DateTime.now;
 
   final Duration Function()? latency;
@@ -397,8 +397,16 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
       suggestions: _suggestions[id],
       // The design shows the same summary and file details for every item.
       summary: _summaries[id] ?? _summary,
-      regeneration: _regeneration[id] ?? SummaryRegeneration.available,
+      regeneration: regenerationLimit == 0
+          ? SummaryRegeneration.unavailable // the plan has none
+          : _regenerating.contains(id)
+          ? SummaryRegeneration.running
+          : (regenerationLimit != null && (_regenerationsUsed[id] ?? 0) >= regenerationLimit!)
+              ? SummaryRegeneration.used
+              : SummaryRegeneration.available,
       regeneratedAt: _regeneratedAt[id],
+      regenerationsUsed: _regenerationsUsed[id] ?? 0,
+      regenerationsMax: regenerationLimit,
       originalFilename: 'product_sync_2025_06_23.mp4',
       fileSizeBytes: 23488102, // 22.4 MB
       language: 'EN',
@@ -710,8 +718,12 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
 
   // "Regenerate summary": the call starts it; a test ends it with [finishRegeneration] (the real one takes a
   // while on the gateway).
-  final Map<String, SummaryRegeneration> _regeneration = {};
+  final Set<String> _regenerating = {};
+  final Map<String, int> _regenerationsUsed = {};
   final Map<String, DateTime> _regeneratedAt = {};
+
+  /// How many times a transcription may be regenerated, as the user's plan says (null: no limit).
+  final int? regenerationLimit;
   final Map<String, String> _summaries = {};
 
   /// The ids [regenerateSummary] was called with.
@@ -729,12 +741,13 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
       regenerateError = null;
       throw error;
     }
-    _regeneration[id] = SummaryRegeneration.running;
+    _regenerating.add(id);
   }
 
   /// The gateway is done with a regeneration: the new [summary] is in, and the button is used up.
   void finishRegeneration(String id, String summary) {
-    _regeneration[id] = SummaryRegeneration.used;
+    _regenerating.remove(id);
+    _regenerationsUsed[id] = (_regenerationsUsed[id] ?? 0) + 1;
     _regeneratedAt[id] = DateTime(2025, 6, 24, 10, 0);
     _summaries[id] = summary;
   }

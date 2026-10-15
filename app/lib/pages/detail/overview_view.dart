@@ -142,12 +142,13 @@ class _RegenerateControl extends StatelessWidget {
         final at = detail.regeneratedAt;
         return Text(at == null ? 'Regenerated' : 'Regenerated ${formatDay(at)}', key: const Key('regenerated'), style: small);
       case SummaryRegeneration.available:
-        return InkWell(
+        final last = detail.regeneratedAt;
+        final button = InkWell(
           key: const Key('regenerate-summary'),
           borderRadius: BorderRadius.circular(8),
           onTap: () async {
             final controller = context.read<TranscriptionDetailController>();
-            if (await showRegenerateDialog(context)) await controller.regenerateSummary();
+            if (await showRegenerateDialog(context, left: detail.regenerationsLeft)) await controller.regenerateSummary();
           },
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -160,6 +161,16 @@ class _RegenerateControl extends StatelessWidget {
               ],
             ),
           ),
+        );
+        // Done before and can be done again (a plan with no limit): say when it last was.
+        if (last == null) return button;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Last regenerated ${formatDay(last)}', key: const Key('regenerated'), style: small),
+            const SizedBox(width: 4),
+            button,
+          ],
         );
     }
   }
