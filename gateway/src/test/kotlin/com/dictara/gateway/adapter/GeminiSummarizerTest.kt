@@ -180,6 +180,15 @@ class GeminiSummarizerTest {
     }
 
     @Test
+    fun `a tag has to fit the recording as a whole, a passing mention is not enough`() {
+        assertThat(GeminiSummarizer.buildPrompt(input))
+            .contains("A tag fits only when its description fits the recording as a whole")
+            .contains("Merely mentioning a topic or a name is not enough")
+            .contains("is not a meeting with that vendor")
+            .contains("Never invent a tag. Use [] when none fits.")
+    }
+
+    @Test
     fun `the quote asked for as evidence is without the timestamps and labels of its line`() {
         assertThat(GeminiSummarizer.buildPrompt(input)).contains("WITHOUT the [timestamps] and [SPEAKER_xx] labels")
     }
