@@ -83,7 +83,8 @@ class TranscriptionDetailController extends ChangeNotifier {
     if (current == null || current.regeneration != SummaryRegeneration.available) return;
     final id = current.item.id;
 
-    _current = current.copyWith(regeneration: SummaryRegeneration.running);
+    // A new attempt has no old complaint (the gateway forgets it as the attempt starts).
+    _current = current.copyWith(regeneration: SummaryRegeneration.running, clearRegenerationError: true);
     notifyListeners();
     try {
       await _repository.regenerateSummary(id);

@@ -36,6 +36,17 @@ curl -s localhost:9091/api/v1/query --data-urlencode 'query=dictara_build'   # g
 gcloud run revisions list --service transcriber --region europe-west4 --limit 5
 ```
 
+## Backlog run: ask Gemini again about old transcriptions
+
+For transcriptions made before the analysis was as good as it is now: the summary is replaced and what the user has not settled (title, tags, speakers) is proposed again (accepted and rejected ones stay); the user's own "Regenerate" button is not touched or counted. `POST /admin/reanalyze` on the gateway, with `ADMIN_KEY`, on the VM only (nginx answers 404 for `/api/admin/`); drive it with `scriptseanalyze.ps1`. **It costs money** (about 1.5-3 cents a recording at `gemini-2.5-flash`, mostly the model's "thinking" tokens), so go in steps and look at each:
+
+1. Pick ids with SQL (the user's finished transcriptions, a varied first ten), write them one per line to a file.
+2. `scriptseanalyze.ps1 -Action dryrun -UserId <uuid> -IdsFile ids10.txt`: which ids are eligible, which are left out and why (`not_owner`, `not_found`, `not_ready`, `already_done`, `duplicate`, `invalid`), estimated tokens and cost. Nothing is asked.
+3. `-Action run`: one transcription after another (pause 1.5 s), in the background. `-Action status` shows done / failed, tokens, the cost so far and the last errors; `-Action stop` stops after the one it is on. A batch stops by itself after 5 failures in a row (Gemini down, quota), and only one runs at a time.
+4. Look at the results in the app (the user accepts the new titles, tags and speakers by hand), then 100, then the rest. The same ids sent again are skipped (`already_done`, marked in `submissions.analysis_backfilled_at`) unless `-Force`.
+
+At most 300 ids a call. Logs: `{service="gateway"} |= "Backlog reanalysis"`; each run is also a row in `job_runs` (`reanalyze_backlog`).
+
 ## Health checks (read-only)
 
 ```bash

@@ -71,4 +71,6 @@ dictara:
   storage:
     gcs:
       bucket: ${GCS_UPLOADS_BUCKET:}
+  admin:
+    key: ${ADMIN_KEY:}
 

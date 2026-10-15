@@ -45,6 +45,7 @@ dictara/
 | `GCS_UPLOADS_BUCKET` | gateway | — | GCS bucket for audio uploads — files are uploaded to GCS and the transcriber receives a `gs://` reference (works around Cloud Run's 32 MiB request body limit). **Required** — the legacy in-DB BLOB path has been removed |
 | `GEMINI_API_KEY` | gateway | — | Google Gemini key — enables summarization |
 | `GEMINI_MODEL` | gateway | `gemini-2.5-flash` | Gemini model to use |
+| `ADMIN_KEY` | gateway | — | Key of the operator's `/admin/...` endpoints (the backlog run, `scriptseanalyze.ps1`). The endpoints answer 404 while it is empty; nginx never passes `/api/admin/` on, they are used on the VM |
 | `SUMMARIZER_PROVIDER` | gateway | `gemini` | Summarization backend |
 | `CF_ZONE_ID` | CI only | — | CloudFlare Zone ID for dictary.app — used by CI to purge CDN cache after `app-material` deploys |
 | `CF_API_TOKEN` | CI only | — | CloudFlare API token with Zone / Cache Purge right — stored as GitHub Actions secret |

@@ -1011,6 +1011,11 @@ void main() {
       final unlimited = await read({'state': 'available', 'used': 4});
       expect((unlimited.regenerationsUsed, unlimited.regenerationsMax, unlimited.regenerationsLeft), (4, null, null));
       expect((await read({'state': 'used', 'used': 1, 'max': 1})).regenerationsLeft, 0);
+
+      // Why the last attempt failed, when it did.
+      final failed = await read({'state': 'available', 'used': 0, 'max': 1, 'error': 'The summary service has run out of credits.'});
+      expect(failed.regenerationError, 'The summary service has run out of credits.');
+      expect((await read({'state': 'available', 'used': 0, 'max': 1})).regenerationError, isNull);
       // An older gateway says nothing: no button.
       expect((await read(null)).regeneration, SummaryRegeneration.unavailable);
     });

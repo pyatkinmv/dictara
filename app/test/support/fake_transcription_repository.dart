@@ -407,6 +407,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
       regeneratedAt: _regeneratedAt[id],
       regenerationsUsed: _regenerationsUsed[id] ?? 0,
       regenerationsMax: regenerationLimit,
+      regenerationError: _regenerationErrors[id],
       originalFilename: 'product_sync_2025_06_23.mp4',
       fileSizeBytes: 23488102, // 22.4 MB
       language: 'EN',
@@ -719,6 +720,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   // "Regenerate summary": the call starts it; a test ends it with [finishRegeneration] (the real one takes a
   // while on the gateway).
   final Set<String> _regenerating = {};
+  final Map<String, String> _regenerationErrors = {};
   final Map<String, int> _regenerationsUsed = {};
   final Map<String, DateTime> _regeneratedAt = {};
 
@@ -741,7 +743,14 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
       regenerateError = null;
       throw error;
     }
+    _regenerationErrors.remove(id); // a new attempt has no old complaint
     _regenerating.add(id);
+  }
+
+  /// The gateway could not do the regeneration: it is not running any more, and says why ([message]) until the next attempt.
+  void failRegeneration(String id, String message) {
+    _regenerating.remove(id);
+    _regenerationErrors[id] = message;
   }
 
   /// The gateway is done with a regeneration: the new [summary] is in, and the button is used up.

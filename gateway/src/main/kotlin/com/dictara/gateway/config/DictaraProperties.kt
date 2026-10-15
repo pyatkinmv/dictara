@@ -8,7 +8,22 @@ data class DictaraProperties(
     val summarizer: SummarizerProps = SummarizerProps(),
     val storage: StorageProps = StorageProps(),
     val local: LocalProps = LocalProps(),
+    val admin: AdminProps = AdminProps(),
 ) {
+    /**
+     * The operator's endpoints (`/admin/...`, see AdminController). They are off while [key] is blank. They are not
+     * reachable from outside (nginx answers 404 for `/api/admin/`): they are called on the VM, on localhost:8080.
+     */
+    data class AdminProps(
+        val key: String = "",
+        /** How many ids one call to `/admin/reanalyze` may carry. */
+        val maxIdsPerCall: Int = 300,
+        /** Pause between two transcriptions of a batch, so that Gemini is not hammered. */
+        val reanalyzePauseMs: Long = 1500,
+        /** A batch stops after this many failures in a row (Gemini down, a bad key, quota used up). */
+        val stopAfterFailures: Int = 5,
+    )
+
     data class TranscriberProps(
         val url: String = "http://localhost:8000",
         val pollIntervalMs: Long = 5000,
@@ -18,6 +33,8 @@ data class DictaraProperties(
     data class SummarizerProps(
         val provider: String = "gemini",
         val gemini: GeminiProps = GeminiProps(),
+        /** Pause before a failed analysis is asked for again (three tries in all). */
+        val retryPauseMs: Long = 2000,
     )
 
     data class GeminiProps(

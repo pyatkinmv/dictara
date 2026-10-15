@@ -1,5 +1,6 @@
 package com.dictara.gateway.service
 
+import com.dictara.gateway.config.DictaraProperties
 import com.dictara.gateway.entity.SummaryEntity
 import com.dictara.gateway.model.SummaryMode
 import com.dictara.gateway.port.Analysis
@@ -42,6 +43,7 @@ class SummaryRegenerationService(
     private val summarizer: SummarizerPort,
     private val queries: SummaryRegenerationQueries,
     private val planService: PlanService,
+    private val props: DictaraProperties,
     txManager: PlatformTransactionManager,
 ) {
     /**
@@ -49,7 +51,7 @@ class SummaryRegenerationService(
      * `running`, `used` (the plan's limit is reached), `unavailable` (no summary service, or the plan has none).
      * [used] is how many times it was done, [max] how many the plan allows (null: no limit), [at] when it was last done.
      */
-    data class Regeneration(val state: String, val used: Int, val max: Int?, val at: String? = null)
+    data class Regeneration(val state: String, val used: Int, val max: Int?, val at: String? = null, val error: String? = null)
 
     private val log = LoggerFactory.getLogger(javaClass)
     private val tx = TransactionTemplate(txManager)
@@ -71,7 +73,7 @@ class SummaryRegenerationService(
             max != null && s.count >= max -> "used"
             else -> "available"
         }
-        return Regeneration(state, s.count, max, s.at?.toString())
+        return Regeneration(state, s.count, max, s.at?.toString(), s.error)
     }
 
     /** Starts the regeneration of [userId]'s transcription in the background; 404 / 409 when it cannot be done. */
@@ -101,19 +103,29 @@ class SummaryRegenerationService(
 
     private fun run(submissionId: UUID) {
         try {
-            val analysis = askGemini(submissionId)
-            tx.executeWithoutResult {
-                replaceSummary(submissionId, analysis.summary)
-                // The proposals are a bonus: a failure here must not cost the new summary, as on the first run.
-                runCatching { suggestionService.refresh(submissionId, analysis) }
-                    .onFailure { log.warn("Suggestions for submission $submissionId were not refreshed: ${it.message}") }
-            }
+            val analysis = analyzeAndReplace(submissionId)
             queries.finish(submissionId)
             log.info("Summary regenerated for submission $submissionId (${analysis.summary.length} chars)")
         } catch (e: Exception) {
-            queries.release(submissionId)
+            queries.fail(submissionId, describeFailure(e))
             log.error("Summary regeneration failed for submission $submissionId: ${e.message}")
         }
+    }
+
+    /**
+     * Asks Gemini again about the transcription and, in one transaction, replaces its summary and refreshes its unsettled
+     * proposals. The caller owns the "running" state and the counting (the user's own regeneration, or the backlog run).
+     * Throws when Gemini could not give a usable answer.
+     */
+    fun analyzeAndReplace(submissionId: UUID): Analysis {
+        val analysis = askGemini(submissionId)
+        tx.executeWithoutResult {
+            replaceSummary(submissionId, analysis.summary)
+            // The proposals are a bonus: a failure here must not cost the new summary, as on the first run.
+            runCatching { suggestionService.refresh(submissionId, analysis) }
+                .onFailure { log.warn("Suggestions for submission $submissionId were not refreshed: ${it.message}") }
+        }
+        return analysis
     }
 
     /** As on the first run, an unusable answer (no summary, a summary cut off) is asked for again, up to three times. */
@@ -148,7 +160,7 @@ class SummaryRegenerationService(
             } catch (e: Exception) {
                 last = e
                 log.warn("Summary regeneration attempt ${attempt + 1} failed for submission $submissionId: ${e.message}")
-                if (attempt < ATTEMPTS - 1) Thread.sleep(RETRY_PAUSE_MS)
+                if (attempt < ATTEMPTS - 1) Thread.sleep(props.summarizer.retryPauseMs)
             }
         }
         throw last!!
@@ -166,6 +178,19 @@ class SummaryRegenerationService(
 
     private companion object {
         const val ATTEMPTS = 3
-        const val RETRY_PAUSE_MS = 2000L
+
+        /** What the user is told about a failed regeneration: the cause in plain words, never the raw reply of the service. */
+        fun describeFailure(e: Exception): String {
+            val text = e.message.orEmpty()
+            val code = Regex("""Gemini error \((\d{3})\)""").find(text)?.groupValues?.get(1)?.toInt()
+            return when {
+                code == 402 || text.contains("prepayment", ignoreCase = true) || text.contains("credits", ignoreCase = true) ->
+                    "The summary service has run out of credits."
+                code == 429 -> "The summary service is busy. Try again in a minute."
+                code != null && code >= 500 -> "The summary service is not available right now. Try again later."
+                code != null -> "The summary service refused the request."
+                else -> "The summary service did not give a usable answer. Try again."
+            }
+        }
     }
 }
