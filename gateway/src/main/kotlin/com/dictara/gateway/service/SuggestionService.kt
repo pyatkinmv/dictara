@@ -1,7 +1,5 @@
 package com.dictara.gateway.service
 
-import com.dictara.gateway.entity.SpeakerEntity
-import com.dictara.gateway.entity.TagEntity
 import com.dictara.gateway.port.Analysis
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.dictara.gateway.port.LibraryHint
@@ -65,48 +63,6 @@ class SuggestionService(
         const val MAX_LIBRARY_HINTS = 200
 
         /** Lower case, everything but letters and digits made a single space: "Hi, I'm Anna!" → "hi i m anna". */
-        private val neverTogether = Regex("never together with ([^.:;\\n]*)", RegexOption.IGNORE_CASE)
-        private val tagName = Regex("[\\p{L}\\p{N}_-]+")
-
-        /**
-         * The tags a tag says it is never used together with: "NEVER together with localisation_daily, health" in its
-         * description. The model does not keep to such a sentence reliably, so it is enforced here: such a tag is
-         * dropped when one of the others is proposed. Written by the user in the description, nothing else to set up.
-         */
-        internal fun excludedBy(description: String?): List<String> =
-            neverTogether.find(description.orEmpty())?.groupValues?.get(1)
-                ?.let { tagName.findAll(it).map { m -> m.value.lowercase(Locale.ROOT) }.toList() }
-                ?.filter { it != "and" && it != "or" }
-                .orEmpty()
-
-        private fun letters(text: String): List<String> =
-            java.text.Normalizer.normalize(text.lowercase(Locale.ROOT), java.text.Normalizer.Form.NFD)
-                .replace(Regex("\\p{M}+"), "").split(Regex("[^\\p{L}\\p{N}]+")).filter { it.isNotEmpty() }
-
-        private fun nearlyEqual(a: String, b: String): Boolean {
-            if (a == b) return true
-            if (a.length < 5 || b.length < 5 || kotlin.math.abs(a.length - b.length) > 1) return false
-            var i = 0
-            while (i < a.length && i < b.length && a[i] == b[i]) i++
-            val restA = a.substring(i); val restB = b.substring(i)
-            return restA.drop(1) == restB || restA == restB.drop(1) || restA.drop(1) == restB.drop(1)
-        }
-
-        /**
-         * The library speaker a proposed [name] means, when it differs only in how much of the name is said: "Patricia" for
-         * "Patricia Brazao", "Chris Lloyd" for "Chris", "Frederic" for "Frederick". The first names have to agree (one of the
-         * two names being a single word) and exactly one speaker has to fit, otherwise it is not guessed.
-         */
-        internal fun sameFirstName(name: String, library: List<SpeakerEntity>): SpeakerEntity? {
-            val asked = letters(name)
-            if (asked.isEmpty()) return null
-            val fits = library.filter { speaker ->
-                val listed = letters(speaker.name)
-                listed.isNotEmpty() && (asked.size == 1 || listed.size == 1) && nearlyEqual(asked.first(), listed.first())
-            }
-            return fits.singleOrNull()
-        }
-
         /** A title as it is kept: no quotes around it, one space between words. */
         private fun cleanTitle(raw: String): String = raw.trim().trim('"', '\'', '«', '»', '“', '”').replace(Regex("\\s+"), " ")
 
@@ -154,24 +110,17 @@ class SuggestionService(
             queries.insertTitle(transcriptId, title)
         }
 
-        val proposed = LinkedHashMap<String, TagEntity>()
+        val tagIds = LinkedHashSet<UUID>()
         for (raw in analysis.tags) {
             val label = runCatching { TagService.normalizeLabel(raw) }.getOrNull() ?: continue
             val tag = tagRepository.findByUserIdAndName(userId, label)
             if (tag == null) { log.info("Suggestion dropped for $submissionId: tag '$label' is not in the library"); continue }
-            proposed[label] = tag
-        }
-        val tagIds = LinkedHashSet<UUID>()
-        for ((label, tag) in proposed) {
-            val clash = excludedBy(tag.description).firstOrNull { it in proposed }
-            if (clash != null) { log.info("Suggestion dropped for $submissionId: tag '$label' is never used together with '$clash'"); continue }
             if (tagIds.size < MAX_TAGS) tagIds += tag.id!!
         }
         tagIds.forEach { queries.insertTag(transcriptId, it) }
 
         val usedVoices = HashSet<String>()
         val usedNames = HashSet<String>()
-        val library by lazy { speakerRepository.findByUserId(userId) }
         for (guess in analysis.speakers) {
             val name = runCatching { SpeakerService.normalizeName(guess.name) }.getOrNull() ?: continue
             if (guess.voice !in voices) {
@@ -183,7 +132,7 @@ class SuggestionService(
             val quote = guess.evidence?.let(::withoutMarkers)?.takeIf { it.isNotEmpty() }
             val evidence = quote?.takeIf { " ${normalize(it)} " in said }
             if (evidence == null) log.info("Quote of ${guess.voice} ('$name') for $submissionId is not in the transcript, proposal kept: '${guess.evidence?.take(120)}'")
-            val known = speakerRepository.findByUserIdAndNameIgnoringCase(userId, name) ?: sameFirstName(name, library)
+            val known = speakerRepository.findByUserIdAndNameIgnoringCase(userId, name)
             if (known == null && " ${normalize(name)} " !in said) {
                 log.info("Suggestion dropped for $submissionId: '$name' is not in the library and not in the transcript")
                 continue
