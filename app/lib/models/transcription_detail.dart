@@ -25,18 +25,18 @@ class SpeakerRun {
   final List<Segment> segments;
 }
 
-/// Where "Regenerate summary" stands for a transcription: it may be done once.
+/// Where "Regenerate summary" stands for a transcription. How many times it may be done is the user's plan.
 enum SummaryRegeneration {
-  /// Not used yet: the button is there.
+  /// The button is there.
   available,
 
   /// Gemini is being asked again; the old summary stays until the new one is ready.
   running,
 
-  /// Used: [TranscriptionDetail.regeneratedAt] says when.
+  /// The plan's limit is reached: [TranscriptionDetail.regeneratedAt] says when it was last done.
   used,
 
-  /// Nothing to ask (no summary service), so no button.
+  /// Nothing to ask (no summary service, or the plan has none), so no button.
   unavailable,
 }
 
@@ -55,6 +55,8 @@ class TranscriptionDetail {
     this.wordCount,
     this.regeneration = SummaryRegeneration.unavailable,
     this.regeneratedAt,
+    this.regenerationsUsed = 0,
+    this.regenerationsMax,
   });
 
   /// The list-level data (title, tags, status, duration, date...).
@@ -87,9 +89,20 @@ class TranscriptionDetail {
   /// Counted by the gateway when the page is opened.
   final int? wordCount;
 
-  /// The state of "Regenerate summary", and when it was used.
+  /// The state of "Regenerate summary", when it was last done, how many times so far and how many the plan allows
+  /// (null: as many as wanted).
   final SummaryRegeneration regeneration;
   final DateTime? regeneratedAt;
+  final int regenerationsUsed;
+  final int? regenerationsMax;
+
+  /// How many more times it can be done; null when there is no limit.
+  int? get regenerationsLeft {
+    final max = regenerationsMax;
+    if (max == null) return null;
+    final left = max - regenerationsUsed;
+    return left < 0 ? 0 : left;
+  }
 
   /// The speaker of a diarizer slot: the confirmed mapping, else "Speaker N" -
   /// tinted with the color of a pending AI suggestion for that slot, else grey.
@@ -156,6 +169,8 @@ class TranscriptionDetail {
       wordCount: wordCount,
       regeneration: regeneration ?? this.regeneration,
       regeneratedAt: regeneratedAt,
+      regenerationsUsed: regenerationsUsed,
+      regenerationsMax: regenerationsMax,
     );
   }
 }

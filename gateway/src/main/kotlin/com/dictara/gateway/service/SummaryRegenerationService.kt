@@ -4,6 +4,7 @@ import com.dictara.gateway.entity.SummaryEntity
 import com.dictara.gateway.model.SummaryMode
 import com.dictara.gateway.port.Analysis
 import com.dictara.gateway.port.AnalysisInput
+import com.dictara.gateway.plan.PlanService
 import com.dictara.gateway.port.SummarizerPort
 import com.dictara.gateway.repository.AudioMetaRepository
 import com.dictara.gateway.repository.SubmissionRepository
@@ -24,8 +25,9 @@ import java.util.concurrent.Executors
 
 /**
  * "Regenerate summary": asks Gemini again about a finished transcription (the transcript itself is not touched) and
- * replaces its summary and its unsettled proposals (title, tags, speakers) with the new answer. The user gets one
- * regeneration per transcription; a run that fails does not use it up.
+ * replaces its summary and its unsettled proposals (title, tags, speakers) with the new answer. How many times a
+ * transcription may be regenerated is the user's plan (`regenerations_per_transcription`, see [PlanService.regenerationLimit]);
+ * a run that fails is not counted.
  */
 @Service
 class SummaryRegenerationService(
@@ -37,10 +39,15 @@ class SummaryRegenerationService(
     private val suggestionService: SuggestionService,
     private val summarizer: SummarizerPort,
     private val queries: SummaryRegenerationQueries,
+    private val planService: PlanService,
     txManager: PlatformTransactionManager,
 ) {
-    /** What the detail of a transcription tells the client about the button. [state]: available, running, used or unavailable. */
-    data class Regeneration(val state: String, val at: String? = null)
+    /**
+     * What the detail of a transcription tells the client about the button. [state]: `available` (it can be done),
+     * `running`, `used` (the plan's limit is reached), `unavailable` (no summary service, or the plan has none).
+     * [used] is how many times it was done, [max] how many the plan allows (null: no limit), [at] when it was last done.
+     */
+    data class Regeneration(val state: String, val used: Int, val max: Int?, val at: String? = null)
 
     private val log = LoggerFactory.getLogger(javaClass)
     private val tx = TransactionTemplate(txManager)
@@ -53,13 +60,16 @@ class SummaryRegenerationService(
         if (n > 0) log.warn("Gave back $n summary regeneration(s) that were interrupted by a restart")
     }
 
-    fun stateOf(submissionId: UUID): Regeneration {
+    fun stateOf(userId: UUID, submissionId: UUID): Regeneration {
         val s = queries.stateOf(submissionId)
-        return when (s.state) {
-            "running" -> Regeneration("running")
-            "done" -> Regeneration("used", s.at?.toString())
-            else -> Regeneration(if (summarizer.isAvailable()) "available" else "unavailable")
+        val max = planService.regenerationLimit(userId)
+        val state = when {
+            s.running -> "running"
+            !summarizer.isAvailable() || max == 0 -> "unavailable"
+            max != null && s.count >= max -> "used"
+            else -> "available"
         }
+        return Regeneration(state, s.count, max, s.at?.toString())
     }
 
     /** Starts the regeneration of [userId]'s transcription in the background; 404 / 409 when it cannot be done. */
@@ -74,8 +84,15 @@ class SummaryRegenerationService(
         if (segmentQueries.findByTranscriptId(transcriptId).isEmpty()) {
             throw ResponseStatusException(HttpStatus.CONFLICT, "There is nothing to summarize")
         }
-        if (!queries.claim(submissionId)) {
-            throw ResponseStatusException(HttpStatus.CONFLICT, "The summary was already regenerated, or it is being regenerated now")
+        val limit = planService.regenerationLimit(userId)
+        if (limit == 0) throw ResponseStatusException(HttpStatus.CONFLICT, "Your plan does not include regenerating summaries")
+        if (!queries.claim(submissionId, limit)) {
+            // Either a run is going, or the plan's limit for this transcription is used up; say which.
+            throw ResponseStatusException(
+                HttpStatus.CONFLICT,
+                if (queries.stateOf(submissionId).running) "The summary is being regenerated now"
+                else "Your plan allows regenerating the summary of a recording $limit time${if (limit == 1) "" else "s"}, and that is used up",
+            )
         }
         executor.submit { run(submissionId) }
     }

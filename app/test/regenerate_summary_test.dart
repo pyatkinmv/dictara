@@ -14,8 +14,8 @@ void main() {
 
   late FakeTranscriptionRepository repo;
 
-  Future<void> openOverview(WidgetTester tester) async {
-    repo = FakeTranscriptionRepository();
+  Future<void> openOverview(WidgetTester tester, {FakeTranscriptionRepository? fake}) async {
+    repo = fake ?? FakeTranscriptionRepository();
     await tester.pumpWidget(DictaraApp(authController: signedInAuthController(), repository: repo, initialLocation: '/transcriptions/0'));
     await settle(tester);
     await tester.tap(find.text('Overview'));
@@ -107,6 +107,76 @@ void main() {
 
       expect(find.byKey(const Key('regenerate-summary')), findsOneWidget);
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('By plan', () {
+    Future<void> finish(WidgetTester tester, String summary) async {
+      repo.finishRegeneration('0', summary);
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    testWidgets('a plan with no limit can regenerate again and again, and the card says when it last was', (tester) async {
+      useDesktopSize(tester);
+      await openOverview(tester, fake: FakeTranscriptionRepository(regenerationLimit: null));
+
+      await tester.tap(find.byKey(const Key('regenerate-summary')));
+      await settle(tester);
+      expect(find.textContaining('once'), findsNothing); // no limit to tell about
+      expect(find.textContaining('more times'), findsNothing);
+      await tester.tap(find.text('Regenerate').last);
+      await settle(tester);
+      await finish(tester, 'First fresh summary.');
+
+      expect(find.text('First fresh summary.'), findsOneWidget);
+      expect(find.text('Last regenerated 24 Jun'), findsOneWidget);
+      expect(find.byKey(const Key('regenerate-summary')), findsOneWidget); // and again
+
+      await confirm(tester);
+      await finish(tester, 'Second fresh summary.');
+
+      expect(find.text('Second fresh summary.'), findsOneWidget);
+      expect(repo.regenerateCalls, ['0', '0']);
+      expect(find.byKey(const Key('regenerate-summary')), findsOneWidget);
+    });
+
+    testWidgets('a plan that allows three says how many are left, and the button goes after the third', (tester) async {
+      useDesktopSize(tester);
+      await openOverview(tester, fake: FakeTranscriptionRepository(regenerationLimit: 3));
+
+      await tester.tap(find.byKey(const Key('regenerate-summary')));
+      await settle(tester);
+      expect(find.textContaining('You can do this 3 more times for this recording.'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await settle(tester);
+
+      await confirm(tester);
+      await finish(tester, 'One.');
+      await tester.tap(find.byKey(const Key('regenerate-summary')));
+      await settle(tester);
+      expect(find.textContaining('You can do this 2 more times for this recording.'), findsOneWidget);
+      await tester.tap(find.text('Regenerate').last);
+      await settle(tester);
+      await finish(tester, 'Two.');
+
+      await tester.tap(find.byKey(const Key('regenerate-summary')));
+      await settle(tester);
+      expect(find.textContaining('You can do this once for this recording.'), findsOneWidget); // the last one
+      await tester.tap(find.text('Regenerate').last);
+      await settle(tester);
+      await finish(tester, 'Three.');
+
+      expect(find.byKey(const Key('regenerate-summary')), findsNothing);
+      expect(find.text('Regenerated 24 Jun'), findsOneWidget);
+    });
+
+    testWidgets('a plan with none shows no button', (tester) async {
+      useDesktopSize(tester);
+      await openOverview(tester, fake: FakeTranscriptionRepository(regenerationLimit: 0));
+
+      expect(find.byKey(const Key('regenerate-summary')), findsNothing);
+      expect(find.byKey(const Key('regenerated')), findsNothing);
     });
   });
 }

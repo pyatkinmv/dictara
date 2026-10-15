@@ -1004,6 +1004,13 @@ void main() {
       expect(used.regeneration, SummaryRegeneration.used);
       expect(used.regeneratedAt!.toUtc(), DateTime.utc(2026, 10, 15, 10));
       expect((await read({'state': 'unavailable'})).regeneration, SummaryRegeneration.unavailable);
+
+      // How many times so far, and how many the plan allows (none given: no limit).
+      final limited = await read({'state': 'available', 'used': 1, 'max': 3, 'at': '2026-10-15T10:00:00Z'});
+      expect((limited.regenerationsUsed, limited.regenerationsMax, limited.regenerationsLeft), (1, 3, 2));
+      final unlimited = await read({'state': 'available', 'used': 4});
+      expect((unlimited.regenerationsUsed, unlimited.regenerationsMax, unlimited.regenerationsLeft), (4, null, null));
+      expect((await read({'state': 'used', 'used': 1, 'max': 1})).regenerationsLeft, 0);
       // An older gateway says nothing: no button.
       expect((await read(null)).regeneration, SummaryRegeneration.unavailable);
     });

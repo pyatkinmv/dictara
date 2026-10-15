@@ -155,6 +155,8 @@ class SummaryRegenerationIntegrationTest : AbstractSharedContextIntegrationTest(
     fun `a transcription starts with the button available`() {
         val state = detail()["summary_regeneration"]
         assertThat(state["state"].asText()).isEqualTo("available")
+        assertThat(state["used"].asInt()).isZero()
+        assertThat(state["max"].asInt()).isEqualTo(1) // the default plan, free, allows it once
         assertThat(state.has("at")).isFalse()
     }
 
@@ -444,6 +446,167 @@ class SummaryRegenerationIntegrationTest : AbstractSharedContextIntegrationTest(
         service.releaseInterrupted()
 
         assertThat(regenState()).isEqualTo("available")
+    }
+
+    // ── The plan decides how many times ────────────────────────────────────────
+
+    private fun userOnPlan(plan: String): UUID = newUser().also { jdbcTemplate.update("UPDATE users SET plan = ? WHERE id = ?", plan, it) }
+
+    /** A plan of its own with [limit] regenerations per transcription (null: the key is left out, so no limit). */
+    private fun planWithLimit(name: String, limit: Int?): String {
+        val constraints = if (limit == null) "{}" else """{"regenerations_per_transcription": $limit}"""
+        jdbcTemplate.update("INSERT INTO plans(name, display_name, constraints) VALUES (?, ?, ?::jsonb) ON CONFLICT (name) DO UPDATE SET constraints = EXCLUDED.constraints", name, name, constraints)
+        return name
+    }
+
+    private fun regenState(user: UUID, tx: UUID) = call(HttpMethod.GET, "/transcriptions/$tx", user).body!!["summary_regeneration"]
+
+    private fun regenerateAndWait(user: UUID, tx: UUID) {
+        assertThat(regenerate(tx, user).status).isEqualTo(HttpStatus.ACCEPTED)
+        val deadline = System.currentTimeMillis() + 15_000
+        while (regenState(user, tx)["state"].asText() == "running") {
+            check(System.currentTimeMillis() < deadline) { "still running" }
+            Thread.sleep(50)
+        }
+    }
+
+    @Test
+    fun `an ultra user can regenerate the same transcription again and again, and it says when it was last done`() {
+        val ultra = userOnPlan("unlimited")
+        val (tx, _) = addTranscription(ultra)
+        assertThat(regenState(ultra, tx).has("max")).isFalse()
+
+        for (time in 1..3) {
+            answer = Analysis("Summary number $time.")
+            regenerateAndWait(ultra, tx)
+
+            val state = regenState(ultra, tx)
+            assertThat(state["state"].asText()).isEqualTo("available") // and again
+            assertThat(state["used"].asInt()).isEqualTo(time)
+            assertThat(state.has("max")).isFalse()
+            assertThat(state["at"].asText()).isNotBlank()
+            assertThat(call(HttpMethod.GET, "/transcriptions/$tx", ultra).body!!["summary"].asText()).isEqualTo("Summary number $time.")
+        }
+    }
+
+    @Test
+    fun `even an ultra user cannot start a second run of the same transcription while one is running`() {
+        val ultra = userOnPlan("unlimited")
+        val (tx, _) = addTranscription(ultra)
+        gate = CountDownLatch(1)
+
+        assertThat(regenerate(tx, ultra).status).isEqualTo(HttpStatus.ACCEPTED)
+        val second = regenerate(tx, ultra)
+        assertThat(second.status).isEqualTo(HttpStatus.CONFLICT)
+        assertThat(second.body!!["message"].asText()).contains("being regenerated now")
+
+        gate!!.countDown()
+        val deadline = System.currentTimeMillis() + 15_000
+        while (regenState(ultra, tx)["state"].asText() == "running") { // let the first one end
+            check(System.currentTimeMillis() < deadline) { "still running" }
+            Thread.sleep(50)
+        }
+        assertThat(asked).hasSize(1) // the refused click made no call
+        regenerateAndWait(ultra, tx) // and then it can be done again
+        assertThat(asked).hasSize(2)
+    }
+
+    @Test
+    fun `a free user gets one, then is told that the plan's limit is used up`() {
+        val free = userOnPlan("free")
+        val (tx, _) = addTranscription(free)
+
+        regenerateAndWait(free, tx)
+        val state = regenState(free, tx)
+        assertThat(state["state"].asText()).isEqualTo("used")
+        assertThat(state["used"].asInt()).isEqualTo(1)
+        assertThat(state["max"].asInt()).isEqualTo(1)
+
+        val second = regenerate(tx, free)
+        assertThat(second.status).isEqualTo(HttpStatus.CONFLICT)
+        assertThat(second.body!!["message"].asText()).contains("allows regenerating the summary of a recording 1 time").contains("used up")
+        assertThat(asked).hasSize(1)
+    }
+
+    @Test
+    fun `the limit is per transcription, so another one of the same free user can still be regenerated`() {
+        val free = userOnPlan("free")
+        val (first, _) = addTranscription(free)
+        val (second, _) = addTranscription(free)
+
+        regenerateAndWait(free, first)
+
+        assertThat(regenState(free, second)["state"].asText()).isEqualTo("available")
+        regenerateAndWait(free, second)
+        assertThat(regenState(free, second)["state"].asText()).isEqualTo("used")
+    }
+
+    @Test
+    fun `an anonymous guest gets one too`() {
+        val guest = userOnPlan("anonymous")
+        val (tx, _) = addTranscription(guest)
+
+        regenerateAndWait(guest, tx)
+
+        assertThat(regenState(guest, tx)["state"].asText()).isEqualTo("used")
+        assertThat(regenerate(tx, guest).status).isEqualTo(HttpStatus.CONFLICT)
+    }
+
+    @Test
+    fun `a plan that allows two lets two through and refuses the third`() {
+        val two = userOnPlan(planWithLimit("regen_two", 2))
+        val (tx, _) = addTranscription(two)
+
+        regenerateAndWait(two, tx)
+        assertThat(regenState(two, tx)["state"].asText()).isEqualTo("available")
+        regenerateAndWait(two, tx)
+
+        assertThat(regenState(two, tx)["state"].asText()).isEqualTo("used")
+        val third = regenerate(tx, two)
+        assertThat(third.status).isEqualTo(HttpStatus.CONFLICT)
+        assertThat(third.body!!["message"].asText()).contains("2 times")
+        assertThat(asked).hasSize(2)
+    }
+
+    @Test
+    fun `a plan with none has no button and refuses the call`() {
+        val none = userOnPlan(planWithLimit("regen_none", 0))
+        val (tx, _) = addTranscription(none)
+
+        assertThat(regenState(none, tx)["state"].asText()).isEqualTo("unavailable")
+        val reply = regenerate(tx, none)
+        assertThat(reply.status).isEqualTo(HttpStatus.CONFLICT)
+        assertThat(reply.body!!["message"].asText()).contains("does not include")
+        assertThat(asked).isEmpty()
+    }
+
+    @Test
+    fun `a failed run is not counted against the limit`() {
+        val free = userOnPlan("free")
+        val (tx, _) = addTranscription(free)
+        failWith = RuntimeException("Gemini error (503)")
+
+        regenerateAndWait(free, tx)
+
+        assertThat(regenState(free, tx)["used"].asInt()).isZero()
+        assertThat(regenState(free, tx)["state"].asText()).isEqualTo("available")
+        failWith = null
+        regenerateAndWait(free, tx)
+        assertThat(regenState(free, tx)["state"].asText()).isEqualTo("used")
+    }
+
+    @Test
+    fun `switching the plan changes what is allowed at once, on the same transcription`() {
+        val user = userOnPlan("free")
+        val (tx, _) = addTranscription(user)
+        regenerateAndWait(user, tx)
+        assertThat(regenState(user, tx)["state"].asText()).isEqualTo("used")
+
+        jdbcTemplate.update("UPDATE users SET plan = 'unlimited' WHERE id = ?", user)
+
+        assertThat(regenState(user, tx)["state"].asText()).isEqualTo("available")
+        regenerateAndWait(user, tx)
+        assertThat(regenState(user, tx)["used"].asInt()).isEqualTo(2)
     }
 
     // ── Who and when ───────────────────────────────────────────────────────────

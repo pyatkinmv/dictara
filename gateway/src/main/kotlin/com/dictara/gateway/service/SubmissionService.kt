@@ -253,7 +253,7 @@ class SubmissionService(
             segments = segments,
             voices = voices,
             suggestions = transcript?.id?.let { suggestionService.pending(it) },
-            summaryRegeneration = regenerationService.stateOf(submissionId),
+            summaryRegeneration = regenerationService.stateOf(userId, submissionId),
         )
     }
 
