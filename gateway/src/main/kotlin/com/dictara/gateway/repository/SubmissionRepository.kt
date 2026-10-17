@@ -62,22 +62,6 @@ interface SubmissionRepository : CrudRepository<SubmissionEntity, UUID> {
         summaryMode: String,
     ): SubmissionEntity?
 
-    /**
-     * TODO(remove-restore-only): the user's latest transcription that is not failed, made from exactly these bytes
-     * ([contentHash] is the SHA-256 of the file), whatever options it was made with.
-     */
-    @Query("""
-        SELECT s.* FROM submissions s
-        JOIN audio_meta a ON s.audio_id = a.id
-        WHERE a.user_id = :userId
-          AND s.user_id = :userId
-          AND a.content_hash = :contentHash
-          AND s.status <> 'failed'
-        ORDER BY s.created_at DESC
-        LIMIT 1
-    """)
-    fun findLatestNonFailedByContentHash(userId: UUID, contentHash: String): SubmissionEntity?
-
     @Query("""
         SELECT COUNT(*) FROM submissions
         WHERE user_id = :userId

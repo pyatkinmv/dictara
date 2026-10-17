@@ -1,6 +1,5 @@
 package com.dictara.gateway.service
 
-import com.dictara.gateway.config.DictaraProperties
 import com.dictara.gateway.entity.AudioMetaEntity
 import com.dictara.gateway.entity.SubmissionEntity
 import com.dictara.gateway.entity.TagEntity
@@ -9,7 +8,6 @@ import com.dictara.gateway.util.TranscriptFormatter
 import com.dictara.gateway.plan.PlanService
 import com.dictara.gateway.repository.*
 import com.dictara.gateway.storage.UploadResult
-import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -37,10 +35,7 @@ class SubmissionService(
     private val suggestionService: SuggestionService,
     private val audioRestoreService: AudioRestoreService,
     private val regenerationService: SummaryRegenerationService,
-    private val props: DictaraProperties,
 ) {
-    private val log = LoggerFactory.getLogger(javaClass)
-
     data class CreateResult(val submissionId: UUID, val dedup: Boolean)
 
     data class SubmissionSummary(
@@ -126,15 +121,6 @@ class SubmissionService(
             lockForDedup("audio:$contentHash")
             audioRestoreService.adoptOriginalName(userId, contentHash, originalName)
             audioRestoreService.restore(userId, contentHash, uploadResult.ref.uri)?.let { return CreateResult(it, dedup = true) }
-
-            // TODO(remove-restore-only): temporary, see DictaraProperties.restoreOnly. Only for a real SHA-256 and only
-            // for the user's own finished or running transcription of exactly these bytes; anything else is transcribed.
-            if (props.restoreOnly && SHA256_HEX.matches(contentHash)) {
-                submissionRepo.findLatestNonFailedByContentHash(userId, contentHash)?.let {
-                    log.info("Restore-only mode: {} already has {} for these bytes (sha256={}), not transcribing again", userId, it.id, contentHash)
-                    return CreateResult(it.id!!, dedup = true)
-                }
-            }
 
             lockForDedup(listOf(userId, contentHash, model, languageHint, diarize, numSpeakers ?: 0, summaryMode).joinToString(":"))
 
@@ -366,9 +352,6 @@ class SubmissionService(
 
     private companion object {
         const val DEDUP_LOCK_MAX_ATTEMPTS = 3000
-
-        /** TODO(remove-restore-only) */
-        val SHA256_HEX = Regex("^[0-9a-f]{64}$")
     }
 }
 
