@@ -22,6 +22,23 @@ class AudioRestoreService(
     private val log = LoggerFactory.getLogger(javaClass)
 
     /**
+     * A file sent again under its real name replaces a made-up one. Older uploads from the Telegram bot were stored
+     * under the name of a temporary file (`dictara-7802649983095675646.m4a`) and a voice message has only the bot's
+     * own `audio_1792062859802.oga`; the real name (`20260608_213900.m4a`) usually says when it was recorded. Only the
+     * uploader's own records of this content are renamed, and only those that carry such a made-up name: a name the
+     * user kept is not touched, and neither is anything when the new name is made up as well.
+     */
+    fun adoptOriginalName(userId: UUID, contentHash: String, originalName: String) {
+        if (isMadeUpName(originalName)) return
+        val stale = audioMetaRepo.findByContentHashOrderByCreatedAtAsc(contentHash)
+            .filter { it.userId == userId && isMadeUpName(it.originalName) }
+            .map { it.id }
+        if (stale.isEmpty()) return
+        audioMetaRepo.updateOriginalName(stale, originalName)
+        log.info("Audio name restored: {} record(s) with hash {} are now called {}", stale.size, contentHash, originalName)
+    }
+
+    /**
      * Heals every record that has [contentHash] and a missing file ([freshUri] is the object this upload just
      * created). Returns the user's own latest submission on a healed record, if any: the upload was a re-send of
      * a file whose audio was lost, so it only restores the audio and answers with the transcription that is
@@ -43,5 +60,13 @@ class AudioRestoreService(
 
         val ownDead = dead.filter { it.userId == userId }.map { it.id }
         return if (ownDead.isEmpty()) null else submissionRepo.findLatestNonFailedByAudioIds(ownDead)?.id
+    }
+
+    companion object {
+        /** `dictara-<digits>.<ext>` (a temp file of the old bot) and `audio_<digits>.<ext>` (the bot's name for a
+         *  voice message): they carry no information about the recording. */
+        private val MADE_UP_NAME = Regex("""^(dictara-|audio_)\d+(\.[A-Za-z0-9]+)?$""")
+
+        fun isMadeUpName(name: String) = MADE_UP_NAME.matches(name)
     }
 }

@@ -35,12 +35,12 @@ class AudioRestoreServiceTest : AbstractSharedContextIntegrationTest() {
     private fun newUser() = UUID.randomUUID().also { jdbcTemplate.update("INSERT INTO users(id) VALUES (?)", it) }
 
     /** An audio record and one submission on it; returns (audio id, submission id). */
-    private fun record(owner: UUID, uri: String?, status: String = "done", contentHash: String = hash): Pair<UUID, UUID> {
+    private fun record(owner: UUID, uri: String?, status: String = "done", contentHash: String = hash, name: String = "a.m4a"): Pair<UUID, UUID> {
         val audioId = UUID.randomUUID()
         val submissionId = UUID.randomUUID()
         jdbcTemplate.update(
-            "INSERT INTO audio_meta(id, user_id, original_name, content_type, size_bytes, storage_uri, content_hash) VALUES (?, ?, 'a.m4a', 'audio/mp4', 10, ?, ?)",
-            audioId, owner, uri, contentHash,
+            "INSERT INTO audio_meta(id, user_id, original_name, content_type, size_bytes, storage_uri, content_hash) VALUES (?, ?, ?, 'audio/mp4', 10, ?, ?)",
+            audioId, owner, name, uri, contentHash,
         )
         jdbcTemplate.update(
             "INSERT INTO submissions(id, user_id, audio_id, model, language_hint, diarize, summary_mode, source, status) VALUES (?, ?, ?, 'turbo', 'auto', true, 'auto', 'telegram', ?)",
@@ -48,6 +48,9 @@ class AudioRestoreServiceTest : AbstractSharedContextIntegrationTest() {
         )
         return audioId to submissionId
     }
+
+    private fun nameOf(audioId: UUID) =
+        jdbcTemplate.queryForObject("SELECT original_name FROM audio_meta WHERE id = ?", String::class.java, audioId)
 
     private fun uriOf(audioId: UUID) =
         jdbcTemplate.queryForObject("SELECT storage_uri FROM audio_meta WHERE id = ?", String::class.java, audioId)
@@ -125,5 +128,51 @@ class AudioRestoreServiceTest : AbstractSharedContextIntegrationTest() {
         record(alice, deadUri, contentHash = "someone-else")
 
         assertThat(restore.restore(alice, "brand-new-hash", freshUri)).isNull()
+    }
+
+    @Test
+    fun `a made-up name of the uploader's own record is replaced by the real one, live audio or not`() {
+        val (temp, _) = record(alice, "gs://b/audio/live.m4a", name = "dictara-7802649983095675646.m4a")
+        val (voice, _) = record(alice, deadUri, name = "audio_1792062859802.oga")
+
+        restore.adoptOriginalName(alice, hash, "20260608_213900.m4a")
+
+        assertThat(nameOf(temp)).isEqualTo("20260608_213900.m4a")
+        assertThat(nameOf(voice)).isEqualTo("20260608_213900.m4a")
+    }
+
+    @Test
+    fun `a name the user kept is left alone`() {
+        val (audio, _) = record(alice, "gs://b/audio/live.m4a", name = "Interview with Anna.m4a")
+
+        restore.adoptOriginalName(alice, hash, "20260608_213900.m4a")
+
+        assertThat(nameOf(audio)).isEqualTo("Interview with Anna.m4a")
+    }
+
+    @Test
+    fun `another user's record keeps its name`() {
+        val (bobAudio, _) = record(bob, "gs://b/audio/live.m4a", name = "dictara-123.m4a")
+
+        restore.adoptOriginalName(alice, hash, "20260608_213900.m4a")
+
+        assertThat(nameOf(bobAudio)).isEqualTo("dictara-123.m4a")
+    }
+
+    @Test
+    fun `a new name that is made up as well changes nothing`() {
+        val (audio, _) = record(alice, "gs://b/audio/live.m4a", name = "dictara-123.m4a")
+
+        restore.adoptOriginalName(alice, hash, "dictara-999.m4a")
+
+        assertThat(nameOf(audio)).isEqualTo("dictara-123.m4a")
+    }
+
+    @Test
+    fun `only the made-up shapes count as made up`() {
+        assertThat(listOf("dictara-7802649983095675646.m4a", "dictara-1.oga", "audio_1792062859802.oga", "audio_17")
+            .all { AudioRestoreService.isMadeUpName(it) }).isTrue()
+        assertThat(listOf("20260608_213900.m4a", "audio_2026-09-20_22-32-32.ogg", "dictara-notes.m4a", "my audio_1.m4a", "audio.m4a")
+            .none { AudioRestoreService.isMadeUpName(it) }).isTrue()
     }
 }

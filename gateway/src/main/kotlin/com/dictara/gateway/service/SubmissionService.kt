@@ -119,6 +119,7 @@ class SubmissionService(
             // A re-send of a file whose stored copy is gone only brings the audio back (for every record with this
             // content) and answers with the transcription that exists, whatever options came with it.
             lockForDedup("audio:$contentHash")
+            audioRestoreService.adoptOriginalName(userId, contentHash, originalName)
             audioRestoreService.restore(userId, contentHash, uploadResult.ref.uri)?.let { return CreateResult(it, dedup = true) }
 
             lockForDedup(listOf(userId, contentHash, model, languageHint, diarize, numSpeakers ?: 0, summaryMode).joinToString(":"))
