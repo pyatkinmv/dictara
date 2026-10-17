@@ -65,8 +65,9 @@ class DeduplicationIntegrationTest : AbstractSharedContextIntegrationTest() {
         model: String = "small",
         diarize: Boolean = false,
         summaryMode: String = "off",
+        fileName: String = "audio.m4a",
     ): ResponseEntity<Map<*, *>> {
-        val file = object : ByteArrayResource(ByteArray(8)) { override fun getFilename() = "audio.m4a" }
+        val file = object : ByteArrayResource(ByteArray(8)) { override fun getFilename() = fileName }
         val body = LinkedMultiValueMap<String, Any>().apply { add("file", file) }
         val headers = HttpHeaders().apply { contentType = MediaType.MULTIPART_FORM_DATA }
         @Suppress("UNCHECKED_CAST")
@@ -246,5 +247,28 @@ class DeduplicationIntegrationTest : AbstractSharedContextIntegrationTest() {
         val submission = submissionRepo.findById(jobId(response)).orElseThrow()
         assertThat(audioMetaRepo.findById(submission.audioId).orElseThrow().storageUri).isEqualTo(liveUri)
         awaitTranscriberCalls(1)
+    }
+
+    @Test
+    fun `the same file sent again under its real name replaces the made-up name of the old upload`() {
+        val first = submit(fileName = "dictara-7802649983095675646.m4a")
+        awaitTranscriberCalls(1)
+
+        val second = submit(fileName = "20260608_213900.m4a") // the audio is still there: nothing to restore
+
+        assertThat(second.body!!["dedup"]).isEqualTo(true)
+        assertThat(jobId(second)).isEqualTo(jobId(first))
+        assertThat(audioMetaRepo.findAll().map { it.originalName }).containsOnly("20260608_213900.m4a")
+    }
+
+    @Test
+    fun `a name the user kept is not replaced by a later upload`() {
+        val first = submit(fileName = "Interview with Anna.m4a")
+        awaitTranscriberCalls(1)
+
+        val second = submit(fileName = "20260608_213900.m4a")
+
+        assertThat(jobId(second)).isEqualTo(jobId(first))
+        assertThat(audioMetaRepo.findAll().map { it.originalName }).containsOnly("Interview with Anna.m4a")
     }
 }
