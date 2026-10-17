@@ -43,7 +43,9 @@ A user can forward a whole chat of recordings in one go. Every recording runs on
 
 Without the gate the gateway ran out of memory (`OutOfMemoryError`, 10 in a few minutes for ~50 files) and the local telegram-bot-api container crashed and restarted. Not a bug of the limit, but to keep in mind: Telegram limits what a bot may send (about one message a second to one chat, about 30 a second in all; more gets 429 and, kept up, a pause or a block). Every forwarded file is a "Transcribing…" message, edits of it (at most one every 30 s, `DictaraClient.poll`) and the answer, so a very large forward, or many users, can reach it. Not handled yet.
 
-Tests: `UploadGateTest`, `UploadPipelineTest`, `DictaraClientTest` (a stand-in gateway, `MockWebServer`) and `ForwardedChatTest` (80 recordings at once through the real gate, pipeline and client).
+The name and the extension of a recording come from `AudioNames`, not from the file's path on the Telegram server: the local telegram-bot-api keeps files as `voice/file_1`, `music/file_0` and, after it has crashed and restarted (it did, under a burst of files), without any extension, which gave copies called `….bin` that the gateway refused (29 of 31 recordings one evening). The extension is taken from the path when it has one, else from the name Telegram gave, else from the MIME type, else from what the kind of message always is (voice = `oga`, video note and video = `mp4`, audio = `mp3`).
+
+Tests: `UploadGateTest`, `UploadPipelineTest`, `AudioNamesTest`, `DictaraClientTest` (a stand-in gateway, `MockWebServer`) and `ForwardedChatTest` (80 recordings at once through the real gate, pipeline and client).
 
 ## Model aliases
 

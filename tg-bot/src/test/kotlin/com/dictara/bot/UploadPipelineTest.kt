@@ -21,14 +21,14 @@ class UploadPipelineTest {
     private val downloads = AtomicInteger()
 
     /** A download that makes a real file, as the bot does, named after the hint (or made up when there is none). */
-    private fun fakeDownload(fileId: String, nameHint: String?): Pair<File, String> {
+    private fun fakeDownload(telegramFile: TelegramFile): Pair<File, String> {
         downloads.incrementAndGet()
         val file = File.createTempFile("dictara-", ".m4a", dir)
-        file.writeText("bytes of $fileId")
-        return file to (nameHint ?: "audio_$fileId.oga")
+        file.writeText("bytes of ${telegramFile.fileId}")
+        return file to (telegramFile.nameHint ?: "audio_${telegramFile.fileId}.${telegramFile.defaultExt}")
     }
 
-    private fun pipeline(download: (String, String?) -> Pair<File, String> = ::fakeDownload) = UploadPipeline(gate, download)
+    private fun pipeline(download: (TelegramFile) -> Pair<File, String> = ::fakeDownload) = UploadPipeline(gate, download)
 
     private fun filesLeft() = dir.listFiles()!!.size
 
@@ -39,7 +39,7 @@ class UploadPipelineTest {
 
     @Test
     fun `the gateway step gets the file and the name it was sent with`() {
-        val seen = pipeline().submit("id-1", "20260608_213900.m4a") { file, name ->
+        val seen = pipeline().submit(TelegramFile("id-1", "20260608_213900.m4a")) { file, name ->
             "${file.readText()} / $name"
         }
 
@@ -47,17 +47,27 @@ class UploadPipelineTest {
     }
 
     @Test
-    fun `a recording with no name of its own gets the name the download made up`() {
-        val name = pipeline().submit("id-2", null) { _, n -> n }
+    fun `the download is told everything Telegram said about the file`() {
+        var asked: TelegramFile? = null
+        val telegramFile = TelegramFile("id-8", null, "audio/ogg", "oga")
 
-        assertEquals("audio_id-2.oga", name)
+        pipeline { tf -> asked = tf; fakeDownload(tf) }.submit(telegramFile) { _, _ -> }
+
+        assertEquals(telegramFile, asked)
+    }
+
+    @Test
+    fun `a recording with no name of its own gets the name the download made up`() {
+        val name = pipeline().submit(TelegramFile("id-2", null)) { _, n -> n }
+
+        assertEquals("audio_id-2.mp3", name)
     }
 
     @Test
     fun `the copy is there while the file is being sent and gone as soon as it is sent`() {
         var existedWhileSending = false
 
-        pipeline().submit("id-3", "a.m4a") { file, _ -> existedWhileSending = file.exists() }
+        pipeline().submit(TelegramFile("id-3", "a.m4a")) { file, _ -> existedWhileSending = file.exists() }
 
         assertTrue(existedWhileSending)
         assertEquals(0, filesLeft())
@@ -66,7 +76,7 @@ class UploadPipelineTest {
     @Test
     fun `the copy is deleted and the error comes out when the gateway refuses the file`() {
         val e = assertThrows(PlanLimitException::class.java) {
-            pipeline().submit<Unit>("id-4", "a.m4a") { _, _ -> throw PlanLimitException("Monthly limit reached") }
+            pipeline().submit<Unit>(TelegramFile("id-4", "a.m4a")) { _, _ -> throw PlanLimitException("Monthly limit reached") }
         }
 
         assertEquals("Monthly limit reached", e.message)
@@ -77,9 +87,9 @@ class UploadPipelineTest {
     @Test
     fun `a failed download sends nothing and gives the place back`() {
         val sent = AtomicInteger()
-        val broken = pipeline { _, _ -> throw IOException("telegram-bot-api is down") }
+        val broken = pipeline { _ -> throw IOException("telegram-bot-api is down") }
 
-        assertThrows(IOException::class.java) { broken.submit("id-5", "a.m4a") { _, _ -> sent.incrementAndGet() } }
+        assertThrows(IOException::class.java) { broken.submit(TelegramFile("id-5", "a.m4a")) { _, _ -> sent.incrementAndGet() } }
 
         assertEquals(0, sent.get())
         assertEquals(3, gate.free)
@@ -90,7 +100,7 @@ class UploadPipelineTest {
     fun `the place is kept for the whole download and send, and given back after it`() {
         var freeWhileSending = -1
 
-        pipeline().submit("id-6", "a.m4a") { _, _ -> freeWhileSending = gate.free }
+        pipeline().submit(TelegramFile("id-6", "a.m4a")) { _, _ -> freeWhileSending = gate.free }
 
         assertEquals(2, freeWhileSending)
         assertEquals(3, gate.free)
@@ -99,7 +109,7 @@ class UploadPipelineTest {
     @Test
     fun `waiting for the transcript is not part of it, so a slow transcription does not hold a place`() {
         // what the bot does after submit(): poll for the result. Here it is a long wait done after the place is back.
-        val jobId = pipeline().submit("id-7", "long.m4a") { _, _ -> "job-7" }
+        val jobId = pipeline().submit(TelegramFile("id-7", "long.m4a")) { _, _ -> "job-7" }
 
         assertEquals(3, gate.free)
         assertEquals("job-7", jobId)
@@ -114,7 +124,7 @@ class UploadPipelineTest {
         try {
             val results = (1..50).map { n ->
                 pool.submit<String> {
-                    pipeline().submit("id-$n", "file-$n.m4a") { file, name ->
+                    pipeline().submit(TelegramFile("id-$n", "file-$n.m4a")) { file, name ->
                         peak.accumulateAndGet(inside.incrementAndGet(), ::maxOf)
                         Thread.sleep(10)
                         sentNames.add(name)
@@ -143,7 +153,7 @@ class UploadPipelineTest {
             val outcomes = (1..30).map { n ->
                 pool.submit<Boolean> {
                     try {
-                        pipeline().submit("id-$n", "f$n.m4a") { _, _ -> if (n % 3 == 0) throw RuntimeException("500") else true }
+                        pipeline().submit(TelegramFile("id-$n", "f$n.m4a")) { _, _ -> if (n % 3 == 0) throw RuntimeException("500") else true }
                     } catch (_: RuntimeException) {
                         false
                     }
