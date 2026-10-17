@@ -84,6 +84,8 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       ADMIN_KEY: ${ADMIN_KEY:-}
+      # TODO(remove-restore-only): temporary, off by default. docs/ops/runbook.md, "Restore-only mode"
+      RESTORE_ONLY: ${RESTORE_ONLY:-false}
       SUMMARIZER_PROVIDER: ${SUMMARIZER_PROVIDER:-gemini}
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
       JWT_SECRET: ${JWT_SECRET}

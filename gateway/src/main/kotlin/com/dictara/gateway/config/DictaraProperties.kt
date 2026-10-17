@@ -9,6 +9,13 @@ data class DictaraProperties(
     val storage: StorageProps = StorageProps(),
     val local: LocalProps = LocalProps(),
     val admin: AdminProps = AdminProps(),
+    /**
+     * TODO(remove-restore-only): TEMPORARY, to be deleted when the old audio has been brought back (see
+     * docs/ops/runbook.md, "Restore-only mode"). While it is on, a file whose bytes the user already has a finished
+     * (or running) transcription of is answered with that transcription whatever options come with it, instead of
+     * being transcribed again under other options. A file the user has no such record of is transcribed as usual.
+     */
+    val restoreOnly: Boolean = false,
 ) {
     /**
      * The operator's endpoints (`/admin/...`, see AdminController). They are off while [key] is blank. They are not
