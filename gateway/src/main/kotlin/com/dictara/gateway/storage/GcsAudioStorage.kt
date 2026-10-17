@@ -24,11 +24,20 @@ import java.util.UUID
  *  lifecycle rule that expires them automatically. */
 @Profile("!local")
 @Component
-class GcsAudioStorage(props: DictaraProperties) : AudioStorage {
+class GcsAudioStorage(
+    props: DictaraProperties,
+    private val storage: Storage = StorageOptions.getDefaultInstance().service,
+) : AudioStorage {
 
     private val log = LoggerFactory.getLogger(javaClass)
     private val bucket = props.storage.gcs.bucket
-    private val storage: Storage = StorageOptions.getDefaultInstance().service
+
+    companion object {
+        /** The client reserves this much memory for every upload, however small the file is: its default is 15 MiB,
+         *  and dozens of uploads at once (a user forwarding a whole chat) filled the heap of the 2 GB VM. A multiple of
+         *  256 KiB, as the resumable upload wants. */
+        const val UPLOAD_BUFFER_BYTES = 2 * 1024 * 1024
+    }
 
     /** Uploads [inputStream] to `gs://{bucket}/audio/{audioMetaId}/{fileName}`.
      *  Computes SHA-256 hash of the content in a single streaming pass alongside the upload
@@ -38,7 +47,7 @@ class GcsAudioStorage(props: DictaraProperties) : AudioStorage {
         val digestStream = DigestInputStream(inputStream, digest)
         val objectName = "audio/${LocalDate.now()}/$audioMetaId/$fileName"
         val blobInfo = BlobInfo.newBuilder(BlobId.of(bucket, objectName)).setContentType(contentType).build()
-        storage.createFrom(blobInfo, digestStream)
+        storage.createFrom(blobInfo, digestStream, UPLOAD_BUFFER_BYTES)
         val uri = "gs://$bucket/$objectName"
         val contentHash = digest.digest().joinToString("") { "%02x".format(it) }
         log.info("Uploaded audio to {} ({} bytes, sha256={})", uri, sizeBytes, contentHash)

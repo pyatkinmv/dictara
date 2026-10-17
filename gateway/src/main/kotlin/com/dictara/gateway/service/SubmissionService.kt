@@ -152,13 +152,15 @@ class SubmissionService(
     }
 
     /** Blocks (not just checks) until any other in-flight request with the same [key] has committed — otherwise the
-     *  check and the INSERT in [createSubmission] race it (see tryLockForDedup's doc). The holder only ever does a
-     *  SELECT + INSERT with no external I/O in between, so contention is brief; the cap just turns a pathological
-     *  stuck holder into a clear error instead of a hang. */
+     *  check and the INSERT in [createSubmission] race it (see tryLockForDedup's doc). The holder does a SELECT + INSERT
+     *  and, for the `audio:` key, asks storage whether the old objects still exist, so when dozens of copies of one
+     *  file arrive at once (a user forwarding a chat to the bot) the last ones wait their turn: a minute is allowed
+     *  ([DEDUP_LOCK_MAX_ATTEMPTS] tries 20 ms apart); the cap just turns a stuck holder into a clear error instead of
+     *  a hang. */
     private fun lockForDedup(key: String) {
         var attempts = 0
         while (!submissionRepo.tryLockForDedup(key)) {
-            if (++attempts > 250) throw IllegalStateException("Timed out waiting for the dedup lock ($key)")
+            if (++attempts > DEDUP_LOCK_MAX_ATTEMPTS) throw IllegalStateException("Timed out waiting for the dedup lock ($key)")
             Thread.sleep(20)
         }
     }
@@ -346,6 +348,10 @@ class SubmissionService(
             Instant.now().plusSeconds(minOf(30L shl (attempt - 1), 3600L))
         }
         telegramDeliveryRepo.scheduleRetry(jobId, retryAfterTs)
+    }
+
+    private companion object {
+        const val DEDUP_LOCK_MAX_ATTEMPTS = 3000
     }
 }
 
