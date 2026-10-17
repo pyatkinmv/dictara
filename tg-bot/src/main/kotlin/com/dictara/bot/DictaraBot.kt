@@ -277,13 +277,25 @@ class DictaraBot(
 
         log.debug("Message from userId={} chatId={} type={}", userId, chatId, message.chat.type)
 
-        data class FileInfo(val fileId: String, val nameHint: String?, val fileSize: Long?)
+        data class FileInfo(val file: TelegramFile, val fileSize: Long?)
         val fileInfo = when {
             message.hasAnimation() -> return  // GIFs — silently ignore, no message
-            message.hasAudio() -> FileInfo(message.audio.fileId, message.audio.fileName, message.audio.fileSize?.toLong())
-            message.hasVoice() -> FileInfo(message.voice.fileId, null, message.voice.fileSize?.toLong())
-            message.hasVideoNote() -> FileInfo(message.videoNote.fileId, null, message.videoNote.fileSize?.toLong())
-            message.hasVideo() -> FileInfo(message.video.fileId, message.video.fileName, message.video.fileSize?.toLong())
+            message.hasAudio() -> FileInfo(
+                TelegramFile(message.audio.fileId, message.audio.fileName, message.audio.mimeType, "mp3"),
+                message.audio.fileSize?.toLong(),
+            )
+            message.hasVoice() -> FileInfo(
+                TelegramFile(message.voice.fileId, null, message.voice.mimeType, "oga"),  // a voice message is Ogg Opus
+                message.voice.fileSize?.toLong(),
+            )
+            message.hasVideoNote() -> FileInfo(
+                TelegramFile(message.videoNote.fileId, null, "video/mp4", "mp4"),
+                message.videoNote.fileSize?.toLong(),
+            )
+            message.hasVideo() -> FileInfo(
+                TelegramFile(message.video.fileId, message.video.fileName, message.video.mimeType, "mp4"),
+                message.video.fileSize?.toLong(),
+            )
             message.hasDocument() -> {
                 val doc = message.document
                 val mime = doc.mimeType ?: ""
@@ -293,14 +305,14 @@ class DictaraBot(
                     send(chatId, "Unsupported format: .$ext\nSupported: ${supportedExtensions.sorted().joinToString(", ")}")
                     return
                 }
-                FileInfo(doc.fileId, doc.fileName, doc.fileSize?.toLong())
+                FileInfo(TelegramFile(doc.fileId, doc.fileName, doc.mimeType, ext), doc.fileSize?.toLong())
             }
             else -> {
                 if (!isGroup) send(chatId, "Send me an audio or video file. Use /settings to configure preferences.")
                 return
             }
         }
-        val fileId = fileInfo.fileId
+        val fileId = fileInfo.file.fileId
 
         val prefs = UserSettings.get(chatId)
         val modelLabel = prefs.model.replaceFirstChar { it.uppercase() }
@@ -347,7 +359,7 @@ class DictaraBot(
                         )
                     } catch (_: Exception) {}
                 }
-                val submitted = uploads.submit(fileId, fileInfo.nameHint) { audioTmp, originalName ->
+                val submitted = uploads.submit(fileInfo.file) { audioTmp, originalName ->
                     log.info("Submitting to gateway: chatId={} fileId={} name={} size={}b", chatId, fileId, originalName, audioTmp.length())
                     client.submit(
                         audioTmp, originalName, prefs.model, prefs.diarize,
@@ -446,7 +458,8 @@ class DictaraBot(
         }
     }
 
-    private fun downloadAudioFile(fileId: String, nameHint: String?): Pair<File, String> {
+    private fun downloadAudioFile(telegramFile: TelegramFile): Pair<File, String> {
+        val fileId = telegramFile.fileId
         val maxAttempts = 5
         var delayMs = 2000L
         var lastException: Exception? = null
@@ -460,9 +473,8 @@ class DictaraBot(
                 log.debug("GetFile attempt {}/{}: fileId={}", attempt, maxAttempts, fileId)
                 val tgFile = execute(GetFile().apply { this.fileId = fileId })
                 log.debug("GetFile success: fileId={} localPath={} attempt={}", fileId, tgFile.filePath, attempt)
-                val ext = tgFile.filePath.substringAfterLast('.', "bin")
-                val originalName = nameHint?.takeIf { it.isNotBlank() }
-                    ?: "audio_${System.currentTimeMillis()}.$ext"
+                val ext = AudioNames.extension(tgFile.filePath, telegramFile.nameHint, telegramFile.mimeType, telegramFile.defaultExt)
+                val originalName = AudioNames.displayName(telegramFile.nameHint, ext, System.currentTimeMillis())
                 val audioTmp = Files.createTempFile("dictara-", ".$ext").toFile()
                 val localPath = tgFile.filePath
                 try {

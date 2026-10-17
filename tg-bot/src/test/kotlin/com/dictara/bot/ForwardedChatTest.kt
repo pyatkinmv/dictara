@@ -51,6 +51,9 @@ class ForwardedChatTest {
                     try {
                         Thread.sleep(25) // the upload takes a moment
                         receivedPerName.computeIfAbsent(name) { AtomicInteger() }.incrementAndGet()
+                        if (name.endsWith(".bin")) {
+                            return MockResponse().setResponseCode(400).setBody("""{"message":"Unsupported format: .bin"}""")
+                        }
                         if (name in refused) {
                             return MockResponse().setResponseCode(429).setBody("""{"message":"limit reached"}""")
                         }
@@ -73,10 +76,10 @@ class ForwardedChatTest {
         gateway.start()
         client = DictaraClient(gateway.url("/").toString().trimEnd('/'), pollIntervalMs = 5)
         gate = UploadGate(3)
-        pipeline = UploadPipeline(gate) { fileId, hint ->
+        pipeline = UploadPipeline(gate) { telegramFile ->
             val file = File.createTempFile("dictara-", ".m4a", dir)
-            file.writeText("audio of $fileId")
-            file to (hint ?: "audio_$fileId.oga")
+            file.writeText("audio of ${telegramFile.fileId}")
+            file to (telegramFile.nameHint ?: "audio_${telegramFile.fileId}.oga")
         }
     }
 
@@ -87,7 +90,7 @@ class ForwardedChatTest {
 
     /** What the bot does for one forwarded recording, as far as the gateway is concerned. */
     private fun handle(n: Int): String {
-        val submitted = pipeline.submit("file-$n", "recording-$n.m4a") { file, name ->
+        val submitted = pipeline.submit(TelegramFile("file-$n", "recording-$n.m4a")) { file, name ->
             client.submit(
                 file, name, "turbo", true, SummaryMode.AUTO, "auto", null,
                 telegramUserId = 77, chatId = 1011, telegramMessageId = n.toLong(),
@@ -179,5 +182,37 @@ class ForwardedChatTest {
         } finally {
             pool.shutdownNow()
         }
+    }
+
+    @Test
+    fun `voice messages the Telegram server keeps without an extension are sent as Ogg, not refused as bin`() {
+        // the evening after telegram-bot-api had crashed: its paths were voice/file_1, voice/file_2 ... and the
+        // bot's copies ended in .bin, which the gateway refuses
+        val voicePipeline = UploadPipeline(gate) { telegramFile ->
+            val telegramPath = "/var/lib/telegram-bot-api/1:A/voice/file_${telegramFile.fileId}"
+            val ext = AudioNames.extension(telegramPath, telegramFile.nameHint, telegramFile.mimeType, telegramFile.defaultExt)
+            val file = File.createTempFile("dictara-", ".$ext", dir)
+            file.writeText("voice ${telegramFile.fileId}")
+            file to AudioNames.displayName(telegramFile.nameHint, ext, 1792235614000L + telegramFile.fileId.toLong())
+        }
+        val pool = Executors.newCachedThreadPool()
+        try {
+            val results = (1..30).map { n ->
+                pool.submit<Result<String>> {
+                    runCatching {
+                        val submitted = voicePipeline.submit(TelegramFile("$n", null, "audio/ogg", "oga")) { file, name ->
+                            client.submit(file, name, "turbo", true, SummaryMode.AUTO, "auto", null, telegramUserId = 77, chatId = 1011)
+                        }
+                        client.poll(submitted.jobId, true, SummaryMode.AUTO).text
+                    }
+                }
+            }.map { it.get(60, TimeUnit.SECONDS) }
+
+            assertTrue(results.all { it.isSuccess }, results.filter { it.isFailure }.toString())
+            assertEquals((1..30).map { "transcript of audio_${1792235614000L + it}.oga" }, results.map { it.getOrThrow() })
+        } finally {
+            pool.shutdownNow()
+        }
+        assertEquals(0, dir.listFiles()!!.size)
     }
 }
