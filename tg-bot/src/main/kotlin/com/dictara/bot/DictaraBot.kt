@@ -42,6 +42,10 @@ class DictaraBot(
     private val log = LoggerFactory.getLogger(DictaraBot::class.java)  // rebuild
     private val client = DictaraClient(dictaraUrl)
     private val executor = Executors.newCachedThreadPool()
+
+    /** At most this many recordings are copied from the Telegram server and sent to the gateway at the same moment;
+     *  the rest wait their turn. Waiting for the transcript is not limited. */
+    private val uploads = UploadPipeline(UploadGate(MAX_PARALLEL_UPLOADS), ::downloadAudioFile)
     private val supportedExtensions: Set<String> = client.fetchSupportedExtensions()
 
     private val volumeFilesGauge  = AtomicLong(0).also { registry.gauge("dictara_bot_api_volume_files", it) }
@@ -329,13 +333,23 @@ class DictaraBot(
         log.info("Audio received: fileId={} chatId={} prefs={}/{}/{}/{}", fileId, chatId, prefs.model, if (prefs.diarize) "diarize" else "nodiarize", prefs.language, prefs.summaryMode)
         executor.submit {
             try {
-                val (audioTmp, originalName) = downloadAudioFile(fileId, fileInfo.nameHint)
-                try {
-
-                    // Phase 1: transcribe (with live progress updates)
+                // Phase 1: wait for a place, copy the file and hand it to the gateway — a few files at a time —
+                // then wait for the transcript (with live progress updates), which is not limited
+                val sender = message.from
+                val onProgress: (String) -> Unit = { progressText ->
+                    if (statusMsg != null) try {
+                        execute(
+                            EditMessageText.builder()
+                                .chatId(chatId.toString())
+                                .messageId(statusMsg.messageId)
+                                .text("$baseLabel\n$progressText")
+                                .build()
+                        )
+                    } catch (_: Exception) {}
+                }
+                val submitted = uploads.submit(fileId, fileInfo.nameHint) { audioTmp, originalName ->
                     log.info("Submitting to gateway: chatId={} fileId={} name={} size={}b", chatId, fileId, originalName, audioTmp.length())
-                    val sender = message.from
-                    val result = client.transcribe(
+                    client.submit(
                         audioTmp, originalName, prefs.model, prefs.diarize,
                         prefs.summaryMode,
                         prefs.language, prefs.numSpeakers,
@@ -345,86 +359,77 @@ class DictaraBot(
                         telegramLastName = sender.lastName,
                         chatId = chatId,
                         telegramMessageId = originalMessageId,
-                    ) { progressText ->
-                        if (statusMsg != null) try {
-                            execute(
-                                EditMessageText.builder()
-                                    .chatId(chatId.toString())
-                                    .messageId(statusMsg.messageId)
-                                    .text("$baseLabel\n$progressText")
-                                    .build()
-                            )
-                        } catch (_: Exception) {}
-                    }
+                        onProgress = onProgress,
+                    )
+                }
+                val result = client.poll(submitted.jobId, prefs.diarize, prefs.summaryMode, onProgress)
+                    .copy(dedup = submitted.dedup)
 
-                    log.info("Transcription done: chatId={} jobId={} durationS={}", chatId, result.jobId, result.durationSeconds)
-                    // Phase 2: atomically claim delivery — only the caller that gets claimed=true sends the transcript.
-                    log.info("Inline: acking jobId={}", result.jobId)
-                    val claimed = try { client.ackDelivery(result.jobId) } catch (e: Exception) {
-                        log.error("Inline: ackDelivery failed for jobId={}: {}", result.jobId, e.message, e)
-                        false
-                    }
-                    log.info("Inline: ack result jobId={} claimed={}", result.jobId, claimed)
-                    if (!claimed && !result.dedup) {
-                        log.warn("Inline: delivery already claimed by background poller, skipping send: jobId={} chatId={}", result.jobId, chatId)
-                        if (statusMsg != null) try { execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build()) } catch (_: Exception) {}
-                        return@submit
-                    }
-                    log.info("Inline: sending transcript for jobId={} chatId={} dedup={}", result.jobId, chatId, result.dedup)
-                    val sentMsg = try {
-                        val msg = sendTranscript(chatId, result, originalMessageId)
-                        client.confirmDelivery(result.jobId)
-                        log.info("Inline: transcript sent for jobId={}", result.jobId)
-                        msg
-                    } catch (e: Exception) {
-                        val retryAfterS = (e as? TelegramApiRequestException)?.parameters?.retryAfter?.toLong()
-                        log.error("Inline: send failed jobId={} retryAfterS={}: {}", result.jobId, retryAfterS, e.message, e)
-                        if (retryAfterS != null) {
-                            val url = "$baseUrl/transcript?jobId=${result.jobId}"
-                            try {
-                                send(chatId, "Transcript is ready — download it here: $url", replyToMessageId = originalMessageId)
-                                client.confirmDelivery(result.jobId)
-                                log.info("Inline: delivered as link jobId={}", result.jobId)
-                            } catch (linkEx: Exception) {
-                                log.error("Inline: link send also failed jobId={}: {}", result.jobId, linkEx.message)
-                                if (!result.dedup) try { client.failDelivery(result.jobId, retryAfterS) } catch (ex: Exception) {
-                                    log.error("Inline: could not report failure for jobId={}: {}", result.jobId, ex.message)
-                                }
-                            }
-                        } else {
+                log.info("Transcription done: chatId={} jobId={} durationS={}", chatId, result.jobId, result.durationSeconds)
+                // Phase 2: atomically claim delivery — only the caller that gets claimed=true sends the transcript.
+                log.info("Inline: acking jobId={}", result.jobId)
+                val claimed = try { client.ackDelivery(result.jobId) } catch (e: Exception) {
+                    log.error("Inline: ackDelivery failed for jobId={}: {}", result.jobId, e.message, e)
+                    false
+                }
+                log.info("Inline: ack result jobId={} claimed={}", result.jobId, claimed)
+                if (!claimed && !result.dedup) {
+                    log.warn("Inline: delivery already claimed by background poller, skipping send: jobId={} chatId={}", result.jobId, chatId)
+                    if (statusMsg != null) try { execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build()) } catch (_: Exception) {}
+                    return@submit
+                }
+                log.info("Inline: sending transcript for jobId={} chatId={} dedup={}", result.jobId, chatId, result.dedup)
+                val sentMsg = try {
+                    val msg = sendTranscript(chatId, result, originalMessageId)
+                    client.confirmDelivery(result.jobId)
+                    log.info("Inline: transcript sent for jobId={}", result.jobId)
+                    msg
+                } catch (e: Exception) {
+                    val retryAfterS = (e as? TelegramApiRequestException)?.parameters?.retryAfter?.toLong()
+                    log.error("Inline: send failed jobId={} retryAfterS={}: {}", result.jobId, retryAfterS, e.message, e)
+                    if (retryAfterS != null) {
+                        val url = "$baseUrl/transcript?jobId=${result.jobId}"
+                        try {
+                            send(chatId, "Transcript is ready — download it here: $url", replyToMessageId = originalMessageId)
+                            client.confirmDelivery(result.jobId)
+                            log.info("Inline: delivered as link jobId={}", result.jobId)
+                        } catch (linkEx: Exception) {
+                            log.error("Inline: link send also failed jobId={}: {}", result.jobId, linkEx.message)
                             if (!result.dedup) try { client.failDelivery(result.jobId, retryAfterS) } catch (ex: Exception) {
                                 log.error("Inline: could not report failure for jobId={}: {}", result.jobId, ex.message)
                             }
                         }
-                        return@submit
-                    }
-                    if (statusMsg != null) try {
-                        execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build())
-                    } catch (_: Exception) {}
-
-                    // Phase 3: update caption with summary (already computed by gateway)
-                    if (result.text.isNotBlank() && result.summary != null) {
-                        try {
-                            val doneText = formatDoneText(result.durationSeconds)
-                            val caption = "$doneText\n\n${result.summary}"
-                            if (caption.length <= 1024) {
-                                execute(
-                                    EditMessageCaption.builder()
-                                        .chatId(chatId.toString())
-                                        .messageId(sentMsg.messageId)
-                                        .caption(caption)
-                                        .build()
-                                )
-                            } else {
-                                val truncated = if (result.summary.length > 4096) result.summary.take(4093) + "…" else result.summary
-                                send(chatId, truncated)
-                            }
-                        } catch (e: Exception) {
-                            send(chatId, "Summary failed: ${e.message}")
+                    } else {
+                        if (!result.dedup) try { client.failDelivery(result.jobId, retryAfterS) } catch (ex: Exception) {
+                            log.error("Inline: could not report failure for jobId={}: {}", result.jobId, ex.message)
                         }
                     }
-                } finally {
-                    audioTmp.delete()
+                    return@submit
+                }
+                if (statusMsg != null) try {
+                    execute(DeleteMessage.builder().chatId(chatId.toString()).messageId(statusMsg.messageId).build())
+                } catch (_: Exception) {}
+
+                // Phase 3: update caption with summary (already computed by gateway)
+                if (result.text.isNotBlank() && result.summary != null) {
+                    try {
+                        val doneText = formatDoneText(result.durationSeconds)
+                        val caption = "$doneText\n\n${result.summary}"
+                        if (caption.length <= 1024) {
+                            execute(
+                                EditMessageCaption.builder()
+                                    .chatId(chatId.toString())
+                                    .messageId(sentMsg.messageId)
+                                    .caption(caption)
+                                    .build()
+                            )
+                        } else {
+                            val truncated = if (result.summary.length > 4096) result.summary.take(4093) + "…" else result.summary
+                            send(chatId, truncated)
+                        }
+                    } catch (e: Exception) {
+                        send(chatId, "Summary failed: ${e.message}")
+                    }
                 }
             } catch (e: PlanLimitException) {
                 log.info("Plan limit exceeded: chatId={} error={}", chatId, e.message)
@@ -460,17 +465,22 @@ class DictaraBot(
                     ?: "audio_${System.currentTimeMillis()}.$ext"
                 val audioTmp = Files.createTempFile("dictara-", ".$ext").toFile()
                 val localPath = tgFile.filePath
-                if (fileBaseUrl != "https://api.telegram.org" && localPath.startsWith("/")) {
-                    log.debug("Copying local file: localPath={}", localPath)
-                    File(localPath).inputStream().use { input ->
-                        audioTmp.outputStream().use { input.copyTo(it) }
-                    }
-                    log.debug("File copied: localPath={} size={}b", localPath, audioTmp.length())
-                } else {
-                    URL("$fileBaseUrl/file/bot$token/${localPath.trimStart('/')}")
-                        .openStream().use { input ->
+                try {
+                    if (fileBaseUrl != "https://api.telegram.org" && localPath.startsWith("/")) {
+                        log.debug("Copying local file: localPath={}", localPath)
+                        File(localPath).inputStream().use { input ->
                             audioTmp.outputStream().use { input.copyTo(it) }
                         }
+                        log.debug("File copied: localPath={} size={}b", localPath, audioTmp.length())
+                    } else {
+                        URL("$fileBaseUrl/file/bot$token/${localPath.trimStart('/')}")
+                            .openStream().use { input ->
+                                audioTmp.outputStream().use { input.copyTo(it) }
+                            }
+                    }
+                } catch (e: Exception) {
+                    audioTmp.delete()  // a half-copied file would stay on the disk, and the next attempt makes a new one
+                    throw e
                 }
                 return Pair(audioTmp, originalName)
             } catch (e: Exception) {
@@ -713,4 +723,9 @@ class DictaraBot(
         execute(SendMessage.builder().chatId(chatId.toString()).text(text)
             .apply { if (replyToMessageId != null) replyToMessageId(replyToMessageId.toInt()) }
             .build())
+
+    private companion object {
+        /** Recordings copied and sent to the gateway at the same moment, see [uploads]. */
+        const val MAX_PARALLEL_UPLOADS = 3
+    }
 }

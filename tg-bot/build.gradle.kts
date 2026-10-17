@@ -18,6 +18,7 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     runtimeOnly("ch.qos.logback:logback-classic:1.5.6")
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

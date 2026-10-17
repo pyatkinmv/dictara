@@ -271,4 +271,31 @@ class DeduplicationIntegrationTest : AbstractSharedContextIntegrationTest() {
         assertThat(jobId(second)).isEqualTo(jobId(first))
         assertThat(audioMetaRepo.findAll().map { it.originalName }).containsOnly("Interview with Anna.m4a")
     }
+
+    @Test
+    fun `thirty copies of one file sent at once all get an answer and make one transcription`() {
+        // A user forwarding a whole chat of recordings to the bot sends the same file again and again within seconds.
+        // Every copy has to be answered (the dedup lock used to give up after five seconds), and none may start
+        // a second transcription.
+        val barrier = CyclicBarrier(30)
+        val pool = Executors.newFixedThreadPool(30)
+        try {
+            val futures = List(30) {
+                pool.submit<ResponseEntity<Map<*, *>>> {
+                    barrier.await(20, TimeUnit.SECONDS)
+                    submit(fileName = "copy-$it.m4a")
+                }
+            }
+            val results = futures.map { it.get(90, TimeUnit.SECONDS) }
+
+            assertThat(results.map { it.statusCode }).containsOnly(HttpStatus.ACCEPTED)
+            assertThat(results.map { jobId(it) }.toSet()).describedAs("one submission for all of them").hasSize(1)
+            assertThat(results.count { it.body!!["dedup"] == false }).describedAs("only the first is new").isEqualTo(1)
+            assertThat(submissionRepo.count()).isEqualTo(1L)
+            awaitTranscriberCalls(1)
+            wireMock.verify(1, postRequestedFor(urlPathEqualTo("/transcribe")))
+        } finally {
+            pool.shutdown()
+        }
+    }
 }

@@ -44,6 +44,9 @@ data class DictaraProperties(
 
     data class StorageProps(
         val gcs: GcsProps = GcsProps(),
+        /** How many files may be on their way to storage at once. Every upload holds a buffer in memory; the 2 GB
+         *  VM could not take dozens of them when a user forwarded a whole chat of recordings to the bot. The rest wait. */
+        val maxConcurrentUploads: Int = 4,
     )
 
     data class GcsProps(

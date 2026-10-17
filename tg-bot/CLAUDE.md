@@ -37,6 +37,14 @@ Web login flow:
 | `build.gradle.kts` | Kotlin + telegrambots + shadow JAR plugin |
 | `Dockerfile` | Multi-stage: Gradle build → eclipse-temurin JRE slim |
 
+## Many files at once
+
+A user can forward a whole chat of recordings in one go. Every recording runs on its own thread (`DictaraBot`'s cached pool), and its life is: copy the file from the local telegram-bot-api (`downloadAudioFile`) → send it to the gateway (`DictaraClient.submit`) → wait for the transcript (`DictaraClient.poll`, every 5 s, up to hours) → answer. Only the first two steps are heavy (disk, memory, bandwidth, and in the gateway a buffer per upload), so `UploadPipeline` runs them through an `UploadGate` of 3 places (`DictaraBot.MAX_PARALLEL_UPLOADS`, a fair semaphore): the others wait for their turn, in the order they came, then copy and send. The copy is deleted as soon as the gateway has taken the file, not after the transcript. Waiting for the transcript is not limited (the gateway transcribes one file at a time anyway and shows "Waiting in queue... Position: N"). The "⏳ Transcribing…" message is sent at once for every file, before the wait, and a file that waits for a place keeps that text.
+
+Without the gate the gateway ran out of memory (`OutOfMemoryError`, 10 in a few minutes for ~50 files) and the local telegram-bot-api container crashed and restarted. Not a bug of the limit, but to keep in mind: Telegram limits what a bot may send (about one message a second to one chat, about 30 a second in all; more gets 429 and, kept up, a pause or a block). Every forwarded file is a "Transcribing…" message, edits of it (at most one every 30 s, `DictaraClient.poll`) and the answer, so a very large forward, or many users, can reach it. Not handled yet.
+
+Tests: `UploadGateTest`, `UploadPipelineTest`, `DictaraClientTest` (a stand-in gateway, `MockWebServer`) and `ForwardedChatTest` (80 recordings at once through the real gate, pipeline and client).
+
 ## Model aliases
 
 | Bot alias | API model |

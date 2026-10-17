@@ -22,9 +22,13 @@ data class TranscriptResult(
     val dedup: Boolean = false,
 )
 
-private data class SubmitResult(val jobId: String, val dedup: Boolean)
+data class SubmitResult(val jobId: String, val dedup: Boolean)
 
-class DictaraClient(private val baseUrl: String) {
+/**
+ * [pollIntervalMs] is how long to wait between two looks at a job (and the first pause before a failed submit is
+ * tried again); a failing server makes the pause longer, up to five minutes.
+ */
+class DictaraClient(private val baseUrl: String, private val pollIntervalMs: Long = 5_000L) {
     private val log = LoggerFactory.getLogger(DictaraClient::class.java)
     private val http = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -181,6 +185,7 @@ class DictaraClient(private val baseUrl: String) {
         setOf("mp3", "mp4", "m4a", "wav", "ogg", "oga", "opus", "flac", "webm", "mkv", "avi", "mov")
     }
 
+    /** Sends the file and waits for the transcript: [submit] and then [poll]. */
     fun transcribe(
         audioFile: File,
         originalName: String,
@@ -197,28 +202,33 @@ class DictaraClient(private val baseUrl: String) {
         telegramMessageId: Long? = null,
         onProgress: ((String) -> Unit)? = null,
     ): TranscriptResult {
-        val submitResult = submitWithRetry(audioFile, originalName, model, diarize, summaryMode, language, numSpeakers,
+        val submitResult = submit(audioFile, originalName, model, diarize, summaryMode, language, numSpeakers,
             telegramUserId, telegramUsername, telegramFirstName, telegramLastName, chatId, telegramMessageId, onProgress)
-        return pollJob(submitResult.jobId, diarize, summaryMode, onProgress).copy(dedup = submitResult.dedup)
+        return poll(submitResult.jobId, diarize, summaryMode, onProgress).copy(dedup = submitResult.dedup)
     }
 
-    private fun submitWithRetry(
+    /**
+     * Sends the file to the gateway and returns once the gateway has taken it (the job id, and whether it was a
+     * repeat of a file already transcribed). A gateway that cannot be reached is tried again for ten minutes;
+     * a refusal (limit reached, file too large, anything the gateway answers with an error) is not.
+     */
+    fun submit(
         audioFile: File,
         originalName: String,
         model: String,
         diarize: Boolean,
-        summaryMode: SummaryMode,
-        language: String,
-        numSpeakers: Int?,
+        summaryMode: SummaryMode = SummaryMode.AUTO,
+        language: String = "auto",
+        numSpeakers: Int? = null,
         telegramUserId: Long,
-        telegramUsername: String?,
-        telegramFirstName: String?,
-        telegramLastName: String?,
+        telegramUsername: String? = null,
+        telegramFirstName: String? = null,
+        telegramLastName: String? = null,
         chatId: Long,
-        telegramMessageId: Long?,
-        onProgress: ((String) -> Unit)?,
+        telegramMessageId: Long? = null,
+        onProgress: ((String) -> Unit)? = null,
     ): SubmitResult {
-        var pollInterval = 5_000L
+        var pollInterval = pollIntervalMs
         val failureStart = System.currentTimeMillis()
         while (true) {
             try {
@@ -294,14 +304,15 @@ class DictaraClient(private val baseUrl: String) {
         )
     }
 
-    private fun pollJob(
+    /** Waits until the gateway has the transcript of [jobId], telling [onProgress] how far it is. */
+    fun poll(
         jobId: String,
         diarize: Boolean,
         summaryMode: SummaryMode,
         onProgress: ((String) -> Unit)? = null,
     ): TranscriptResult {
         val deadline = System.currentTimeMillis() + 8 * 60 * 60 * 1000L
-        var pollInterval = 5_000L
+        var pollInterval = pollIntervalMs
         var failureStartMs: Long? = null
         // Rate-limit EditMessageText: only update on phase transitions or every 30 s within a phase.
         // Prevents Telegram flood-lock (429) when many files are submitted in parallel.
@@ -324,7 +335,7 @@ class DictaraClient(private val baseUrl: String) {
                 val root = mapper.readTree(response.body?.string() ?: "{}")
                 // Successful response — reset backoff
                 failureStartMs = null
-                pollInterval = 5_000L
+                pollInterval = pollIntervalMs
                 when (root["status"]?.asText()) {
                     "pending" -> {
                         val pos = root["queue_position"]?.takeIf { !it.isNull }?.asInt()
