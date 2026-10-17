@@ -73,4 +73,6 @@ dictara:
       bucket: ${GCS_UPLOADS_BUCKET:}
   admin:
     key: ${ADMIN_KEY:}
+  # TODO(remove-restore-only): temporary, see docs/ops/runbook.md ("Restore-only mode")
+  restore-only: ${RESTORE_ONLY:false}
 
