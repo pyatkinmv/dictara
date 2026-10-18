@@ -49,18 +49,6 @@ eanalyze.ps1 -Action dryrun -UserId <uuid> -IdsFile ids10.txt`: which ids are el
 
 At most 300 ids a call. Logs: `{service="gateway"} |= "Backlog reanalysis"`; each run is also a row in `job_runs` (`reanalyze_backlog`).
 
-## Restore-only mode (TEMPORARY - remove it afterwards)
-
-Why: most of the old audio was deleted from the bucket. Sending the original file to the bot again brings the audio back to the existing records. But a second send of a file whose audio is already back is an ordinary upload with the bot's *current* options (diarization on), which differ from those of the old record, so a **new transcription** (an hour of GPU, a duplicate in the library) was started. With `RESTORE_ONLY=true` a file whose exact bytes the user already has a finished or running transcription of is answered with it, whatever the options; a file with no such record is transcribed as usual.
-
-Switch on: add `RESTORE_ONLY=true` to `.env` on the VM, `docker compose up -d gateway`; the gateway logs "RESTORE_ONLY is ON" at start. Switch off: remove the line (or `false`), `docker compose up -d gateway`.
-
-**To remove when the old audio is back (do not leave it):**
-1. `RESTORE_ONLY` out of `.env` on the VM and the gateway restarted.
-2. `grep -r "remove-restore-only" .` and delete everything it finds: `DictaraProperties.restoreOnly`, the `restore-only` line in `application.yaml`, `RESTORE_ONLY` in `docker-compose.yml`, the block in `SubmissionService.createSubmission` (and `SHA256_HEX`), `SubmissionRepository.findLatestNonFailedByContentHash`, `RestoreOnlyModeWarning`, `RestoreOnlyModeIntegrationTest`, `RestoreOnlyExpiryTest`.
-3. The `RESTORE_ONLY` row in `CLAUDE.md`, the paragraph in `gateway/CLAUDE.md` and this section.
-4. `RestoreOnlyExpiryTest` fails the build after **2026-12-01** as a reminder; if the mode is still needed then, say why in the commit and move the date, otherwise remove it as above.
-
 ## Health checks (read-only)
 
 ```bash
