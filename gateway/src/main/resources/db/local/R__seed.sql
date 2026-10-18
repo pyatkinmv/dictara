@@ -53,6 +53,16 @@ ON CONFLICT (id) DO UPDATE SET
     original_name = EXCLUDED.original_name, content_type = EXCLUDED.content_type, size_bytes = EXCLUDED.size_bytes,
     duration_s = EXCLUDED.duration_s, created_at = EXCLUDED.created_at;
 
+-- When the recordings were made (not uploaded): some far before the upload, one on the same day, and three with
+-- no known time at all, so that the list, the Overview tab and the "recorded" sorts can be tried.
+UPDATE audio_meta am SET recorded_at = r.recorded_at, recorded_at_source = r.source
+FROM (VALUES
+    (0, '2025-06-20 09:12:00+00'::timestamptz, 'metadata'),
+    (2, '2025-03-04 10:30:00+00'::timestamptz, 'metadata'),
+    (5, '2025-06-19 06:00:00+00'::timestamptz, 'filename')
+) AS r(n, recorded_at, source)
+WHERE am.id = ('00000000-0000-4000-8000-0000000a00' || lpad(r.n::text, 2, '0'))::uuid;
+
 INSERT INTO submissions (id, user_id, audio_id, model, language_hint, diarize, summary_mode, source, status, created_at, updated_at)
 SELECT ('00000000-0000-4000-8000-0000000b00' || lpad(n::text, 2, '0'))::uuid,
        '00000000-0000-4000-8000-000000000001',

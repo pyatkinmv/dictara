@@ -50,6 +50,7 @@ class TranscriptionListFieldsIntegrationTest : AbstractSharedContextIntegrationT
         durationS: Double? = null,
         segments: String? = null,
         transcript: Boolean = segments != null,
+        recordedAt: Instant? = null,
     ): UUID {
         val audioId = UUID.randomUUID()
         val id = UUID.randomUUID()
@@ -58,6 +59,12 @@ class TranscriptionListFieldsIntegrationTest : AbstractSharedContextIntegrationT
             "INSERT INTO audio_meta(id, user_id, original_name, content_type, size_bytes, storage_uri, content_hash, duration_s) VALUES (?, ?, ?, 'audio/mp4', 1000, ?, ?, ?)",
             audioId, userId, name, "gs://test/$name", "hash-$audioId", durationS,
         )
+        if (recordedAt != null) {
+            jdbcTemplate.update(
+                "UPDATE audio_meta SET recorded_at = ?, recorded_at_source = 'metadata' WHERE id = ?",
+                java.sql.Timestamp.from(recordedAt), audioId,
+            )
+        }
         jdbcTemplate.update(
             "INSERT INTO submissions(id, user_id, audio_id, model, language_hint, diarize, summary_mode, source, status, created_at) VALUES (?, ?, ?, 'fast', 'auto', false, 'off', 'web', ?, ?)",
             id, userId, audioId, status, createdAt,
@@ -93,6 +100,37 @@ class TranscriptionListFieldsIntegrationTest : AbstractSharedContextIntegrationT
 
         assertThat(found["known.mp3"]!!["audio_duration_s"].asDouble()).isEqualTo(862.0)
         assertThat(found["unknown.mp3"]!!.has("audio_duration_s")).isFalse()
+    }
+
+    // ── When the recording was made ────────────────────────────────────────────
+
+    @Test
+    fun `the time of the recording is reported when the file says it, and left out otherwise`() {
+        addSubmission("dated.m4a", recordedAt = Instant.parse("2025-04-09T09:46:52Z"))
+        addSubmission("undated.m4a")
+
+        val found = items()
+
+        assertThat(found["dated.m4a"]!!["recorded_at"].asText()).isEqualTo("2025-04-09T09:46:52Z")
+        assertThat(found["undated.m4a"]!!.has("recorded_at")).isFalse()
+    }
+
+    @Test
+    fun `the list can be ordered by the time of the recording, with the upload time for those that have none`() {
+        // uploaded in this order (a minute apart): old.m4a, none.m4a, recent.m4a
+        addSubmission("old.m4a", recordedAt = Instant.parse("2024-01-01T00:00:00Z"))
+        addSubmission("none.m4a")
+        addSubmission("recent.m4a", recordedAt = Instant.parse("2026-01-01T10:30:00Z"))
+
+        fun names(sort: String): List<String> {
+            val headers = HttpHeaders().apply { setBearerAuth(jwt.issue(userId)) }
+            val body = rest.exchange("/transcriptions?page=0&size=50&sort=$sort", HttpMethod.GET, HttpEntity<Void>(headers), String::class.java).body
+            return json.readTree(body)["items"].map { it["file_name"].asText() }
+        }
+
+        assertThat(names("recorded_newest")).containsExactly("recent.m4a", "none.m4a", "old.m4a")
+        assertThat(names("recorded_oldest")).containsExactly("old.m4a", "none.m4a", "recent.m4a")
+        assertThat(names("newest")).containsExactly("recent.m4a", "none.m4a", "old.m4a")
     }
 
     // ── Speakers ───────────────────────────────────────────────────────────────

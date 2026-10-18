@@ -95,6 +95,16 @@ def _get_duration(wav_path: str) -> float:
     return float(result.stdout.strip())
 
 
+def _container_tags(fmt: dict, audio_stream: dict) -> dict:
+    """The tags of the container; when it keeps its `creation_time` on the audio stream instead of the format
+    (some recorders and muxers do), take it from there, so the recording date is not lost."""
+    tags = dict(fmt.get("tags") or {})
+    stream_time = (audio_stream.get("tags") or {}).get("creation_time")
+    if "creation_time" not in tags and stream_time:
+        tags["creation_time"] = stream_time
+    return tags
+
+
 def _probe_metadata(path: str) -> dict | None:
     """The container's own facts about the file — codec, bit rate, sample rate, channels, and whatever tags
     it carries (many recorders write a `creation_time`, the actual recording date, distinct from the upload
@@ -116,7 +126,7 @@ def _probe_metadata(path: str) -> dict | None:
         "codec": audio_stream.get("codec_name"),
         "sample_rate": int(audio_stream["sample_rate"]) if audio_stream.get("sample_rate") else None,
         "channels": audio_stream.get("channels"),
-        "tags": fmt.get("tags", {}),
+        "tags": _container_tags(fmt, audio_stream),
     }
     return metadata if any(v not in (None, {}) for v in metadata.values()) else None
 

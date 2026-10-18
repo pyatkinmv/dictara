@@ -46,7 +46,7 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
           'status': [for (final s in TranscriptionStatus.values) if (query.statuses.contains(s)) s.name],
         if (tags.isNotEmpty) 'tag': tags,
         if (speakers.isNotEmpty) 'speaker': speakers,
-        if (query.sort != TranscriptionSort.newest) 'sort': query.sort.name,
+        if (query.sort != TranscriptionSort.newest) 'sort': _sortParam(query.sort),
       },
     ).toString();
   }
@@ -300,6 +300,16 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
   }
 }
 
+/// The value of `sort=` for [sort]: the gateway writes the recorded ones in snake case.
+String _sortParam(TranscriptionSort sort) => switch (sort) {
+  TranscriptionSort.recordedNewest => 'recorded_newest',
+  TranscriptionSort.recordedOldest => 'recorded_oldest',
+  _ => sort.name,
+};
+
+/// A time the gateway may leave out (`recorded_at`), in the viewer's own zone; null when absent.
+DateTime? _timeFromJson(Object? value) => value is String ? DateTime.parse(value).toLocal() : null;
+
 /// One entry of the gateway's `GET /transcriptions`. Length, speakers and progress are optional there: they
 /// appear as the transcription gets far enough.
 Transcription _transcriptionFromJson(Map<String, dynamic> json) {
@@ -308,6 +318,7 @@ Transcription _transcriptionFromJson(Map<String, dynamic> json) {
     id: json['job_id'] as String,
     title: title == null || title.isEmpty ? json['file_name'] as String : title,
     uploadedAt: DateTime.parse(json['created_at'] as String).toLocal(),
+    recordedAt: _timeFromJson(json['recorded_at']),
     status: _statusFromJson(json['status'] as String?),
     duration: _secondsFromJson(json['audio_duration_s']),
     speakerCount: (json['speaker_count'] as num?)?.toInt() ?? 0,
@@ -337,6 +348,7 @@ TranscriptionDetail _detailFromJson(Map<String, dynamic> json) {
       id: json['job_id'] as String,
       title: title == null || title.isEmpty ? fileName : title,
       uploadedAt: DateTime.parse(json['created_at'] as String).toLocal(),
+      recordedAt: _timeFromJson(json['recorded_at']),
       status: _statusFromJson(json['status'] as String?),
       duration: _secondsFromJson(json['audio_duration_s']),
       speakerCount: {for (final s in segments) if (s.speakerSlot != null) s.speakerSlot}.length,

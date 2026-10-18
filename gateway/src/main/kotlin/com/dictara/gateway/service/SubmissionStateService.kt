@@ -19,6 +19,7 @@ class SubmissionStateService(
     private val summaryRepo: SummaryRepository,
     private val audioMetaRepo: AudioMetaRepository,
     private val segmentQueries: TranscriptSegmentQueries,
+    private val recordedAt: RecordedAt,
 ) {
     // Plain, unconfigured: the JSON kept in transcripts.segments must stay exactly what it always was.
     private val jsonMapper = ObjectMapper().registerKotlinModule()
@@ -87,7 +88,10 @@ class SubmissionStateService(
         ))
         segmentQueries.insertAll(transcript.id!!, segments)
         audioMetaRepo.updateDurationS(audioId, audioDurationS)
-        if (audioMetadata != null) audioMetaRepo.updateMetadata(audioId, audioMetadata)
+        if (audioMetadata != null) {
+            audioMetaRepo.updateMetadata(audioId, audioMetadata)
+            recordedAt.setFromMetadata(audioId, audioMetadata)
+        }
         val attempt = stageAttemptRepo.findById(attemptId).orElseThrow()
         attempt.status = "done"
         attempt.finishedAt = Instant.now()

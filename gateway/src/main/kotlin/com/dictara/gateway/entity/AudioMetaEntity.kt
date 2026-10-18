@@ -23,6 +23,10 @@ class AudioMetaEntity(
      *  transcriber's `ffprobe` found on the original file; opaque here, just stored. Null until the
      *  transcription finishes, or when nothing useful was found. */
     var metadata: JsonNode? = null,
+    /** When the recording was made (see [RecordedAt]); null when nothing tells it. */
+    var recordedAt: Instant? = null,
+    /** Where [recordedAt] came from: `metadata`, `filename` or `manual`. */
+    var recordedAtSource: String? = null,
 ) : Persistable<UUID> {
     @Transient var _isNew: Boolean = false
     override fun getId(): UUID = id

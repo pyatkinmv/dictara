@@ -480,8 +480,11 @@ class _SortDropdown extends StatelessWidget {
   const _SortDropdown();
 
   static const _options = <TranscriptionSort, (String option, String button)>{
-    TranscriptionSort.newest: ('Newest first', 'Sort'),
-    TranscriptionSort.oldest: ('Oldest first', 'Oldest first'),
+    // "Uploaded" is when the file was sent to Dictara, "recorded" when the recording was made (where the file says).
+    TranscriptionSort.newest: ('Newest uploaded', 'Sort'),
+    TranscriptionSort.oldest: ('Oldest uploaded', 'Oldest uploaded'),
+    TranscriptionSort.recordedNewest: ('Newest recorded', 'Newest recorded'),
+    TranscriptionSort.recordedOldest: ('Oldest recorded', 'Oldest recorded'),
     TranscriptionSort.longest: ('Longest', 'Longest'),
     TranscriptionSort.name: ('Name A→Z', 'A→Z'),
   };

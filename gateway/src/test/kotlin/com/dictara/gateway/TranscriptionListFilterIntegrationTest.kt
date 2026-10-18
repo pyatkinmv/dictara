@@ -416,6 +416,15 @@ class TranscriptionListFilterIntegrationTest : AbstractSharedContextIntegrationT
     fun `an unknown sort is refused`() {
         assertThat(status("sort" to "random")).isEqualTo(HttpStatus.BAD_REQUEST)
         assertThat(status("sort" to "NEWEST")).isEqualTo(HttpStatus.BAD_REQUEST)
+        // The recorded ones go by their snake_case names only.
+        assertThat(status("sort" to "recordedNewest")).isEqualTo(HttpStatus.BAD_REQUEST)
+        assertThat(status("sort" to "recorded-oldest")).isEqualTo(HttpStatus.BAD_REQUEST)
+    }
+
+    @Test
+    fun `the sorts by recording date are accepted`() {
+        assertThat(status("sort" to "recorded_newest")).isEqualTo(HttpStatus.OK)
+        assertThat(status("sort" to "recorded_oldest")).isEqualTo(HttpStatus.OK)
     }
 
     // ── Together, and with pages ───────────────────────────────────────────────

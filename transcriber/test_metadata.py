@@ -60,3 +60,22 @@ def test_a_container_with_no_tags_still_reports_its_technical_facts():
 
     assert metadata["tags"] == {}
     assert metadata["codec"] == "aac"
+
+
+def test_creation_time_kept_on_the_audio_stream_is_used_when_the_format_has_none():
+    output = _ffprobe_output(stream_extra={"tags": {"creation_time": "2026-06-22T14:41:00.000000Z"}})
+    with _run_with(output):
+        metadata = _probe_metadata("/tmp/stream-tagged.m4a")
+
+    assert metadata["tags"] == {"creation_time": "2026-06-22T14:41:00.000000Z"}
+
+
+def test_the_format_creation_time_wins_over_the_stream_one():
+    output = _ffprobe_output(
+        fmt_extra={"tags": {"creation_time": "2026-06-22T14:41:00.000000Z", "title": "memo"}},
+        stream_extra={"tags": {"creation_time": "2020-01-01T00:00:00.000000Z"}},
+    )
+    with _run_with(output):
+        metadata = _probe_metadata("/tmp/both.m4a")
+
+    assert metadata["tags"] == {"creation_time": "2026-06-22T14:41:00.000000Z", "title": "memo"}

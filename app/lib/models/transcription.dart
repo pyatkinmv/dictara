@@ -12,6 +12,7 @@ class Transcription {
     required this.title,
     this.duration,
     required this.uploadedAt,
+    this.recordedAt,
     required this.status,
     this.processingPct,
     this.processingPhase,
@@ -25,6 +26,10 @@ class Transcription {
   /// Null when the source does not know it (the gateway sends it once the audio has been transcribed).
   final Duration? duration;
   final DateTime uploadedAt;
+
+  /// When the recording was made, if the file says so (the container's own time or a date in its name);
+  /// null when nothing tells it. Not the same as [uploadedAt], which can be months later.
+  final DateTime? recordedAt;
   final TranscriptionStatus status;
 
   /// Percent of the audio transcribed so far. Only while [status] is [TranscriptionStatus.processing]
@@ -42,6 +47,7 @@ class Transcription {
       title: title ?? this.title,
       duration: duration,
       uploadedAt: uploadedAt,
+      recordedAt: recordedAt,
       status: status,
       processingPct: processingPct,
       processingPhase: processingPhase,

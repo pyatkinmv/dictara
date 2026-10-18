@@ -147,6 +147,38 @@ class PersistenceIntegrationTest : AbstractSharedContextIntegrationTest() {
         assertThat(audioMeta.metadata!!["bit_rate"].asInt()).isEqualTo(128000)
         assertThat(audioMeta.metadata!!["codec"].asText()).isEqualTo("aac")
         assertThat(audioMeta.metadata!!["tags"]["creation_time"].asText()).isEqualTo("2026-06-22T14:41:00.000000Z")
+        assertThat(audioMeta.recordedAt).isEqualTo(java.time.Instant.parse("2026-06-22T14:41:00Z"))
+        assertThat(audioMeta.recordedAtSource).isEqualTo("metadata")
+    }
+
+    @Test
+    fun `a date in the file name is kept as the time of the recording until the container says better`() {
+        wireMock.stubFor(post(urlPathEqualTo("/transcribe"))
+            .willReturn(okJson("""{"job_id":"persist-name-1"}""")))
+        wireMock.stubFor(get(urlEqualTo("/jobs/persist-name-1"))
+            .willReturn(okJson("""
+                {"status":"done","duration_s":1.5,
+                 "result":{"formatted_text":"Hello.","audio_duration_s":5.0,"language":"en",
+                           "segments":[{"start":0.0,"end":2.0,"text":"Hello."}]}}
+            """)))
+        val named = object : ByteArrayResource(ByteArray(8)) {
+            override fun getFilename() = "20260608_213900.m4a"
+        }
+        val body = LinkedMultiValueMap<String, Any>().apply { add("file", named) }
+        val headers = HttpHeaders().apply { contentType = MediaType.MULTIPART_FORM_DATA }
+        val jobId = UUID.fromString(
+            rest.postForEntity(
+                "/transcribe?model=fast&diarize=false&summary_mode=off",
+                HttpEntity(body, headers), Map::class.java,
+            ).body!!["job_id"] as String
+        )
+        waitForStatus(jobId, "done")
+
+        val audioMeta = audioMetaRepo.findById(submissionRepo.findById(jobId).orElseThrow().audioId).orElseThrow()
+
+        // 21:39:00 read as Asia/Dubai (the default zone for names) is 17:39:00 UTC; the answer had no metadata to override it
+        assertThat(audioMeta.recordedAt).isEqualTo(java.time.Instant.parse("2026-06-08T17:39:00Z"))
+        assertThat(audioMeta.recordedAtSource).isEqualTo("filename")
     }
 
     @Test

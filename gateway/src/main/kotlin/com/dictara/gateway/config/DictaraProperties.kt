@@ -9,6 +9,7 @@ data class DictaraProperties(
     val storage: StorageProps = StorageProps(),
     val local: LocalProps = LocalProps(),
     val admin: AdminProps = AdminProps(),
+    val recordedAt: RecordedAtProps = RecordedAtProps(),
 ) {
     /**
      * The operator's endpoints (`/admin/...`, see AdminController). They are off while [key] is blank. They are not
@@ -40,6 +41,12 @@ data class DictaraProperties(
     data class GeminiProps(
         val apiKey: String = "",
         val model: String = "gemini-2.5-flash",
+    )
+
+    data class RecordedAtProps(
+        /** The zone in which a time written in a file name (`20260608_213900.m4a`) is read; the container's own
+         *  creation_time is UTC and does not need it. Only a fallback, so a rough value is enough. */
+        val nameZone: String = "Asia/Dubai",
     )
 
     data class StorageProps(

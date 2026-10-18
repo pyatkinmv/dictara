@@ -10,7 +10,11 @@ enum class ListSort(val param: String) {
     LONGEST("longest"),
 
     /** By the title shown in the list, without regard to case. */
-    NAME("name");
+    NAME("name"),
+
+    /** By when the recording was made, newest first; a recording whose time is not known counts as made when it was uploaded. */
+    RECORDED_NEWEST("recorded_newest"),
+    RECORDED_OLDEST("recorded_oldest");
 
     companion object {
         fun parse(value: String): ListSort? = entries.firstOrNull { it.param == value }

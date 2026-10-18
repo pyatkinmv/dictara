@@ -123,12 +123,17 @@ const _seedSuggestions = Suggestions(
   speakers: {1: _alexei, 2: _maria, 3: _james},
 );
 
+/// The year of the demo data is the current one, so that its dates are shown without a year (as the app does
+/// for this year) whatever year the tests run in; a recording made in the year before shows its year.
+final _year = DateTime.now().year;
+
 List<Transcription> _seedItems() => [
       Transcription(
         id: '0',
         title: 'Quarterly Review Meeting',
         duration: const Duration(minutes: 14, seconds: 22),
-        uploadedAt: DateTime(2025, 6, 22, 14, 41),
+        uploadedAt: DateTime(_year, 6, 22, 14, 41),
+        recordedAt: DateTime(_year, 6, 20, 9, 12),
         status: TranscriptionStatus.done,
         tags: const [_meeting, _quarterly],
         speakerCount: 3,
@@ -137,7 +142,7 @@ List<Transcription> _seedItems() => [
         id: '1',
         title: 'Economics Lecture — Part 2',
         duration: const Duration(minutes: 72),
-        uploadedAt: DateTime(2025, 6, 22, 11, 5),
+        uploadedAt: DateTime(_year, 6, 22, 11, 5),
         status: TranscriptionStatus.processing,
         processingPct: 41,
       ),
@@ -145,7 +150,8 @@ List<Transcription> _seedItems() => [
         id: '2',
         title: 'Interview: Anna K.',
         duration: const Duration(minutes: 47),
-        uploadedAt: DateTime(2025, 6, 21, 16, 20),
+        uploadedAt: DateTime(_year, 6, 21, 16, 20),
+        recordedAt: DateTime(_year - 1, 3, 4, 10, 30),
         status: TranscriptionStatus.done,
         tags: const [_interview, _hiring],
         speakerCount: 2,
@@ -154,14 +160,14 @@ List<Transcription> _seedItems() => [
         id: '3',
         title: 'Podcast Episode #47',
         duration: const Duration(minutes: 38),
-        uploadedAt: DateTime(2025, 6, 22, 9, 30),
+        uploadedAt: DateTime(_year, 6, 22, 9, 30),
         status: TranscriptionStatus.pending,
       ),
       Transcription(
         id: '4',
         title: 'Product Ideas — Voice Memo',
         duration: const Duration(minutes: 12),
-        uploadedAt: DateTime(2025, 6, 20, 18, 2),
+        uploadedAt: DateTime(_year, 6, 20, 18, 2),
         status: TranscriptionStatus.done,
         tags: const [_ideas],
       ),
@@ -169,7 +175,7 @@ List<Transcription> _seedItems() => [
         id: '5',
         title: 'Daily Standup 19 Jun',
         duration: const Duration(minutes: 8),
-        uploadedAt: DateTime(2025, 6, 19, 10, 0),
+        uploadedAt: DateTime(_year, 6, 19, 10, 0),
         status: TranscriptionStatus.done,
         tags: const [_meeting, _standup],
         speakerCount: 3,
@@ -178,7 +184,7 @@ List<Transcription> _seedItems() => [
         id: '6',
         title: 'product_sync_2025_06_23.mp4',
         duration: const Duration(minutes: 34),
-        uploadedAt: DateTime(2025, 6, 23, 13, 15),
+        uploadedAt: DateTime(_year, 6, 23, 13, 15),
         status: TranscriptionStatus.done,
         speakerCount: 3,
       ),
@@ -346,6 +352,8 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   /// The mock hands out numeric ids (creation order), which the server would not.
   int _order(Transcription item) => int.parse(item.id);
 
+  DateTime _recordedOrUploaded(Transcription item) => item.recordedAt ?? item.uploadedAt;
+
   /// Who actually speaks in transcription [id] right now, the same resolution `presentSpeakers` uses on the
   /// detail page (a phrase's own mark, else its voice's confirmed speaker, else its "Speaker N" placeholder,
   /// which can never match a filter since it is not a library name). Empty before there is a transcript to
@@ -376,6 +384,10 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
         items.sort((a, b) => _order(b).compareTo(_order(a)));
       case TranscriptionSort.oldest:
         items.sort((a, b) => _order(a).compareTo(_order(b)));
+      case TranscriptionSort.recordedNewest:
+        items.sort((a, b) => _recordedOrUploaded(b).compareTo(_recordedOrUploaded(a)));
+      case TranscriptionSort.recordedOldest:
+        items.sort((a, b) => _recordedOrUploaded(a).compareTo(_recordedOrUploaded(b)));
       case TranscriptionSort.longest:
         items.sort((a, b) => (b.duration ?? Duration.zero).compareTo(a.duration ?? Duration.zero));
       case TranscriptionSort.name:
@@ -757,7 +769,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   void finishRegeneration(String id, String summary) {
     _regenerating.remove(id);
     _regenerationsUsed[id] = (_regenerationsUsed[id] ?? 0) + 1;
-    _regeneratedAt[id] = DateTime(2025, 6, 24, 10, 0);
+    _regeneratedAt[id] = DateTime(_year, 6, 24, 10, 0);
     _summaries[id] = summary;
   }
 

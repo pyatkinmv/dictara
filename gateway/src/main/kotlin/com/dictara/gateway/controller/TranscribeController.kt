@@ -245,6 +245,8 @@ class TranscribeController(
         val fileName: String,
         val title: String,
         val createdAt: String,
+        /** When the recording was made, if the file says; absent otherwise. */
+        val recordedAt: String? = null,
         val status: String,
         val tags: List<T>,
         /** Seconds of audio; absent until the transcriber has finished. */
@@ -275,7 +277,8 @@ class TranscribeController(
      *    comma is not a separator);
      *  - `speaker`: any of these library speaker names actually speak in the transcript; repeat the parameter
      *    for several;
-     *  - `sort`: `newest` (default), `oldest`, `longest` or `name`.
+     *  - `sort`: `newest` (default, by upload time), `oldest`, `recorded_newest`, `recorded_oldest` (by when the
+     *    recording was made, else by upload time), `longest` or `name`.
      * An unknown status or sort is a 400 rather than being ignored, so a typo does not quietly return the
      * wrong list.
      */
@@ -291,7 +294,7 @@ class TranscribeController(
             ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
         fun <T> summary(it: SubmissionService.SubmissionSummary, tag: (TagRef) -> T) =
             TranscriptionSummary(
-                it.jobId.toString(), it.fileName, it.title, it.createdAt, it.status, it.tags.map(tag),
+                it.jobId.toString(), it.fileName, it.title, it.createdAt, it.recordedAt, it.status, it.tags.map(tag),
                 it.audioDurationS, it.speakerCount, it.processingPct, it.processingPhase,
             )
 

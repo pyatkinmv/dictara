@@ -46,6 +46,23 @@ void main() {
           'Daily Standup 19 Jun');
     });
 
+    test('sorts by the recording date, and a recording with no date counts by its upload time', () async {
+      const newestRecorded = [
+        'product_sync_2025_06_23.mp4', // no date: uploaded 23 Jun
+        'Economics Lecture — Part 2', // no date: uploaded 22 Jun 11:05
+        'Podcast Episode #47', // no date: uploaded 22 Jun 09:30
+        'Product Ideas — Voice Memo', // no date: uploaded 20 Jun 18:02
+        'Quarterly Review Meeting', // recorded 20 Jun 09:12 (uploaded two days later)
+        'Daily Standup 19 Jun', // no date: uploaded 19 Jun
+        'Interview: Anna K.', // recorded the year before (uploaded in June)
+      ];
+      expect(await titles(const TranscriptionQuery(sort: TranscriptionSort.recordedNewest)), newestRecorded);
+      expect(
+        await titles(const TranscriptionQuery(sort: TranscriptionSort.recordedOldest)),
+        newestRecorded.reversed.toList(),
+      );
+    });
+
     test('search is case-insensitive and matches the title', () async {
       expect(await titles(const TranscriptionQuery(search: 'STANDUP')), ['Daily Standup 19 Jun']);
     });
@@ -280,12 +297,77 @@ void main() {
       expect(find.text('Longest'), findsNWidgets(2)); // option + button
     });
 
+    testWidgets('the sort menu offers upload and recording dates, then length and name', (tester) async {
+      await open(tester);
+      await tester.tap(find.text('Sort'));
+      await settle(tester);
+
+      final labels = ['Newest uploaded', 'Oldest uploaded', 'Newest recorded', 'Oldest recorded', 'Longest', 'Name A→Z'];
+      for (final label in labels) {
+        expect(find.text(label), findsOneWidget, reason: label);
+      }
+      final tops = [for (final label in labels) tester.getTopLeft(find.text(label)).dy];
+      expect(tops, [...tops]..sort(), reason: 'in this order, one under the other');
+    });
+
+    testWidgets('sorting by the recording date reorders the list and names the button', (tester) async {
+      await open(tester);
+      await tester.tap(find.text('Sort'));
+      await settle(tester);
+      await tester.tap(find.text('Newest recorded'));
+      await settle(tester);
+
+      expect(visibleTitles(tester).last, 'Interview: Anna K.'); // recorded the year before
+      expect(visibleTitles(tester).indexOf('Quarterly Review Meeting'), 4); // recorded 20 Jun, uploaded 22 Jun
+      expect(find.text('Newest recorded'), findsNWidgets(2)); // option + button
+    });
+
+    testWidgets('a row shows both dates, and the words do not change with the sort', (tester) async {
+      await open(tester);
+      Finder inRow(String title, Finder what) =>
+          find.descendant(of: find.widgetWithText(TranscriptionRow, title), matching: what);
+
+      // Quarterly Review: uploaded 22 Jun, recorded 20 Jun.
+      expect(inRow('Quarterly Review Meeting', find.text('22 Jun')), findsOneWidget);
+      expect(inRow('Quarterly Review Meeting', find.text('20 Jun')), findsOneWidget);
+      expect(inRow('Quarterly Review Meeting', find.byIcon(Icons.cloud_upload_outlined)), findsOneWidget);
+      expect(inRow('Quarterly Review Meeting', find.byIcon(Icons.mic_none_rounded)), findsOneWidget);
+
+      await tester.tap(find.text('Sort'));
+      await settle(tester);
+      await tester.tap(find.text('Oldest recorded'));
+      await settle(tester);
+
+      expect(inRow('Quarterly Review Meeting', find.text('22 Jun')), findsOneWidget);
+      expect(inRow('Quarterly Review Meeting', find.text('20 Jun')), findsOneWidget);
+    });
+
+    testWidgets('a row without a recording date has the upload date only; an older recording shows its year', (tester) async {
+      await open(tester);
+      Finder inRow(String title, Finder what) =>
+          find.descendant(of: find.widgetWithText(TranscriptionRow, title), matching: what);
+
+      expect(inRow('Product Ideas — Voice Memo', find.byIcon(Icons.cloud_upload_outlined)), findsOneWidget);
+      expect(inRow('Product Ideas — Voice Memo', find.byIcon(Icons.mic_none_rounded)), findsNothing);
+
+      final year = DateTime.now().year - 1;
+      expect(inRow('Interview: Anna K.', find.text('21 Jun')), findsOneWidget); // uploaded this year: no year
+      expect(inRow('Interview: Anna K.', find.text('4 Mar $year')), findsOneWidget);
+    });
+
+    testWidgets('hovering a date tells the full time and which date it is', (tester) async {
+      await open(tester);
+
+      expect(find.byTooltip('Uploaded 22 Jun · 14:41'), findsOneWidget);
+      expect(find.byTooltip('Recorded 20 Jun · 09:12'), findsOneWidget);
+    });
+
     testWidgets('sort panel stays inside the window', (tester) async {
       await open(tester);
       await tester.tap(find.text('Sort'));
       await settle(tester);
 
-      expect(tester.getRect(find.text('Newest first')).right, lessThanOrEqualTo(1280));
+      expect(tester.getRect(find.text('Newest uploaded')).right, lessThanOrEqualTo(1280));
       expect(tester.getRect(find.text('Name A→Z')).left, greaterThan(0));
     });
 

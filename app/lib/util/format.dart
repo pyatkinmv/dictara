@@ -17,13 +17,17 @@ String formatTimestamp(Duration d) {
 
 const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-/// "22 Jun".
-String formatDay(DateTime d) => '${d.day} ${_months[d.month - 1]}';
+/// "22 Jun", and "22 Jun 2025" when the year is not the current one (recordings are often months or years
+/// older than the upload, so a day alone would be ambiguous). [now] is for tests.
+String formatDay(DateTime d, {DateTime? now}) {
+  final base = '${d.day} ${_months[d.month - 1]}';
+  return d.year == (now ?? DateTime.now()).year ? base : '$base ${d.year}';
+}
 
-/// "22 Jun · 14:41".
-String formatDayTime(DateTime d) {
+/// "22 Jun · 14:41" (with the year when it is not the current one).
+String formatDayTime(DateTime d, {DateTime? now}) {
   String two(int n) => n.toString().padLeft(2, '0');
-  return '${formatDay(d)} · ${two(d.hour)}:${two(d.minute)}';
+  return '${formatDay(d, now: now)} · ${two(d.hour)}:${two(d.minute)}';
 }
 
 /// "1,840".

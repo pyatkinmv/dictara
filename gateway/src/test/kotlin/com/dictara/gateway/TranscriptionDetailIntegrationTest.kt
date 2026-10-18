@@ -81,6 +81,19 @@ class TranscriptionDetailIntegrationTest : AbstractSharedContextIntegrationTest(
     ]"""
 
     @Test
+    fun `the detail says when the recording was made if the file tells it, and says nothing otherwise`() {
+        val dated = addSubmission(name = "20250409_124652.m4a", segments = twoSpeakers)
+        jdbcTemplate.update(
+            "UPDATE audio_meta SET recorded_at = ?, recorded_at_source = 'filename' WHERE id = (SELECT audio_id FROM submissions WHERE id = ?)",
+            java.sql.Timestamp.from(java.time.Instant.parse("2025-04-09T08:46:52Z")), dated,
+        )
+        val undated = addSubmission(name = "memo.m4a", segments = twoSpeakers)
+
+        assertThat(get(dated).second!!["recorded_at"].asText()).isEqualTo("2025-04-09T08:46:52Z")
+        assertThat(get(undated).second!!.has("recorded_at")).isFalse()
+    }
+
+    @Test
     fun `a finished transcription comes with its facts, segments, summary and tags`() {
         val id = addSubmission(name = "review.m4a", segments = twoSpeakers, title = "Quarterly Review", summary = "**Key points**\n* one")
         jdbcTemplate.update("INSERT INTO tags(id, user_id, name) VALUES (?, ?, 'meeting')", UUID.randomUUID(), userId)

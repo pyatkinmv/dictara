@@ -35,6 +35,7 @@ class SubmissionService(
     private val suggestionService: SuggestionService,
     private val audioRestoreService: AudioRestoreService,
     private val regenerationService: SummaryRegenerationService,
+    private val recordedAt: RecordedAt,
 ) {
     data class CreateResult(val submissionId: UUID, val dedup: Boolean)
 
@@ -43,6 +44,8 @@ class SubmissionService(
         val fileName: String,
         val title: String,
         val createdAt: String,
+        /** When the recording was made, if the file says (the container's time or a date in its name); else null. */
+        val recordedAt: String? = null,
         val status: String,
         val tags: List<TagRef>,
         /** Length of the audio; known once the transcriber has finished. */
@@ -71,6 +74,8 @@ class SubmissionService(
         val title: String,
         val fileSizeBytes: Long,
         val createdAt: String,
+        /** When the recording was made, if the file says; null otherwise. */
+        val recordedAt: String? = null,
         val status: String,
         val audioDurationS: Double?,
         val language: String?,
@@ -135,6 +140,7 @@ class SubmissionService(
             contentType = contentType, sizeBytes = sizeBytes,
             storageUri = uploadResult.ref.uri, contentHash = contentHash,
         ).apply { _isNew = true })
+        recordedAt.setFromFileName(audio.id, originalName)
         val submission = submissionRepo.save(SubmissionEntity(
             userId = userId, audioId = audio.id, model = model, languageHint = languageHint,
             diarize = diarize, numSpeakers = numSpeakers, summaryMode = summaryMode, source = source,
@@ -216,6 +222,7 @@ class SubmissionService(
                 fileName = fileName,
                 title = transcript?.title ?: fileName,
                 createdAt = s.createdAt.toString(),
+                recordedAt = audio?.recordedAt?.toString(),
                 status = s.status,
                 tags = (tagsByTranscriptId[transcript?.transcriptId] ?: emptyList()).sortedBy { it.label },
                 audioDurationS = audio?.durationS,
@@ -247,6 +254,7 @@ class SubmissionService(
             title = transcript?.title?.takeIf { it.isNotBlank() } ?: fileName,
             fileSizeBytes = audio?.sizeBytes ?: 0,
             createdAt = submission.createdAt.toString(),
+            recordedAt = audio?.recordedAt?.toString(),
             status = submission.status,
             audioDurationS = audio?.durationS,
             language = transcript?.detectedLanguage,

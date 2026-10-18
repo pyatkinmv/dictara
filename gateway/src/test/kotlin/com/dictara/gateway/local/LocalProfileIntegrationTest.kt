@@ -126,6 +126,17 @@ class LocalProfileIntegrationTest {
     }
 
     @Test
+    fun `the seed has recording dates for some transcriptions and none for the rest`() {
+        val byName = get("/transcriptions?page=0&size=50")["items"].associateBy { it["file_name"].asText() }
+
+        assertThat(byName["quarterly_review_2025-06-22.m4a"]!!["recorded_at"].asText()).startsWith("2025-06-20T09:12")
+        assertThat(byName["interview_anna_k.mp3"]!!["recorded_at"].asText()).startsWith("2025-03-04T10:30")
+        // Unknown is left out, not sent as null.
+        assertThat(byName["voice_memo_2025-06-20.m4a"]!!.has("recorded_at")).isFalse()
+        assertThat(byName["broken_recording.mp3"]!!.has("recorded_at")).isFalse()
+    }
+
+    @Test
     fun `the seed gives the speaker library of the design, with usage from the voices`() {
         val speakers = get("/speakers")["speakers"].associateBy { it["name"].asText() }
 

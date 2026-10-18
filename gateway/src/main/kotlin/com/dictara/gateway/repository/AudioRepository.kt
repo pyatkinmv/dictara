@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.data.jdbc.repository.query.Modifying
 import org.springframework.data.jdbc.repository.query.Query
 import org.springframework.data.repository.CrudRepository
+import java.time.Instant
 import java.util.UUID
 
 interface AudioMetaRepository : CrudRepository<AudioMetaEntity, UUID> {
@@ -47,4 +48,19 @@ interface AudioMetaRepository : CrudRepository<AudioMetaEntity, UUID> {
     @Query("UPDATE audio_meta SET metadata = :metadata WHERE id = :id")
     fun updateMetadata(id: UUID, metadata: JsonNode?)
 
+    /** A date from the file name never replaces a better source (the container's own time, or a manual value). */
+    @Modifying
+    @Query("""
+        UPDATE audio_meta SET recorded_at = :at, recorded_at_source = 'filename'
+        WHERE id = :id AND (recorded_at_source IS NULL OR recorded_at_source = 'filename')
+    """)
+    fun updateRecordedAtFromFileName(id: UUID, at: Instant)
+
+    /** The container's creation_time wins over a date from the name, and over nothing; not over a manual value. */
+    @Modifying
+    @Query("""
+        UPDATE audio_meta SET recorded_at = :at, recorded_at_source = 'metadata'
+        WHERE id = :id AND (recorded_at_source IS NULL OR recorded_at_source IN ('filename', 'metadata'))
+    """)
+    fun updateRecordedAtFromMetadata(id: UUID, at: Instant)
 }

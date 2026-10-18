@@ -254,8 +254,16 @@ class _DetailsPanel extends StatelessWidget {
         label: 'Words',
       ),
       _DetailChip(icon: Icons.storage_rounded, value: formatFileSize(detail.fileSizeBytes), label: 'File size'),
+      // Only when the file says when it was recorded; otherwise there is no such fact to show.
+      if (item.recordedAt != null)
+        _DetailChip(
+          icon: Icons.mic_none_rounded,
+          value: formatDayTime(item.recordedAt!),
+          label: 'Recorded',
+          valueSize: 12,
+        ),
       _DetailChip(
-        icon: Icons.calendar_today_rounded,
+        icon: Icons.cloud_upload_outlined,
         value: formatDayTime(item.uploadedAt),
         label: 'Uploaded',
         valueSize: 12,
