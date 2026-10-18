@@ -94,6 +94,7 @@ class _TagsPageState extends State<TagsPage> {
               onEdit: () => _openForm(entry),
               onDelete: () => _delete(entry),
               onViewRest: () => _viewInTranscriptions(entry),
+              onOpen: (id) => context.go('/transcriptions/$id'),
             ),
           ),
       ],
@@ -108,6 +109,7 @@ class _TagCardContent extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onViewRest,
+    required this.onOpen,
   });
 
   final TagEntry entry;
@@ -115,6 +117,7 @@ class _TagCardContent extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onViewRest;
+  final ValueChanged<String> onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -145,7 +148,8 @@ class _TagCardContent extends StatelessWidget {
         CardUsage(
           countLabel: '${entry.count} file${entry.count == 1 ? '' : 's'}',
           totalCount: entry.count,
-          titles: entry.transcriptions,
+          transcriptions: entry.transcriptions,
+          onOpen: onOpen,
           onViewRest: onViewRest,
         ),
       ],

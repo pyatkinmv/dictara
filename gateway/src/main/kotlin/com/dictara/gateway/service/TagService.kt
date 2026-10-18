@@ -1,5 +1,6 @@
 package com.dictara.gateway.service
 
+import com.dictara.gateway.repository.LibrarySample
 import com.dictara.gateway.entity.TagEntity
 import com.dictara.gateway.repository.SubmissionRepository
 import com.dictara.gateway.repository.TagLibraryQueries
@@ -66,9 +67,12 @@ class TagService(
         val label: String,
         val description: String?,
         val transcriptionCount: Int,
-        /** The titles of the latest transcriptions that carry the tag, newest first. */
-        val sampleTitles: List<String>,
+        /** The latest finished transcriptions carry the tag, newest first: id to open it and the title to show. */
+        val samples: List<LibrarySample>,
     ) {
+        /** The same titles alone, for clients that only show them. */
+        val sampleTitles: List<String> get() = samples.map { it.title }
+
         val color: String get() = NameColors.of(label)
     }
 
@@ -77,7 +81,7 @@ class TagService(
     @Transactional(readOnly = true)
     fun library(userId: UUID): Library = Library(
         tags = libraryQueries.findLibrary(userId, SAMPLE_TITLES).map {
-            LibraryEntry(it.id, it.name, it.description, it.transcriptionCount, it.sampleTitles)
+            LibraryEntry(it.id, it.name, it.description, it.transcriptionCount, it.samples)
         },
         taggedTranscriptions = libraryQueries.countTaggedTranscriptions(userId),
     )

@@ -1,4 +1,5 @@
 import 'tag.dart';
+import 'transcription_link.dart';
 
 /// A tag of the library as the Tags page shows it: the tag itself, what it is
 /// for and where it is used.
@@ -11,9 +12,10 @@ class TagEntry {
   /// What the tag is for; the AI uses it to tag new transcriptions.
   final String description;
 
-  /// Titles of the transcriptions that carry the tag: only the latest couple, newest first, so the card does
-  /// not depend on how many transcriptions there are ([count] has the total).
-  final List<String> transcriptions;
+  /// The finished transcriptions that carry the tag, to open from the card: only the latest couple, newest
+  /// first, so the card does not depend on how many transcriptions there are ([count] has the total, which
+  /// also counts those still being made, so it can be more than this list says).
+  final List<TranscriptionLink> transcriptions;
 
   final int? _count;
 

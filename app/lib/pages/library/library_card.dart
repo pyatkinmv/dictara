@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../models/transcription_link.dart';
 import '../../theme/app_palette.dart';
 
 /// A card of the Tags/Speakers grid (`.card`): white, rounded, lifts a little
@@ -143,19 +144,30 @@ class CardDescription extends StatelessWidget {
 /// The rule, the "N files" line and the chips of linked transcriptions at the
 /// bottom of a card (`.card-divider`, `.card-stat`, `.card-files`).
 class CardUsage extends StatelessWidget {
-  const CardUsage({super.key, required this.countLabel, required this.totalCount, required this.titles, this.onViewRest});
+  const CardUsage({
+    super.key,
+    required this.countLabel,
+    required this.totalCount,
+    required this.transcriptions,
+    this.onOpen,
+    this.onViewRest,
+  });
 
   /// "3 files" / "2 transcriptions".
   final String countLabel;
 
   /// How many transcriptions actually carry this tag/speaker — the real total, which can be more than
-  /// [titles].length: the gateway only ever sends the latest couple of sample titles, so the "+N more" chip
-  /// must count from this, never from titles.length (that undercounts whenever the gateway's own cap is at
-  /// or below what is shown here).
+  /// [transcriptions].length: the gateway only ever sends the latest couple of finished ones, so the "+N more"
+  /// chip must count from this, never from the length of the list (that undercounts whenever the gateway's own
+  /// cap is at or below what is shown here, and ignores those still being made).
   final int totalCount;
 
-  /// Titles of the linked transcriptions the gateway sent (already capped); the first two are shown as chips.
-  final List<String> titles;
+  /// The linked transcriptions the gateway sent (finished ones, already capped); the first two are shown as chips.
+  final List<TranscriptionLink> transcriptions;
+
+  /// Opens a transcription by its id when its chip is pressed; null leaves the chips as plain labels (used only
+  /// where a test has no navigation to exercise).
+  final ValueChanged<String>? onOpen;
 
   /// Opens the Transcriptions list filtered to just this tag/speaker; null hides the "+N more" chip's link
   /// (still shown as plain text) — used only where a test has no navigation to exercise.
@@ -166,7 +178,7 @@ class CardUsage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final rest = totalCount - titles.length;
+    final rest = totalCount - transcriptions.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -184,14 +196,16 @@ class CardUsage extends StatelessWidget {
             ],
           ),
         ),
-        if (titles.isEmpty)
+        // Nothing is shown when it is used only by transcriptions that are not finished yet: there is no page to open.
+        if (totalCount == 0)
           Text('Not used yet', style: TextStyle(fontSize: 11, color: p.text3, fontStyle: FontStyle.italic))
         else
           Wrap(
             spacing: 4,
             runSpacing: 4,
             children: [
-              for (final title in titles.take(_shown)) _FileChip(title),
+              for (final link in transcriptions.take(_shown))
+                _FileChip(link.title, onTap: onOpen == null ? null : () => onOpen!(link.id)),
               if (rest > 0) _MoreChip(rest, onTap: onViewRest),
             ],
           ),
@@ -201,9 +215,12 @@ class CardUsage extends StatelessWidget {
 }
 
 class _FileChip extends StatefulWidget {
-  const _FileChip(this.title);
+  const _FileChip(this.title, {this.onTap});
 
   final String title;
+
+  /// Opens the transcription; with none the chip is only a label (no hand cursor).
+  final VoidCallback? onTap;
 
   @override
   State<_FileChip> createState() => _FileChipState();
@@ -215,9 +232,10 @@ class _FileChipState extends State<_FileChip> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return Tooltip(
+    final chip = Tooltip(
       message: widget.title,
       child: MouseRegion(
+        cursor: widget.onTap == null ? MouseCursor.defer : SystemMouseCursors.click,
         onEnter: (_) => setState(() => _hover = true),
         onExit: (_) => setState(() => _hover = false),
         child: Container(
@@ -238,6 +256,7 @@ class _FileChipState extends State<_FileChip> {
         ),
       ),
     );
+    return widget.onTap == null ? chip : GestureDetector(onTap: widget.onTap, child: chip);
   }
 }
 

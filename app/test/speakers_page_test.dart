@@ -24,12 +24,12 @@ void main() {
         expect(entries.keys, ['Alexei Sorokin', 'Maria Chen', 'James Wright']);
         // Slots 1-3 in the three-speaker recordings, slots 1-2 in the interview: 3 and 2 uses, but the
         // sample titles are capped to the latest two, newest first (count carries the true total).
-        expect(entries['Alexei Sorokin']!.transcriptions, [
+        expect(entries['Alexei Sorokin']!.transcriptions.map((t) => t.title), [
           'Daily Standup 19 Jun',
           'Interview: Anna K.',
         ]);
         expect(entries['Alexei Sorokin']!.count, 3);
-        expect(entries['James Wright']!.transcriptions, [
+        expect(entries['James Wright']!.transcriptions.map((t) => t.title), [
           'Daily Standup 19 Jun',
           'Quarterly Review Meeting',
         ]);
@@ -54,7 +54,7 @@ void main() {
       final maria = (await repo.speakerLibrary()).firstWhere(
         (e) => e.speaker.name == 'Maria Chen',
       );
-      expect(maria.transcriptions, contains('Product Ideas — Voice Memo'));
+      expect(maria.transcriptions.map((t) => t.title), contains('Product Ideas — Voice Memo'));
     });
 
     test(
@@ -213,6 +213,16 @@ void main() {
         expect(find.text('+1 more →'), findsNWidgets(2));
       },
     );
+
+    testWidgets('a transcription chip opens that transcription on the same page', (tester) async {
+      await openSpeakers(tester);
+
+      await tester.tap(find.text('Interview: Anna K.').first);
+      await settle(tester);
+
+      expect(find.text('Add speaker'), findsNothing); // left the Speakers page
+      expect(find.text('Overview'), findsOneWidget); // the transcription page
+    });
 
     testWidgets('tapping "+N more" jumps to Transcriptions filtered to just that speaker', (tester) async {
       await openSpeakers(tester); // Alexei Sorokin already has 3 uses in the seed

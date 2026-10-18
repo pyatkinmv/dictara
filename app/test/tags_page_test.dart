@@ -19,9 +19,9 @@ void main() {
 
       expect(entries.keys, ['meeting', 'quarterly', 'interview', 'hiring', 'ideas', 'standup']);
       // Newest first (count has the true total, separate from how many sample titles are shown).
-      expect(entries['meeting']!.transcriptions, ['Daily Standup 19 Jun', 'Quarterly Review Meeting']);
+      expect(entries['meeting']!.transcriptions.map((t) => t.title), ['Daily Standup 19 Jun', 'Quarterly Review Meeting']);
       expect(entries['meeting']!.count, 2);
-      expect(entries['quarterly']!.transcriptions, ['Quarterly Review Meeting']);
+      expect(entries['quarterly']!.transcriptions.map((t) => t.title), ['Quarterly Review Meeting']);
       expect(entries['meeting']!.description, startsWith('Regular team meetings'));
     });
 
@@ -45,7 +45,7 @@ void main() {
       final sync = library.firstWhere((e) => e.tag.label == 'sync');
       expect(sync.tag.color, const Color(0xFF2563EB));
       expect(sync.description, 'New text');
-      expect(sync.transcriptions, ['Daily Standup 19 Jun', 'Quarterly Review Meeting']);
+      expect(sync.transcriptions.map((t) => t.title), ['Daily Standup 19 Jun', 'Quarterly Review Meeting']);
       expect(library.any((e) => e.tag.label == 'meeting'), isFalse);
       expect((await repo.get('0'))!.item.tags.map((t) => t.label), ['sync', 'quarterly']);
       expect((await repo.tags()).map((t) => t.label), contains('sync'));
@@ -114,6 +114,42 @@ void main() {
       expect(find.text('Daily Standup 19 Jun'), findsNWidgets(2)); // meeting + standup cards
       expect(find.text('Product Ideas — Voice Memo'), findsNWidgets(2)); // meeting + ideas cards
       expect(find.text('Quarterly Review Meeting'), findsOneWidget); // its own card title only
+    });
+
+    testWidgets('a transcription chip opens that transcription on the same page, and has a hand cursor', (tester) async {
+      await openTags(tester);
+
+      final chip = find.text('Interview: Anna K.').first; // the interview card
+      final regions = tester.widgetList<MouseRegion>(find.ancestor(of: chip, matching: find.byType(MouseRegion)));
+      expect(regions.any((r) => r.cursor == SystemMouseCursors.click), isTrue);
+
+      await tester.tap(chip);
+      await settle(tester);
+
+      expect(find.text('Add tag'), findsNothing); // left the Tags page
+      expect(find.text('Overview'), findsOneWidget); // the transcription page
+      expect(find.text('Interview: Anna K.'), findsWidgets);
+    });
+
+    testWidgets('a transcription that is not finished is counted but has no chip', (tester) async {
+      final repo = FakeTranscriptionRepository();
+      await repo.addTag('1', 'meeting'); // Economics Lecture is still processing, and the newest of the three
+      await openTags(tester, repo: repo);
+
+      expect(find.text('3 files'), findsOneWidget);
+      expect(find.text('Economics Lecture — Part 2'), findsNothing);
+      expect(find.text('+1 more →'), findsOneWidget);
+    });
+
+    testWidgets('a tag used only by transcriptions still being made shows its count and no chips, not "Not used yet"', (tester) async {
+      final repo = FakeTranscriptionRepository();
+      await repo.addTag('1', 'solo');
+      await openTags(tester, repo: repo);
+
+      expect(find.text('solo'), findsOneWidget);
+      expect(find.text('Not used yet'), findsNothing);
+      expect(find.text('Economics Lecture — Part 2'), findsNothing);
+      expect(find.text('+1 more →'), findsOneWidget);
     });
 
     testWidgets('tapping "+N more" jumps to Transcriptions filtered to just that tag', (tester) async {

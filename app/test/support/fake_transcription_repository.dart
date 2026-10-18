@@ -7,6 +7,7 @@ import 'package:dictara_web/models/tag.dart';
 import 'package:dictara_web/models/tag_entry.dart';
 import 'package:dictara_web/models/transcription.dart';
 import 'package:dictara_web/models/transcription_detail.dart';
+import 'package:dictara_web/models/transcription_link.dart';
 import 'package:dictara_web/models/upload.dart';
 import 'package:dictara_web/util/format.dart';
 import 'package:dictara_web/data/transcription_repository.dart';
@@ -462,12 +463,13 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
             () {
               // Items are kept oldest first; the gateway sends only the two most recent, newest first, with
               // the true count separate — mirrored here so a tag used more than twice is testable.
-              final matching = [for (final item in _items.reversed) if (item.tags.contains(tag)) item.title];
+              final all = [for (final item in _items.reversed) if (item.tags.contains(tag)) item];
+              final matching = [for (final item in all) if (item.status == TranscriptionStatus.done) TranscriptionLink(id: item.id, title: item.title)];
               return TagEntry(
                 tag: tag,
                 description: _tagDescriptions[tag.label] ?? '',
                 transcriptions: matching.take(2).toList(),
-                count: matching.length,
+                count: all.length,
               );
             }(),
         ],
@@ -534,7 +536,10 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
           return SpeakerEntry(
             speaker: speaker,
             description: _speakerDescriptions[speaker.name] ?? '',
-            transcriptions: [for (final item in items.reversed) item.title].take(2).toList(),
+            transcriptions: [
+              for (final item in items.reversed)
+                if (item.status == TranscriptionStatus.done) TranscriptionLink(id: item.id, title: item.title),
+            ].take(2).toList(),
             count: items.length,
             totalDuration: items.fold(Duration.zero, (sum, item) => sum + (item.duration ?? Duration.zero)),
           );

@@ -159,7 +159,26 @@ class TagLibraryIntegrationTest : AbstractSharedContextIntegrationTest() {
 
         assertThat(entries["meeting"]!!["transcription_count"].asInt()).isEqualTo(3)
         assertThat(entries["meeting"]!!["sample_titles"].map { it.asText() }).containsExactly("new.mp3", "Named")
+        // The same two with the id that opens each (job_id), so that a card can link to them.
+        assertThat(entries["meeting"]!!["samples"].map { it["job_id"].asText() to it["title"].asText() })
+            .containsExactly(newest.toString() to "new.mp3", named.toString() to "Named")
         assertThat(entries["unused"]!!["transcription_count"].asInt()).isZero()
+        assertThat(entries["unused"]!!["samples"]).isEmpty()
+    }
+
+    @Test
+    fun `a transcription that is not finished is counted but is not offered as a sample to open`() {
+        val done = addTranscription("done.mp3")
+        val running = addTranscription("running.mp3") // the newest, but still being worked on
+        val tag = createTag("meeting")
+        for (s in listOf(done, running)) post("/transcriptions/$s/tags", """{"tag_id": "$tag"}""")
+        jdbcTemplate.update("UPDATE submissions SET status = 'summarizing' WHERE id = ?", running)
+
+        val entry = library()["tags"].single()
+
+        assertThat(entry["transcription_count"].asInt()).isEqualTo(2)
+        assertThat(entry["samples"].map { it["job_id"].asText() }).containsExactly(done.toString())
+        assertThat(entry["sample_titles"].map { it.asText() }).containsExactly("done.mp3")
     }
 
     @Test

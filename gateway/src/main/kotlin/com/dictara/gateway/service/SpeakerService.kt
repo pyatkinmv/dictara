@@ -1,5 +1,6 @@
 package com.dictara.gateway.service
 
+import com.dictara.gateway.repository.LibrarySample
 import com.dictara.gateway.entity.SpeakerEntity
 import com.dictara.gateway.repository.SpeakerLibraryQueries
 import com.dictara.gateway.repository.SpeakerRepository
@@ -60,9 +61,12 @@ class SpeakerService(
         val transcriptionCount: Int,
         /** The summed length of the speaker's phrases, in seconds. */
         val speakingS: Double,
-        /** The titles of the latest transcriptions the speaker is in, newest first. */
-        val sampleTitles: List<String>,
+        /** The latest finished transcriptions the speaker is in, newest first: id to open it and the title to show. */
+        val samples: List<LibrarySample>,
     ) {
+        /** The same titles alone, for clients that only show them. */
+        val sampleTitles: List<String> get() = samples.map { it.title }
+
         val color: String get() = NameColors.of(name)
     }
 
@@ -71,7 +75,7 @@ class SpeakerService(
     @Transactional(readOnly = true)
     fun library(userId: UUID): Library = Library(
         libraryQueries.findLibrary(userId, SAMPLE_TITLES).map {
-            LibraryEntry(it.id, it.name, it.description, it.transcriptionCount, it.speakingS, it.sampleTitles)
+            LibraryEntry(it.id, it.name, it.description, it.transcriptionCount, it.speakingS, it.samples)
         },
     )
 

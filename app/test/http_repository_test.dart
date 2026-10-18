@@ -275,8 +275,12 @@ void main() {
           'description': 'Regular meetings',
           'transcription_count': 5,
           'sample_titles': ['New one', 'Older one'],
+          'samples': [
+            {'job_id': 'job-new', 'title': 'New one'},
+            {'job_id': 'job-old', 'title': 'Older one'},
+          ],
         },
-        {'id': 'b', 'label': 'unused', 'color': '#059669', 'transcription_count': 0, 'sample_titles': <String>[]},
+        {'id': 'b', 'label': 'unused', 'color': '#059669', 'transcription_count': 0, 'sample_titles': <String>[], 'samples': <Map<String, String>>[]},
       ],
       'tagged_transcriptions': 4,
     };
@@ -304,11 +308,20 @@ void main() {
       expect(meeting.tag.color, const Color(0xFF2563EB));
       expect(meeting.description, 'Regular meetings');
       expect(meeting.count, 5);
-      expect(meeting.transcriptions, ['New one', 'Older one']); // only the latest two: count says the rest
+      expect(meeting.transcriptions.map((t) => (t.id, t.title)), [('job-new', 'New one'), ('job-old', 'Older one')]); // only the latest two: count says the rest, and each carries the id that opens it
       final unused = library.entries.last;
       expect(unused.description, '');
       expect(unused.count, 0);
       expect(unused.transcriptions, isEmpty);
+    });
+
+    test('a library answer without samples (an older gateway) simply has no chips', () async {
+      final (repo, _) = repoWith({'GET /api/tags': (_) => _json({'tags': [{'id': 'a', 'label': 'meeting', 'color': '#2563EB', 'transcription_count': 3, 'sample_titles': ['x']}], 'tagged_transcriptions': 3})});
+
+      final entry = (await repo.tagLibrary()).entries.single;
+
+      expect(entry.transcriptions, isEmpty);
+      expect(entry.count, 3);
     });
 
     test('tags() are the library entries, unused ones too', () async {
@@ -445,8 +458,12 @@ void main() {
           'transcription_count': 5,
           'speaking_s': 3725.5,
           'sample_titles': ['New one', 'Older one'],
+          'samples': [
+            {'job_id': 'job-new', 'title': 'New one'},
+            {'job_id': 'job-old', 'title': 'Older one'},
+          ],
         },
-        {'id': 'b', 'name': 'Unused', 'color': '#059669', 'transcription_count': 0, 'speaking_s': 0.0, 'sample_titles': <String>[]},
+        {'id': 'b', 'name': 'Unused', 'color': '#059669', 'transcription_count': 0, 'speaking_s': 0.0, 'sample_titles': <String>[], 'samples': <Map<String, String>>[]},
       ],
     };
 
@@ -471,7 +488,7 @@ void main() {
       expect(maria.speaker.color, const Color(0xFF8F13AE));
       expect(maria.description, 'Head of Engineering');
       expect(maria.count, 5);
-      expect(maria.transcriptions, ['New one', 'Older one']); // the latest two: count says the rest
+      expect(maria.transcriptions.map((t) => (t.id, t.title)), [('job-new', 'New one'), ('job-old', 'Older one')]); // the latest two: count says the rest
       expect(maria.totalDuration, const Duration(hours: 1, minutes: 2, seconds: 5, milliseconds: 500));
       final unused = library.last;
       expect(unused.description, '');
