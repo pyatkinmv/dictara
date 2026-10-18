@@ -190,6 +190,28 @@ void main() {
       expect(first.speakerCount, 0);
     });
 
+    test('recorded_at is read when the gateway has it, and is null when it is left out', () async {
+      final repo = _repo(
+        _gateway([
+          {..._listJson[0], 'recorded_at': '2026-06-08T17:39:00Z'},
+          _listJson[1],
+        ]),
+      );
+      final items = (await repo.list(const TranscriptionQuery())).items;
+
+      expect(items[0].recordedAt!.toUtc(), DateTime.utc(2026, 6, 8, 17, 39));
+      expect(items[1].recordedAt, isNull);
+      // The upload time is a different thing and is never replaced by it.
+      expect(items[0].uploadedAt.toUtc(), DateTime.utc(2026, 9, 20, 16, 36, 21, 609, 254));
+    });
+
+    test('times from the gateway are shown in the zone of the viewer', () async {
+      final item = (await _repo(_gateway([{..._listJson[0], 'recorded_at': '2026-06-08T17:39:00Z'}])).list(const TranscriptionQuery())).items.single;
+
+      expect(item.recordedAt!.isUtc, isFalse);
+      expect(item.uploadedAt.isUtc, isFalse);
+    });
+
     test('statuses are mapped, summarizing counts as processing', () async {
       final byId = {for (final i in (await repo.list(const TranscriptionQuery())).items) i.title: i.status};
 
@@ -658,6 +680,15 @@ void main() {
         (const Duration(seconds: 72), 1, 'Yes.'),
       ]);
       expect(detail.item.speakerCount, 2);
+    });
+
+    test('the detail carries the recording time when the gateway knows it', () async {
+      final with_ = await _repo(MockClient((_) async => _json({...detailJson, 'recorded_at': '2026-06-08T17:39:00Z'}))).get('x');
+      final without = await _repo(MockClient((_) async => _json(detailJson))).get('x');
+
+      expect(with_!.item.recordedAt!.toUtc(), DateTime.utc(2026, 6, 8, 17, 39));
+      expect(without!.item.recordedAt, isNull);
+      expect(without.item.uploadedAt.toUtc(), DateTime.utc(2026, 9, 20, 16, 36, 21, 609, 254));
     });
 
     test('without diarization the segments have no speaker and there are no speakers', () async {
@@ -1216,6 +1247,17 @@ void _queryTests() {
       for (final sort in [TranscriptionSort.oldest, TranscriptionSort.longest, TranscriptionSort.name]) {
         expect((await urlFor(TranscriptionQuery(sort: sort))).queryParameters['sort'], sort.name);
       }
+    });
+
+    test('the sorts by recording date go by the snake_case names of the gateway', () async {
+      expect(
+        (await urlFor(const TranscriptionQuery(sort: TranscriptionSort.recordedNewest))).queryParameters['sort'],
+        'recorded_newest',
+      );
+      expect(
+        (await urlFor(const TranscriptionQuery(sort: TranscriptionSort.recordedOldest))).queryParameters['sort'],
+        'recorded_oldest',
+      );
     });
 
     test('everything together, with the page', () async {

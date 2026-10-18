@@ -103,13 +103,25 @@ class _Info extends StatelessWidget {
           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 2),
-        Row(
+        // A Wrap, not a Row: on a phone the length and two dates (with a year each) do not fit on one line.
+        Wrap(
+          spacing: 10,
+          runSpacing: 2,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            if (item.duration != null) ...[
-              _Meta(icon: Icons.schedule_rounded, text: formatDuration(item.duration!)),
-              const SizedBox(width: 10),
-            ],
-            _Meta(icon: Icons.calendar_today_rounded, text: formatDay(item.uploadedAt)),
+            if (item.duration != null) _Meta(icon: Icons.schedule_rounded, text: formatDuration(item.duration!)),
+            // The words of these two never change with the sort order; the full time is in the tooltip.
+            _Meta(
+              icon: Icons.cloud_upload_outlined,
+              text: formatDay(item.uploadedAt),
+              tooltip: 'Uploaded ${formatDayTime(item.uploadedAt)}',
+            ),
+            if (item.recordedAt != null)
+              _Meta(
+                icon: Icons.mic_none_rounded,
+                text: formatDay(item.recordedAt!),
+                tooltip: 'Recorded ${formatDayTime(item.recordedAt!)}',
+              ),
           ],
         ),
         const SizedBox(height: 5),
@@ -137,15 +149,16 @@ class _Info extends StatelessWidget {
 }
 
 class _Meta extends StatelessWidget {
-  const _Meta({required this.icon, required this.text});
+  const _Meta({required this.icon, required this.text, this.tooltip});
 
   final IconData icon;
   final String text;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return Row(
+    final row = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 13, color: p.text3),
@@ -153,6 +166,7 @@ class _Meta extends StatelessWidget {
         Text(text, style: TextStyle(fontSize: 12, color: p.text2)),
       ],
     );
+    return tooltip == null ? row : Tooltip(message: tooltip!, child: row);
   }
 }
 

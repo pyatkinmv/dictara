@@ -18,6 +18,7 @@ class AudioRestoreService(
     private val audioMetaRepo: AudioMetaRepository,
     private val submissionRepo: SubmissionRepository,
     private val audioStorage: AudioStorage,
+    private val recordedAt: RecordedAt,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -35,6 +36,7 @@ class AudioRestoreService(
             .map { it.id }
         if (stale.isEmpty()) return
         audioMetaRepo.updateOriginalName(stale, originalName)
+        stale.forEach { recordedAt.setFromFileName(it, originalName) }
         log.info("Audio name restored: {} record(s) with hash {} are now called {}", stale.size, contentHash, originalName)
     }
 

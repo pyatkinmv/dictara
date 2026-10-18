@@ -92,6 +92,8 @@ class SubmissionListQuery(private val jdbc: NamedParameterJdbcTemplate) {
         ListSort.NEWEST -> "s.created_at DESC, s.id DESC"
         ListSort.OLDEST -> "s.created_at ASC, s.id ASC"
         ListSort.LONGEST -> "a.duration_s DESC NULLS LAST, s.created_at DESC, s.id DESC"
+        ListSort.RECORDED_NEWEST -> "COALESCE(a.recorded_at, s.created_at) DESC, s.created_at DESC, s.id DESC"
+        ListSort.RECORDED_OLDEST -> "COALESCE(a.recorded_at, s.created_at) ASC, s.created_at ASC, s.id ASC"
         ListSort.NAME -> "lower(COALESCE(t.title, a.original_name)) ASC, s.created_at DESC, s.id DESC"
     }
 

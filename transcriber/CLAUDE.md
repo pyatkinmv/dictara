@@ -56,7 +56,7 @@ curl http://localhost:8000/jobs/{job_id}
 # status values: pending | processing | done | failed
 # phase values: "transcribing" | "diarizing"
 # result.audio_metadata: ffprobe's read of the ORIGINAL upload (codec, bit_rate, sample_rate, channels, tags —
-# tags.creation_time is the actual recording date on most phone-recorded M4A/MP4). Probed before the ffmpeg → WAV
+# tags.creation_time is the actual recording date on most phone-recorded M4A/MP4; if the container keeps it on the audio stream instead of the format, that one is used). Probed before the ffmpeg → WAV
 # conversion, which strips all container metadata. null if ffprobe can't read the file or finds nothing (`app.py`,
 # `_probe_metadata`). The gateway stores this as-is in `audio_meta.metadata` — see `gateway/CLAUDE.md`.
 

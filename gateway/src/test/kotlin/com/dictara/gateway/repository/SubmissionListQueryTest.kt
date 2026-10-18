@@ -78,6 +78,8 @@ class SubmissionListQueryTest {
         assertThat(order(ListSort.NEWEST)).isEqualTo("s.created_at DESC, s.id DESC")
         assertThat(order(ListSort.OLDEST)).isEqualTo("s.created_at ASC, s.id ASC")
         assertThat(order(ListSort.LONGEST)).isEqualTo("a.duration_s DESC NULLS LAST, s.created_at DESC, s.id DESC")
+        assertThat(order(ListSort.RECORDED_NEWEST)).isEqualTo("COALESCE(a.recorded_at, s.created_at) DESC, s.created_at DESC, s.id DESC")
+        assertThat(order(ListSort.RECORDED_OLDEST)).isEqualTo("COALESCE(a.recorded_at, s.created_at) ASC, s.created_at ASC, s.id ASC")
         assertThat(order(ListSort.NAME)).isEqualTo("lower(COALESCE(t.title, a.original_name)) ASC, s.created_at DESC, s.id DESC")
     }
 

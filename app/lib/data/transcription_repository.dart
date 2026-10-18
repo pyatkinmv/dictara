@@ -6,7 +6,9 @@ import '../models/transcription.dart';
 import '../models/transcription_detail.dart';
 import '../models/upload.dart';
 
-enum TranscriptionSort { newest, oldest, longest, name }
+/// [newest] and [oldest] go by the time of upload; [recordedNewest] and [recordedOldest] by when the recording
+/// was made, and by the time of upload for those whose recording time is not known.
+enum TranscriptionSort { newest, oldest, recordedNewest, recordedOldest, longest, name }
 
 /// How many transcriptions the list loads at a time.
 const transcriptionPageSize = 30;

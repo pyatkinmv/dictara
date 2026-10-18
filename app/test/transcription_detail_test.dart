@@ -13,7 +13,7 @@ Transcription _item() => Transcription(
       id: '1',
       title: 'Title',
       duration: const Duration(minutes: 5),
-      uploadedAt: DateTime(2025, 6, 22),
+      uploadedAt: DateTime(DateTime.now().year, 6, 22),
       status: TranscriptionStatus.done,
     );
 

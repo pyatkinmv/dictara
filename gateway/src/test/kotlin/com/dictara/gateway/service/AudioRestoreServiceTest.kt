@@ -168,6 +168,55 @@ class AudioRestoreServiceTest : AbstractSharedContextIntegrationTest() {
         assertThat(nameOf(audio)).isEqualTo("dictara-123.m4a")
     }
 
+    private fun recordedOf(audioId: UUID) =
+        jdbcTemplate.queryForObject("SELECT recorded_at FROM audio_meta WHERE id = ?", java.sql.Timestamp::class.java, audioId)?.toInstant()
+
+    private fun recordedSourceOf(audioId: UUID) =
+        jdbcTemplate.queryForObject("SELECT recorded_at_source FROM audio_meta WHERE id = ?", String::class.java, audioId)
+
+    @Test
+    fun `the real name brings the recording date with it`() {
+        val (audio, _) = record(alice, "gs://b/audio/live.m4a", name = "audio_1792062859802.oga")
+        assertThat(recordedOf(audio)).isNull()
+
+        restore.adoptOriginalName(alice, hash, "20260608_213900.m4a")
+
+        assertThat(recordedOf(audio)).isEqualTo(java.time.Instant.parse("2026-06-08T17:39:00Z")) // Dubai wall clock
+        assertThat(recordedSourceOf(audio)).isEqualTo("filename")
+    }
+
+    @Test
+    fun `a real name without a date leaves the date unknown`() {
+        val (audio, _) = record(alice, "gs://b/audio/live.m4a", name = "dictara-123.m4a")
+
+        restore.adoptOriginalName(alice, hash, "Interview with Anna.m4a")
+
+        assertThat(nameOf(audio)).isEqualTo("Interview with Anna.m4a")
+        assertThat(recordedOf(audio)).isNull()
+    }
+
+    @Test
+    fun `a date the container gave is not replaced by the one in the new name`() {
+        val (audio, _) = record(alice, "gs://b/audio/live.m4a", name = "dictara-123.m4a")
+        jdbcTemplate.update(
+            "UPDATE audio_meta SET recorded_at = '2026-06-08 17:00:00+00', recorded_at_source = 'metadata' WHERE id = ?", audio,
+        )
+
+        restore.adoptOriginalName(alice, hash, "20260101_101010.m4a")
+
+        assertThat(recordedOf(audio)).isEqualTo(java.time.Instant.parse("2026-06-08T17:00:00Z"))
+        assertThat(recordedSourceOf(audio)).isEqualTo("metadata")
+    }
+
+    @Test
+    fun `a name the user kept does not get a date from the new name either`() {
+        val (audio, _) = record(alice, "gs://b/audio/live.m4a", name = "Interview with Anna.m4a")
+
+        restore.adoptOriginalName(alice, hash, "20260608_213900.m4a")
+
+        assertThat(recordedOf(audio)).isNull()
+    }
+
     @Test
     fun `only the made-up shapes count as made up`() {
         assertThat(listOf("dictara-7802649983095675646.m4a", "dictara-1.oga", "audio_1792062859802.oga", "audio_17")

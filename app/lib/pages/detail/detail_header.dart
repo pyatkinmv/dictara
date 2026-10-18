@@ -390,21 +390,26 @@ class _MetaRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final item = detail.item;
-    Widget entry(IconData icon, String text) => Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: p.text3),
-        const SizedBox(width: 4),
-        Text(text, style: TextStyle(fontSize: 13, color: p.text2)),
-      ],
-    );
+    Widget entry(IconData icon, String text, {String? tooltip}) {
+      final row = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: p.text3),
+          const SizedBox(width: 4),
+          Text(text, style: TextStyle(fontSize: 13, color: p.text2)),
+        ],
+      );
+      return tooltip == null ? row : Tooltip(message: tooltip, child: row);
+    }
     return Wrap(
       spacing: 10,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         // Unknown is not zero: the length of old recordings was lost in a migration, so show nothing for it (as the list does).
         if (item.duration != null) entry(Icons.schedule_rounded, formatDuration(item.duration!)),
-        entry(Icons.calendar_today_rounded, formatDay(item.uploadedAt)),
+        entry(Icons.cloud_upload_outlined, formatDay(item.uploadedAt), tooltip: 'Uploaded ${formatDayTime(item.uploadedAt)}'),
+        if (item.recordedAt != null)
+          entry(Icons.mic_none_rounded, formatDay(item.recordedAt!), tooltip: 'Recorded ${formatDayTime(item.recordedAt!)}'),
         StatusBadge(item.status),
       ],
     );

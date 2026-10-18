@@ -95,7 +95,7 @@ class TranscriptionUploadController(
         val item = submissionService.listItem(result.submissionId)
             ?.let { s ->
                 TranscribeController.TranscriptionSummary(
-                    s.jobId.toString(), s.fileName, s.title, s.createdAt, s.status, s.tags,
+                    s.jobId.toString(), s.fileName, s.title, s.createdAt, s.recordedAt, s.status, s.tags,
                     s.audioDurationS, s.speakerCount, s.processingPct, s.processingPhase,
                 )
             }

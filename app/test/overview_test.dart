@@ -35,9 +35,18 @@ void main() {
       expect(formatFileSize(3 * 1024 * 1024 * 1024), '3.0 GB');
     });
 
+    final now = DateTime(2025, 10, 18, 12);
+
     test('date with time', () {
-      expect(formatDayTime(DateTime(2025, 6, 22, 14, 41)), '22 Jun · 14:41');
-      expect(formatDayTime(DateTime(2025, 1, 5, 9, 5)), '5 Jan · 09:05');
+      expect(formatDayTime(DateTime(2025, 6, 22, 14, 41), now: now), '22 Jun · 14:41');
+      expect(formatDayTime(DateTime(2025, 1, 5, 9, 5), now: now), '5 Jan · 09:05');
+    });
+
+    test('the year is shown when it is not the current one, since recordings can be older than the upload', () {
+      expect(formatDay(DateTime(2025, 3, 4), now: now), '4 Mar');
+      expect(formatDay(DateTime(2024, 3, 4), now: now), '4 Mar 2024');
+      expect(formatDay(DateTime(2026, 1, 1), now: now), '1 Jan 2026');
+      expect(formatDayTime(DateTime(2024, 12, 31, 23, 59), now: now), '31 Dec 2024 · 23:59');
     });
   });
 
@@ -76,12 +85,46 @@ void main() {
         'LANGUAGE': 'EN',
         'WORDS': '~1,840',
         'FILE SIZE': '22.4 MB',
+        'RECORDED': '20 Jun · 09:12',
         'UPLOADED': '22 Jun · 14:41',
       };
       for (final entry in facts.entries) {
         expect(find.text(entry.key), findsOneWidget, reason: entry.key);
         expect(find.text(entry.value), findsOneWidget, reason: entry.value);
       }
+    });
+
+    testWidgets('the details have no Recorded chip when the file does not say when it was recorded', (tester) async {
+      await openOverview(tester, '4'); // Product Ideas — only the upload time is known
+
+      expect(find.text('UPLOADED'), findsOneWidget);
+      expect(find.text('RECORDED'), findsNothing);
+    });
+
+    testWidgets('a recording from an earlier year shows its year, in the chip, the header and its tooltip', (tester) async {
+      await openOverview(tester, '2'); // Interview — recorded in March of the year before
+
+      final year = DateTime.now().year - 1;
+      expect(find.text('4 Mar $year · 10:30'), findsOneWidget); // the Recorded chip
+      expect(find.text('4 Mar $year'), findsOneWidget); // the header, which has the day only
+      expect(find.byTooltip('Recorded 4 Mar $year · 10:30'), findsOneWidget);
+      expect(find.byTooltip(RegExp(r'^Uploaded 21 Jun · 16:20$')), findsOneWidget); // this year: no year
+    });
+
+    testWidgets('the header shows when it was uploaded and when it was recorded, each with its full time on hover', (tester) async {
+      await openOverview(tester); // Quarterly Review: uploaded 22 Jun, recorded 20 Jun
+
+      expect(find.byTooltip('Uploaded 22 Jun · 14:41'), findsOneWidget);
+      expect(find.byTooltip('Recorded 20 Jun · 09:12'), findsOneWidget);
+      expect(find.byIcon(Icons.cloud_upload_outlined), findsWidgets);
+      expect(find.byIcon(Icons.mic_none_rounded), findsWidgets);
+    });
+
+    testWidgets('the header of a transcription with no recording date has the upload date only', (tester) async {
+      await openOverview(tester, '4');
+
+      expect(find.byTooltip('Uploaded 20 Jun · 18:02'), findsOneWidget);
+      expect(find.byTooltip(RegExp(r'^Recorded ')), findsNothing);
     });
 
     testWidgets('a transcription without speakers shows a dash', (tester) async {
