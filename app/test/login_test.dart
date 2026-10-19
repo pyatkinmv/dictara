@@ -239,7 +239,11 @@ void main() {
       final auth = AuthController(api, InMemoryTokenStore(), pollInterval: const Duration(milliseconds: 5));
 
       await auth.submitUsername('maxim');
-      await Future<void>.delayed(const Duration(milliseconds: 60));
+      // Until it is done, not for a fixed time: on a busy machine the 5 ms polls come later than that.
+      final deadline = DateTime.now().add(const Duration(seconds: 5));
+      while (!auth.isLoggedIn && DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
 
       expect(auth.isLoggedIn, isTrue);
       expect(calls, greaterThanOrEqualTo(3));

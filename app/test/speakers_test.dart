@@ -1,3 +1,4 @@
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -479,10 +480,17 @@ void main() {
 
     testWidgets('near the bottom of the window it opens above the name and stays on screen', (tester) async {
       await openDetail(tester, size: const Size(1280, 700));
-      await tester.drag(find.byType(ListView), const Offset(0, -3000));
+      await tester.drag(find.byType(ScrollablePositionedList), const Offset(0, -3000));
       await settle(tester);
 
-      await openPicker(tester, 'MARIA CHEN', at: 0);
+      // The header lowest in the window (the list is long, so several are built, some of them out of sight).
+      final headers = find.text('MARIA CHEN');
+      final inWindow = [
+        for (var i = 0; i < headers.evaluate().length; i++)
+          if (tester.getCenter(headers.at(i)).dy > 0 && tester.getCenter(headers.at(i)).dy < 700) i,
+      ];
+      expect(inWindow, isNotEmpty);
+      await openPicker(tester, 'MARIA CHEN', at: inWindow.last);
       // Whichever header was hit, the panel must fit inside the window.
       final box = tester.getRect(find.byKey(_picker));
       expect(box.top, greaterThanOrEqualTo(0));
