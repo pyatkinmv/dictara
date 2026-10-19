@@ -25,6 +25,15 @@ class SpeakerLibraryQueries(private val jdbc: NamedParameterJdbcTemplate) {
         val samples: List<LibrarySample>,
     )
 
+    /** A speaker without any usage: what a menu needs. */
+    data class BriefRow(val id: UUID, val name: String, val description: String?)
+
+    /** The user's speakers in creation order (ties by name), and nothing else: one cheap query. */
+    fun findBrief(userId: UUID): List<BriefRow> = jdbc.query(
+        "SELECT id, name, description FROM speakers WHERE user_id = :user ORDER BY created_at ASC, name ASC",
+        mapOf("user" to userId),
+    ) { rs, _ -> BriefRow(rs.getObject("id", UUID::class.java), rs.getString("name"), rs.getString("description")) }
+
     /** The user's speakers in creation order (ties by name), each with its [sampleSize] most recent finished transcriptions. */
     fun findLibrary(userId: UUID, sampleSize: Int): List<Row> {
         val usage = USAGE_CTE

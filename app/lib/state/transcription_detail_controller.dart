@@ -6,6 +6,7 @@ import '../data/transcription_repository.dart';
 import '../models/speaker.dart';
 import '../models/tag.dart';
 import '../models/transcription_detail.dart';
+import '../util/parallel.dart';
 
 /// Keys of the suggestion actions, for [TranscriptionDetailController.isBusy].
 abstract final class SuggestionAction {
@@ -62,9 +63,9 @@ class TranscriptionDetailController extends ChangeNotifier {
       notifyListeners();
     }
     final requestId = ++_requestId;
-    final detail = await _repository.get(id);
-    final library = await _repository.tags();
-    final speakers = await _repository.speakers();
+    // The three go out together, and the page is drawn when the last is in: one that is slow holds the page back
+    // (as it would one after another), but they no longer add up.
+    final (detail, library, speakers) = await waitAll3(_repository.get(id), _repository.tags(), _repository.speakers());
     // Another transcription was requested while this one was loading.
     if (_disposed || requestId != _requestId) return;
     _current = detail;
@@ -112,8 +113,7 @@ class TranscriptionDetailController extends ChangeNotifier {
       if (detail == null || detail.regeneration == SummaryRegeneration.running) return;
       timer.cancel();
       // The new summary, and new proposals (a title, tags, speakers) that the page shows.
-      final library = await _repository.tags();
-      final speakers = await _repository.speakers();
+      final (library, speakers) = await waitBoth(_repository.tags(), _repository.speakers());
       if (_disposed || _current?.item.id != id) return;
       _current = detail;
       _library = library;
@@ -212,9 +212,7 @@ class TranscriptionDetailController extends ChangeNotifier {
     notifyListeners();
     try {
       await action(id);
-      final detail = await _repository.get(id);
-      final library = await _repository.tags();
-      final speakers = await _repository.speakers();
+      final (detail, library, speakers) = await waitAll3(_repository.get(id), _repository.tags(), _repository.speakers());
       // The user moved on to another transcription meanwhile.
       if (!_disposed && _current?.item.id == id) {
         _current = detail;
@@ -240,8 +238,7 @@ class TranscriptionDetailController extends ChangeNotifier {
     if (current == null || segmentIndexes.isEmpty || name.trim().isEmpty) return;
 
     await _repository.assignSpeaker(current.item.id, segmentIndexes, name, allBySpeaker: allBySpeaker);
-    final detail = await _repository.get(current.item.id);
-    final speakers = await _repository.speakers();
+    final (detail, speakers) = await waitBoth(_repository.get(current.item.id), _repository.speakers());
     // The user moved on to another transcription meanwhile.
     if (_disposed || _current?.item.id != current.item.id) return;
     _speakers = speakers;

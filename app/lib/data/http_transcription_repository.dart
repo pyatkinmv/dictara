@@ -52,9 +52,14 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
     ).toString();
   }
 
-  /// The tags of the library, for the filter and the "Add tag" menu.
+  /// The tags of the library, for the filter and the "Add tag" menu: the brief view, which is only the tags
+  /// themselves (the full list also counts where each is used, which these menus do not show).
   @override
-  Future<List<Tag>> tags() async => [for (final entry in (await _library()).entries) entry.tag];
+  Future<List<Tag>> tags() async {
+    final body = await _client.getJson('/tags?view=brief');
+    if (body is! Map<String, dynamic> || body['tags'] is! List) throw const GatewayException('Expected the tag library');
+    return [for (final entry in body['tags'] as List<dynamic>) _tagFromJson(entry as Map<String, dynamic>)];
+  }
 
   @override
   Future<TagLibrary> tagLibrary() async => _library();
@@ -199,10 +204,17 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
   }
 
 
-  /// The speaker library, for the Speaker Picker of the detail page. (Choosing one there is connected in
-  /// iteration 6.)
+  /// The speakers of the library, for the Speaker Picker and the filter: the brief view, which is only who they
+  /// are (the full list also adds up how long each speaks across all transcripts, which is slow and which these
+  /// menus do not show). A gateway that does not know the view answers with the full list, which has the same fields.
   @override
-  Future<List<Speaker>> speakers() async => [for (final entry in await _speakerEntries()) entry.speaker];
+  Future<List<Speaker>> speakers() async {
+    final body = await _client.getJson('/speakers?view=brief');
+    if (body is! Map<String, dynamic> || body['speakers'] is! List) {
+      throw const GatewayException('Expected the speaker library');
+    }
+    return [for (final entry in body['speakers'] as List<dynamic>) _speakerFromJson(entry as Map<String, dynamic>)];
+  }
 
   @override
   Future<List<SpeakerEntry>> speakerLibrary() => _speakerEntries();

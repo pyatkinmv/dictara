@@ -167,6 +167,45 @@ class TagLibraryIntegrationTest : AbstractSharedContextIntegrationTest() {
     }
 
     @Test
+    fun `view=brief has only the tags themselves, none of where they are used`() {
+        val tag = createTag("meeting", "Regular meetings")
+        createTag("unused")
+        createTag("theirs", user = newUser())
+        val s = addTranscription("a.mp3")
+        post("/transcriptions/$s/tags", """{"tag_id": "$tag"}""")
+
+        val reply = get("/tags?view=brief")
+
+        assertThat(reply.status).isEqualTo(HttpStatus.OK)
+        assertThat(reply.body!!.fieldNames().asSequence().toList()).containsExactly("tags") // no tagged_transcriptions either
+        val tags = reply.body["tags"]
+        assertThat(tags.map { it["label"].asText() }).containsExactly("meeting", "unused") // creation order, own only
+        assertThat(tags.first().fieldNames().asSequence().toList())
+            .containsExactlyInAnyOrder("id", "label", "color", "description")
+        assertThat(tags.first()["id"].asText()).isEqualTo(tag.toString())
+        assertThat(tags.first()["color"].asText()).isEqualTo(NameColors.of("meeting"))
+        assertThat(tags.first()["description"].asText()).isEqualTo("Regular meetings")
+        assertThat(tags[1].has("description")).isFalse()
+    }
+
+    @Test
+    fun `view=full is the same as no view, and an unknown view is refused`() {
+        createTag("meeting")
+
+        assertThat(get("/tags?view=full").body).isEqualTo(get("/tags").body)
+        assertThat(get("/tags").body!!["tags"].first().has("transcription_count")).isTrue()
+
+        val bad = get("/tags?view=tiny")
+        assertThat(bad.status).isEqualTo(HttpStatus.BAD_REQUEST)
+        assertThat(bad.body!!["message"].asText()).contains("Unknown view 'tiny'").contains("full").contains("brief")
+    }
+
+    @Test
+    fun `the brief view needs a token too`() {
+        assertThat(get("/tags?view=brief", user = null).status).isEqualTo(HttpStatus.UNAUTHORIZED)
+    }
+
+    @Test
     fun `a transcription that is not finished is counted but is not offered as a sample to open`() {
         val done = addTranscription("done.mp3")
         val running = addTranscription("running.mp3") // the newest, but still being worked on

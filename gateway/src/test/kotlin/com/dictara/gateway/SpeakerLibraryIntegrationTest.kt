@@ -163,6 +163,46 @@ class SpeakerLibraryIntegrationTest : AbstractSharedContextIntegrationTest() {
     }
 
     @Test
+    fun `view=brief has only who the speakers are, none of where they are heard`() {
+        val alexei = createSpeaker("Alexei", "Host")
+        createSpeaker("Maria")
+        createSpeaker("Theirs", user = newUser())
+        val t = addTranscript("a.mp3", phrases = arrayOf(Triple(0, 10, "SPEAKER_00")))
+        voice(t, "SPEAKER_00", alexei)
+
+        val reply = get("/speakers?view=brief")
+
+        assertThat(reply.status).isEqualTo(HttpStatus.OK)
+        assertThat(reply.body!!.fieldNames().asSequence().toList()).containsExactly("speakers")
+        val speakers = reply.body["speakers"]
+        assertThat(speakers.map { it["name"].asText() }).containsExactly("Alexei", "Maria") // creation order, own only
+        assertThat(speakers.first().fieldNames().asSequence().toList())
+            .containsExactlyInAnyOrder("id", "name", "color", "description")
+        assertThat(speakers.first()["id"].asText()).isEqualTo(alexei.toString())
+        assertThat(speakers.first()["color"].asText()).isEqualTo(NameColors.of("Alexei"))
+        assertThat(speakers.first()["description"].asText()).isEqualTo("Host")
+        assertThat(speakers[1].has("description")).isFalse() // none given: left out, as in the full view
+    }
+
+    @Test
+    fun `view=full is the same as no view, and an unknown view is refused`() {
+        createSpeaker("Alexei")
+
+        assertThat(get("/speakers?view=full").body).isEqualTo(get("/speakers").body)
+        assertThat(get("/speakers").body!!["speakers"].first().has("transcription_count")).isTrue()
+
+        val bad = get("/speakers?view=tiny")
+        assertThat(bad.status).isEqualTo(HttpStatus.BAD_REQUEST)
+        assertThat(bad.body!!["message"].asText()).contains("Unknown view 'tiny'").contains("full").contains("brief")
+        assertThat(get("/speakers?view=BRIEF").status).isEqualTo(HttpStatus.BAD_REQUEST) // names are exact
+    }
+
+    @Test
+    fun `the brief view needs a token too`() {
+        assertThat(get("/speakers?view=brief", user = null).status).isEqualTo(HttpStatus.UNAUTHORIZED)
+    }
+
+    @Test
     fun `the library needs a token and lists only the user's own speakers, oldest first`() {
         createSpeaker("First")
         createSpeaker("Second")
