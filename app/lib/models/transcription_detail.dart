@@ -160,6 +160,24 @@ class TranscriptionDetail {
     return runs;
   }
 
+  /// The phrase being spoken at [position]: the last one that has started (so it stays the current one through a
+  /// pause, until the next begins). Null before the first phrase starts, or when there are none.
+  int? phraseAt(Duration position) {
+    var low = 0;
+    var high = segments.length - 1;
+    int? found;
+    while (low <= high) {
+      final mid = (low + high) >> 1;
+      if (segments[mid].start <= position) {
+        found = mid;
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+    return found;
+  }
+
   TranscriptionDetail copyWith({
     Transcription? item,
     Map<int, Speaker>? segmentSpeakers,

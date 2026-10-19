@@ -1,3 +1,4 @@
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -479,7 +480,7 @@ void main() {
 
     testWidgets('near the bottom of the window it opens above the name and stays on screen', (tester) async {
       await openDetail(tester, size: const Size(1280, 700));
-      await tester.drag(find.byType(ListView), const Offset(0, -3000));
+      await tester.drag(find.byType(ScrollablePositionedList), const Offset(0, -3000));
       await settle(tester);
 
       await openPicker(tester, 'MARIA CHEN', at: 0);

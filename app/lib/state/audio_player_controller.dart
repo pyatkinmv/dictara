@@ -106,6 +106,12 @@ class AudioPlayerController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Jumps to [position] and plays from there (the play button of a transcript phrase).
+  Future<void> seekAndPlay(Duration position) async {
+    seek(position);
+    if (!_playing) await togglePlay();
+  }
+
   void _onPosition(Duration position) {
     _position = position;
     notifyListeners();
