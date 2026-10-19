@@ -483,7 +483,14 @@ void main() {
       await tester.drag(find.byType(ScrollablePositionedList), const Offset(0, -3000));
       await settle(tester);
 
-      await openPicker(tester, 'MARIA CHEN', at: 0);
+      // The header lowest in the window (the list is long, so several are built, some of them out of sight).
+      final headers = find.text('MARIA CHEN');
+      final inWindow = [
+        for (var i = 0; i < headers.evaluate().length; i++)
+          if (tester.getCenter(headers.at(i)).dy > 0 && tester.getCenter(headers.at(i)).dy < 700) i,
+      ];
+      expect(inWindow, isNotEmpty);
+      await openPicker(tester, 'MARIA CHEN', at: inWindow.last);
       // Whichever header was hit, the panel must fit inside the window.
       final box = tester.getRect(find.byKey(_picker));
       expect(box.top, greaterThanOrEqualTo(0));

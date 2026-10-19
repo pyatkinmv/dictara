@@ -158,7 +158,7 @@ void main() {
       expect(style(tester, 'phrase 0').color, style(tester, 'phrase 5').color);
     });
 
-    testWidgets('the phrase being spoken is marked: stronger text and a time in the accent color', (tester) async {
+    testWidgets('the phrase being spoken is marked: stronger text, a time in the accent color, a soft tint behind it', (tester) async {
       await open(tester);
       await at(tester, 25); // phrase 2 started at 0:20
 
@@ -167,6 +167,19 @@ void main() {
       expect(style(tester, 'phrase 3').fontWeight, FontWeight.w400);
       expect(tester.widget<Text>(find.text('0:20')).style!.color, accentOf(tester));
       expect(tester.widget<Text>(find.text('0:10')).style!.color, isNot(accentOf(tester)));
+
+      // The tint is behind the row of that phrase only.
+      Color? tintOf(String text) {
+        final rows = find.ancestor(
+          of: find.text(text),
+          matching: find.byWidgetPredicate((w) => w is Container && w.decoration is BoxDecoration && (w.decoration! as BoxDecoration).borderRadius != null),
+        );
+        return ((tester.widget<Container>(rows.first)).decoration! as BoxDecoration).color;
+      }
+
+      expect(tintOf('phrase 2'), AppPalette.teal.accent.withValues(alpha: .10));
+      expect(tintOf('phrase 1'), Colors.transparent);
+      expect(tintOf('phrase 3'), Colors.transparent);
     });
 
     testWidgets('what was said is dark and what is ahead is faded', (tester) async {

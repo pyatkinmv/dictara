@@ -338,23 +338,19 @@ class _PhraseRowState extends State<_PhraseRow> {
           } else {
             textColor = widget.index > active ? p.text3 : p.text;
           }
-          return Container(
-            // The bar of the phrase being spoken; transparent (but there) for the others, so nothing shifts.
-            padding: const EdgeInsets.only(left: 4),
-            decoration: BoxDecoration(border: Border(left: BorderSide(color: current ? p.accent : Colors.transparent, width: 2))),
+          final row = Container(
+            // The phrase being spoken sits on a soft tint; for the others the same box is clear, so nothing shifts.
+            padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
+            decoration: BoxDecoration(
+              color: current ? p.accent.withValues(alpha: .10) : Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
+            ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
-                // Play from here: shown while the pointer is over the row (a phone has no pointer, so no column there).
-                if (!mobile)
-                  SizedBox(
-                    width: 18,
-                    child: _PlayFromHere(
-                      visible: _rowHover && playback.canPlay,
-                      onTap: () => widget.onPlayFrom(segment.start),
-                    ),
-                  ),
+                // The column the play button sits in (drawn over the row below); none on a phone, which has no pointer.
+                if (!mobile) const SizedBox(width: 18),
                 SizedBox(
                   width: 36,
                   child: widget.canChangeSpeaker
@@ -377,8 +373,8 @@ class _PhraseRowState extends State<_PhraseRow> {
                   child: Text(
                     segment.text,
                     style: TextStyle(
-                      fontSize: 13.5,
-                      height: 1.52,
+                      fontSize: _phraseFontSize,
+                      height: _phraseLineHeight,
                       color: textColor,
                       fontWeight: current ? FontWeight.w500 : FontWeight.w400,
                     ),
@@ -387,14 +383,34 @@ class _PhraseRowState extends State<_PhraseRow> {
               ],
             ),
           );
+          if (mobile) return row;
+          // The button is laid over the row, centered on the first line of the text: an icon has no text baseline,
+          // so as a child of the baseline-aligned row it would sit too high.
+          return Stack(
+            children: [
+              row,
+              Positioned(
+                left: 6,
+                top: 2,
+                width: 18,
+                child: _PlayFromHere(
+                  visible: _rowHover && playback.canPlay,
+                  onTap: () => widget.onPlayFrom(segment.start),
+                ),
+              ),
+            ],
+          );
         },
       ),
     );
   }
 }
 
-/// The play button at the start of a phrase's row. Its icon is drawn as text so that the row's baseline
-/// alignment holds, and it is kept out of the selection so that copying a passage does not pick it up.
+const _phraseFontSize = 13.5;
+const _phraseLineHeight = 1.52;
+
+/// The play button at the start of a phrase's row, centered on the first line of the text (an icon font has its
+/// own baseline, so aligning it with the text's would sit it too high).
 class _PlayFromHere extends StatelessWidget {
   const _PlayFromHere({required this.visible, required this.onTap});
 
@@ -404,25 +420,22 @@ class _PlayFromHere extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    const icon = Icons.play_arrow_rounded;
-    return SelectionContainer.disabled(
-      child: IgnorePointer(
-        ignoring: !visible,
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 150),
-          opacity: visible ? 1 : 0,
-          child: Tooltip(
-            message: 'Play from here',
-            waitDuration: const Duration(milliseconds: 600),
-            child: MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: onTap,
-                behavior: HitTestBehavior.opaque,
-                child: Text(
-                  String.fromCharCode(icon.codePoint),
-                  style: TextStyle(inherit: false, fontFamily: icon.fontFamily, package: icon.fontPackage, fontSize: 16, color: p.accent),
-                ),
+    return IgnorePointer(
+      ignoring: !visible,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 150),
+        opacity: visible ? 1 : 0,
+        child: Tooltip(
+          message: 'Play from here',
+          waitDuration: const Duration(milliseconds: 600),
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: onTap,
+              behavior: HitTestBehavior.opaque,
+              child: SizedBox(
+                height: _phraseFontSize * _phraseLineHeight,
+                child: Center(child: Icon(Icons.play_arrow_rounded, size: 16, color: p.accent)),
               ),
             ),
           ),
