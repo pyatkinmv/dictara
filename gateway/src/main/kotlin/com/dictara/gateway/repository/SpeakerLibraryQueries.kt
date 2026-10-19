@@ -22,32 +22,35 @@ class SpeakerLibraryQueries(private val jdbc: NamedParameterJdbcTemplate) {
         val description: String?,
         val transcriptionCount: Int,
         val speakingS: Double,
-        val sampleTitles: List<String>,
+        val samples: List<LibrarySample>,
     )
 
-    /** The user's speakers in creation order (ties by name), each with its [sampleSize] most recent transcription titles. */
+    /** The user's speakers in creation order (ties by name), each with its [sampleSize] most recent finished transcriptions. */
     fun findLibrary(userId: UUID, sampleSize: Int): List<Row> {
         val usage = USAGE_CTE
 
         val samples = jdbc.query(
             """
             $usage
-            SELECT x.speaker_id, x.title
+            SELECT x.speaker_id, x.job_id, x.title
             FROM (
                 SELECT u.speaker_id,
+                       s.id AS job_id,
                        COALESCE(t.title, a.original_name) AS title,
                        row_number() OVER (PARTITION BY u.speaker_id ORDER BY s.created_at DESC, s.id DESC) AS rn
                 FROM presence u
                 JOIN transcripts t ON t.id = u.transcript_id
                 JOIN submissions s ON s.id = t.submission_id
                 JOIN audio_meta a ON a.id = s.audio_id
+                WHERE s.status = 'done'
             ) x
             WHERE x.rn <= :size
             ORDER BY x.speaker_id, x.rn
             """.trimIndent(),
             mapOf("user" to userId, "size" to sampleSize),
-        ) { rs, _ -> rs.getObject("speaker_id", UUID::class.java) to rs.getString("title") }
-            .groupBy({ it.first }, { it.second })
+        ) { rs, _ ->
+            rs.getObject("speaker_id", UUID::class.java) to LibrarySample(rs.getObject("job_id", UUID::class.java), rs.getString("title"))
+        }.groupBy({ it.first }, { it.second })
 
         val speaking: Map<UUID, Double> = jdbc.query(
             """

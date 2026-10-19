@@ -8,22 +8,23 @@ import java.util.UUID
 @Repository
 class TagLibraryQueries(private val jdbc: NamedParameterJdbcTemplate) {
 
-    /** A tag with its usage: [transcriptionCount] transcriptions carry it, [sampleTitles] are the latest of them. */
+    /** A tag with its usage: [transcriptionCount] transcriptions carry it, [samples] are the latest finished ones of them. */
     data class Row(
         val id: UUID,
         val name: String,
         val description: String?,
         val transcriptionCount: Int,
-        val sampleTitles: List<String>,
+        val samples: List<LibrarySample>,
     )
 
-    /** The user's tags in creation order (ties by name), each with its [sampleSize] most recent transcription titles. */
+    /** The user's tags in creation order (ties by name), each with its [sampleSize] most recent finished transcriptions. */
     fun findLibrary(userId: UUID, sampleSize: Int): List<Row> {
         val samples = jdbc.query(
             """
-            SELECT x.tag_id, x.title
+            SELECT x.tag_id, x.job_id, x.title
             FROM (
                 SELECT tt.tag_id,
+                       s.id AS job_id,
                        COALESCE(t.title, a.original_name) AS title,
                        row_number() OVER (PARTITION BY tt.tag_id ORDER BY s.created_at DESC, s.id DESC) AS rn
                 FROM transcript_tags tt
@@ -31,14 +32,15 @@ class TagLibraryQueries(private val jdbc: NamedParameterJdbcTemplate) {
                 JOIN transcripts t ON t.id = tt.transcript_id
                 JOIN submissions s ON s.id = t.submission_id
                 JOIN audio_meta a ON a.id = s.audio_id
-                WHERE g.user_id = :user
+                WHERE g.user_id = :user AND s.status = 'done'
             ) x
             WHERE x.rn <= :size
             ORDER BY x.tag_id, x.rn
             """.trimIndent(),
             mapOf("user" to userId, "size" to sampleSize),
-        ) { rs, _ -> rs.getObject("tag_id", UUID::class.java) to rs.getString("title") }
-            .groupBy({ it.first }, { it.second })
+        ) { rs, _ ->
+            rs.getObject("tag_id", UUID::class.java) to LibrarySample(rs.getObject("job_id", UUID::class.java), rs.getString("title"))
+        }.groupBy({ it.first }, { it.second })
 
         return jdbc.query(
             """

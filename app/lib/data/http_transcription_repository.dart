@@ -6,6 +6,7 @@ import '../models/suggestions.dart';
 import '../models/tag.dart';
 import '../models/tag_entry.dart';
 import '../models/transcription.dart';
+import '../models/transcription_link.dart';
 import '../models/transcription_detail.dart';
 import '../models/upload.dart';
 import 'gateway_client.dart';
@@ -67,7 +68,7 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
           TagEntry(
             tag: _tagFromJson(entry as Map<String, dynamic>),
             description: entry['description'] as String? ?? '',
-            transcriptions: [for (final title in (entry['sample_titles'] as List<dynamic>? ?? const [])) title as String],
+            transcriptions: _linksFromJson(entry['samples']),
             count: (entry['transcription_count'] as num?)?.toInt() ?? 0,
           ),
       ],
@@ -216,7 +217,7 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
         SpeakerEntry(
           speaker: _speakerFromJson(entry as Map<String, dynamic>),
           description: entry['description'] as String? ?? '',
-          transcriptions: [for (final title in (entry['sample_titles'] as List<dynamic>? ?? const [])) title as String],
+          transcriptions: _linksFromJson(entry['samples']),
           totalDuration: _secondsFromJson(entry['speaking_s']) ?? Duration.zero,
           count: (entry['transcription_count'] as num?)?.toInt() ?? 0,
         ),
@@ -306,6 +307,12 @@ String _sortParam(TranscriptionSort sort) => switch (sort) {
   TranscriptionSort.recordedOldest => 'recorded_oldest',
   _ => sort.name,
 };
+
+/// The transcriptions a tag or speaker card links to (`samples`: `[{job_id, title}]`); none when absent.
+List<TranscriptionLink> _linksFromJson(Object? samples) => [
+  for (final sample in (samples as List<dynamic>? ?? const []))
+    TranscriptionLink(id: (sample as Map<String, dynamic>)['job_id'] as String, title: sample['title'] as String),
+];
 
 /// A time the gateway may leave out (`recorded_at`), in the viewer's own zone; null when absent.
 DateTime? _timeFromJson(Object? value) => value is String ? DateTime.parse(value).toLocal() : null;

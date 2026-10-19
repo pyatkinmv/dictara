@@ -175,6 +175,23 @@ class SpeakerLibraryIntegrationTest : AbstractSharedContextIntegrationTest() {
 
     // ── Usage ──────────────────────────────────────────────────────────────────
 
+    private fun submissionOf(transcript: UUID): UUID =
+        jdbcTemplate.queryForObject("SELECT submission_id FROM transcripts WHERE id = ?", UUID::class.java, transcript)!!
+
+    @Test
+    fun `a transcription that is not finished is counted but is not offered as a sample to open`() {
+        val alexei = createSpeaker("Alexei")
+        val done = addTranscript("done.mp3", phrases = arrayOf(Triple(0, 10, "SPEAKER_00")))
+        voice(done, "SPEAKER_00", alexei)
+        val running = addTranscript("running.mp3", phrases = arrayOf(Triple(0, 10, "SPEAKER_00"))) // the newest
+        voice(running, "SPEAKER_00", alexei)
+        jdbcTemplate.update("UPDATE submissions SET status = 'summarizing' WHERE id = ?", submissionOf(running))
+
+        assertThat(entry("Alexei")["transcription_count"].asInt()).isEqualTo(2)
+        assertThat(entry("Alexei")["samples"].map { it["job_id"].asText() }).containsExactly(submissionOf(done).toString())
+        assertThat(entry("Alexei")["sample_titles"].map { it.asText() }).containsExactly("done.mp3")
+    }
+
     @Test
     fun `usage counts the transcriptions a speaker is in and the time of their phrases`() {
         val alexei = createSpeaker("Alexei")
@@ -191,6 +208,10 @@ class SpeakerLibraryIntegrationTest : AbstractSharedContextIntegrationTest() {
         assertThat(entry("Alexei")["transcription_count"].asInt()).isEqualTo(2)
         assertThat(entry("Alexei")["speaking_s"].asDouble()).isEqualTo(35.0) // 10 + 5 + 20
         assertThat(entry("Alexei")["sample_titles"].map { it.asText() }).containsExactly("b.mp3", "Meeting A") // newest first, file name without a title
+        // The same two with the id that opens each (job_id = the submission of the transcript), for the card's links.
+        assertThat(entry("Alexei")["samples"].map { it["job_id"].asText() to it["title"].asText() })
+            .containsExactly(submissionOf(b).toString() to "b.mp3", submissionOf(a).toString() to "Meeting A")
+        assertThat(entry("Nobody")["samples"]).isEmpty()
         assertThat(entry("Maria")["transcription_count"].asInt()).isEqualTo(1)
         assertThat(entry("Maria")["speaking_s"].asDouble()).isEqualTo(15.0)
         assertThat(entry("Nobody")["transcription_count"].asInt()).isZero()

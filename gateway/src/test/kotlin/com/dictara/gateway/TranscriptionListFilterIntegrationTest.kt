@@ -524,7 +524,7 @@ class TranscriptionListFilterIntegrationTest : AbstractSharedContextIntegrationT
 
         assertThat(body["tags"].map { it["label"].asText() }).containsExactly("zebra", "alpha", "beta")
         assertThat(body["tags"].first().fieldNames().asSequence().toList())
-            .containsExactlyInAnyOrder("id", "label", "color", "transcription_count", "sample_titles") // no description: left out
+            .containsExactlyInAnyOrder("id", "label", "color", "transcription_count", "samples", "sample_titles") // no description: left out
         assertThat(UUID.fromString(body["tags"].first()["id"].asText())).isNotNull()
     }
 
