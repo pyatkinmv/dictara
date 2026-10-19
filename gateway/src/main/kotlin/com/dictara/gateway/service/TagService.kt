@@ -78,6 +78,18 @@ class TagService(
 
     data class Library(val tags: List<LibraryEntry>, val taggedTranscriptions: Int)
 
+    /** A tag as a menu or a filter needs it (`view=brief`): the tag itself, nothing about where it is used. */
+    data class BriefEntry(val id: UUID, val label: String, val description: String?) {
+        val color: String get() = NameColors.of(label)
+    }
+
+    data class BriefLibrary(val tags: List<BriefEntry>)
+
+    @Transactional(readOnly = true)
+    fun briefLibrary(userId: UUID): BriefLibrary = BriefLibrary(
+        libraryQueries.findBrief(userId).map { BriefEntry(it.id, it.name, it.description) },
+    )
+
     @Transactional(readOnly = true)
     fun library(userId: UUID): Library = Library(
         tags = libraryQueries.findLibrary(userId, SAMPLE_TITLES).map {

@@ -72,6 +72,18 @@ class SpeakerService(
 
     data class Library(val speakers: List<LibraryEntry>)
 
+    /** A speaker as a menu needs it (`view=brief`): who they are, nothing about where they are heard. */
+    data class BriefEntry(val id: UUID, val name: String, val description: String?) {
+        val color: String get() = NameColors.of(name)
+    }
+
+    data class BriefLibrary(val speakers: List<BriefEntry>)
+
+    @Transactional(readOnly = true)
+    fun briefLibrary(userId: UUID): BriefLibrary = BriefLibrary(
+        libraryQueries.findBrief(userId).map { BriefEntry(it.id, it.name, it.description) },
+    )
+
     @Transactional(readOnly = true)
     fun library(userId: UUID): Library = Library(
         libraryQueries.findLibrary(userId, SAMPLE_TITLES).map {

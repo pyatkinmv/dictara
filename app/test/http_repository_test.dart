@@ -330,6 +330,31 @@ void main() {
       expect((await repo.tags()).map((t) => t.label), ['meeting', 'unused']);
     });
 
+    test('tags() ask for the brief view, and read it: only id, label, color and description', () async {
+      final (repo, seen) = repoWith({
+        'GET /api/tags': (_) => _json({
+          'tags': [
+            {'id': 'a', 'label': 'meeting', 'color': '#2563EB', 'description': 'Regular meetings'},
+            {'id': 'b', 'label': 'unused', 'color': '#059669'},
+          ],
+        }),
+      });
+
+      final tags = await repo.tags();
+
+      expect(seen.single.url.queryParameters, {'view': 'brief'});
+      expect(tags.map((t) => t.label), ['meeting', 'unused']);
+      expect(tags.first.color, const Color(0xFF2563EB));
+    });
+
+    test('the tag library page still asks for the full list', () async {
+      final (repo, seen) = repoWith({'GET /api/tags': (_) => _json(libraryJson)});
+
+      await repo.tagLibrary();
+
+      expect(seen.single.url.queryParameters.containsKey('view'), isFalse);
+    });
+
     test('an answer that is not the library is an error', () async {
       final (repo, _) = repoWith({'GET /api/tags': (_) => _json(['oops'])});
 
@@ -500,6 +525,31 @@ void main() {
       final (repo, _) = repoWith({'GET /api/speakers': (_) => _json(libraryJson)});
 
       expect((await repo.speakers()).map((s) => s.name), ['Maria Chen', 'Unused']);
+    });
+
+    test('speakers() ask for the brief view, and read it: only id, name, color and description', () async {
+      final (repo, seen) = repoWith({
+        'GET /api/speakers': (_) => _json({
+          'speakers': [
+            {'id': 'a', 'name': 'Maria Chen', 'color': '#8F13AE', 'description': 'Head of Engineering'},
+            {'id': 'b', 'name': 'Unused', 'color': '#059669'},
+          ],
+        }),
+      });
+
+      final speakers = await repo.speakers();
+
+      expect(seen.single.url.queryParameters, {'view': 'brief'});
+      expect(speakers.map((s) => s.name), ['Maria Chen', 'Unused']);
+      expect(speakers.first.color, const Color(0xFF8F13AE));
+    });
+
+    test('the speaker library page still asks for the full list', () async {
+      final (repo, seen) = repoWith({'GET /api/speakers': (_) => _json(libraryJson)});
+
+      await repo.speakerLibrary();
+
+      expect(seen.single.url.queryParameters.containsKey('view'), isFalse);
     });
 
     test('an answer that is not the library is an error', () async {

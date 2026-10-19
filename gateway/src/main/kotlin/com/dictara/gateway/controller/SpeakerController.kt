@@ -1,5 +1,6 @@
 package com.dictara.gateway.controller
 
+import com.dictara.gateway.service.LibraryView
 import com.dictara.gateway.service.SpeakerRef
 import com.dictara.gateway.service.SpeakerService
 import com.dictara.gateway.service.TranscriptSpeakerService
@@ -19,11 +20,22 @@ class SpeakerController(
     data class DeleteResponse(val affectedTranscriptions: Int)
 
     /**
-     * The whole library in creation order: each speaker with description, color, in how many transcriptions
-     * they are heard, for how long (`speaking_s`, seconds) and the titles of the latest two.
+     * The library in creation order. `view=full` (the default): each speaker with description, color, in how many
+     * transcriptions they are heard, for how long (`speaking_s`, seconds) and the latest two of them. `view=brief`:
+     * only `id`, `name`, `color` and `description`, which is all a menu needs and costs a single cheap query
+     * (the times are what makes the full list slow). Any other view is a 400.
      */
     @GetMapping("/speakers")
-    fun library(request: HttpServletRequest): SpeakerService.Library = speakerService.library(userId(request))
+    fun library(@RequestParam(required = false) view: String?, request: HttpServletRequest): Any {
+        val userId = userId(request)
+        return when (LibraryView.parse(view) ?: throw unknownView(view)) {
+            LibraryView.FULL -> speakerService.library(userId)
+            LibraryView.BRIEF -> speakerService.briefLibrary(userId)
+        }
+    }
+
+    private fun unknownView(view: String?) =
+        ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown view '$view'; expected one of ${LibraryView.names}")
 
     /** Body `{name, description?}`. 400 for a bad name, 409 when the user already has a speaker of that name (any case). */
     @PostMapping("/speakers")

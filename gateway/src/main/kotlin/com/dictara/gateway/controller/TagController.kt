@@ -1,5 +1,6 @@
 package com.dictara.gateway.controller
 
+import com.dictara.gateway.service.LibraryView
 import com.dictara.gateway.service.TagRef
 import com.dictara.gateway.service.TagService
 import jakarta.servlet.http.HttpServletRequest
@@ -15,11 +16,22 @@ class TagController(private val tagService: TagService) {
     data class DeleteResponse(val affectedTranscriptions: Int)
 
     /**
-     * The whole library in creation order: each tag with its description, color, how many transcriptions
-     * carry it and the titles of the latest two, plus how many transcriptions carry any tag at all.
+     * The library in creation order. `view=full` (the default): each tag with its description, color, how many
+     * transcriptions carry it and the latest two of them, plus how many transcriptions carry any tag at all.
+     * `view=brief`: only `id`, `label`, `color` and `description`, which is all a menu or a filter needs. Any other
+     * view is a 400.
      */
     @GetMapping("/tags")
-    fun library(request: HttpServletRequest): TagService.Library = tagService.library(userId(request))
+    fun library(@RequestParam(required = false) view: String?, request: HttpServletRequest): Any {
+        val userId = userId(request)
+        return when (LibraryView.parse(view) ?: throw unknownView(view)) {
+            LibraryView.FULL -> tagService.library(userId)
+            LibraryView.BRIEF -> tagService.briefLibrary(userId)
+        }
+    }
+
+    private fun unknownView(view: String?) =
+        ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown view '$view'; expected one of ${LibraryView.names}")
 
     /** Body `{label, description?}`. 400 for a bad name, 409 when the user already has a tag of that name. */
     @PostMapping("/tags")

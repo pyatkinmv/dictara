@@ -44,6 +44,10 @@ Audio is an object of its own, independent of user and options; a transcription 
    **Only a few files at a time reach storage** (`dictara.storage.max-concurrent-uploads`, 4; a fair `Semaphore` in `AudioIngestService` around `AudioStorage.upload`, so the others wait in the order they came; content already stored does not wait). The GCS client reserves its upload buffer (15 MiB by default, whatever the size of the file) per upload, and a user forwarding a whole chat to the bot filled the heap of the 2 GB VM with `OutOfMemoryError` in `StorageImpl.uploadHelper`; the buffer is `GcsAudioStorage.UPLOAD_BUFFER_BYTES` (2 MiB) now. The dedup lock waits up to a minute (`SubmissionService.DEDUP_LOCK_MAX_ATTEMPTS`) because dozens of copies of one file queue on it in such a burst.
 3. **Same result is not made twice.** Same user + SHA-256 + model + language + diarize + number of speakers + summary mode (failed jobs excluded) returns the existing job. This is about results, so the options matter.
 
+### Library lists: `view=full` and `view=brief`
+
+`GET /tags` and `GET /speakers` take `view` (`LibraryView`): `full` (the default, what a client that does not know the parameter always got: counts, times, `samples`) and `brief` (`id`, `name`/`label`, `color`, `description` only, one cheap query each). The brief view exists because the menus and filters (the Add tag menu, the Speaker Picker, the list's filters) only need who and what, while the full list adds up how long each speaker speaks over all ~350k phrases (~300 ms); the app asks for `brief` everywhere except the Tags and Speakers pages. Any other value is a 400. Adding a representation here means adding a value to `LibraryView`, not a new path (a path like `/speakers/brief` would sit where `/speakers/{id}` does).
+
 ### Transcripts, speakers, suggestions (data model)
 
 - `transcript_segments`: one row per phrase (`idx`, `start_s`, `end_s`, `text`, `voice`, `speaker_id`). The old JSON column `transcripts.segments` is still written too (dual write, marked `TODO(drop-json-segments)`) and is to be dropped in a later release.
