@@ -1,6 +1,7 @@
 package com.dictara.gateway.mcp.token
 
 import com.dictara.gateway.mcp.McpProperties
+import com.dictara.gateway.plan.PlanService
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Service
@@ -51,10 +52,15 @@ data class McpPrincipal(val userId: UUID, val tokenId: UUID, val tokenName: Stri
 sealed interface TokenCheck {
     data class Valid(val principal: McpPrincipal) : TokenCheck
     data object Expired : TokenCheck
+
+    /** A working token whose owner's plan does not (any longer) include MCP access. */
+    data object NotInPlan : TokenCheck
     data object Invalid : TokenCheck
 }
 
 class TokenLimitReachedException(val max: Int) : RuntimeException("You already have $max working tokens; revoke one first")
+
+class McpNotInPlanException : RuntimeException("MCP access is not included in your plan")
 
 class InvalidTokenNameException : RuntimeException("A token needs a name of 1 to ${McpTokenService.MAX_NAME} characters")
 
@@ -68,10 +74,15 @@ class InvalidTokenNameException : RuntimeException("A token needs a name of 1 to
 class McpTokenService(
     private val jdbc: NamedParameterJdbcTemplate,
     private val props: McpProperties,
+    private val plans: PlanService,
 ) {
     private val random = SecureRandom()
 
+    /** Whether the user's plan includes MCP access: what lets them make tokens, and lets their tokens work. */
+    fun availableTo(userId: UUID): Boolean = plans.mcpAccess(userId)
+
     fun create(userId: UUID, rawName: String?, access: McpAccess): CreatedToken {
+        if (!availableTo(userId)) throw McpNotInPlanException()
         val name = rawName?.trim().orEmpty()
         if (name.isEmpty() || name.length > MAX_NAME) throw InvalidTokenNameException()
         val working = jdbc.queryForObject(
@@ -127,6 +138,9 @@ class McpTokenService(
             )
         }.firstOrNull() ?: return TokenCheck.Invalid
         if (!found.second.isAfter(Instant.now())) return TokenCheck.Expired
+        // Asked at every call, not when the token is made: a plan that changes changes this at once, and the token
+        // (kept, not revoked) works again when the plan includes MCP again.
+        if (!availableTo(found.first.userId)) return TokenCheck.NotInPlan
         // Not on every call: a minute of precision is enough for "last used" and spares the table.
         jdbc.update(
             "UPDATE mcp.access_tokens SET last_used_at = now() WHERE id = :id AND (last_used_at IS NULL OR last_used_at < now() - interval '1 minute')",

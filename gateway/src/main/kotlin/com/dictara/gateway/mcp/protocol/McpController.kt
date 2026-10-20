@@ -52,6 +52,9 @@ class McpController(
             is TokenCheck.Valid -> check.principal
             TokenCheck.Expired -> return unauthorized("token_expired", "This token has expired. Create a new one in Settings.")
             TokenCheck.Invalid -> return unauthorized("invalid_token", "The token is missing, wrong or revoked.")
+            TokenCheck.NotInPlan -> return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                mapOf("error" to "mcp_not_in_plan", "error_description" to "MCP access is not included in the plan of this token's owner."),
+            )
         }
         if (!limiter.tryAcquire(principal.tokenId)) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).header(HttpHeaders.RETRY_AFTER, "60")

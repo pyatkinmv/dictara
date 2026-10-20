@@ -330,6 +330,56 @@ void main() {
     });
   });
 
+  group('MCP access, a plan that does not include it', () {
+    testWidgets('says so instead of offering a token: no address, no Create button', (tester) async {
+      await open(tester, api: FakeMcpTokensApi()..available = false);
+
+      expect(find.byKey(const Key('mcp-not-in-plan')), findsOneWidget);
+      expect(find.text('MCP access comes with the Ultra plan'), findsOneWidget);
+      expect(find.byKey(const Key('create-token')), findsNothing);
+      expect(find.byKey(const Key('mcp-server-url')), findsNothing);
+      expect(find.byKey(const Key('no-tokens')), findsNothing);
+      expect(find.text('Your tokens'), findsNothing);
+    });
+
+    testWidgets('does not flash the notice while the list is loading', (tester) async {
+      final api = FakeMcpTokensApi()..listGate = Completer<void>();
+      await open(tester, api: api);
+
+      expect(find.byKey(const Key('mcp-not-in-plan')), findsNothing);
+      expect(find.byKey(const Key('create-token')), findsOneWidget);
+
+      api.available = false;
+      api.listGate!.complete();
+      await settle(tester);
+      expect(find.byKey(const Key('mcp-not-in-plan')), findsOneWidget);
+    });
+
+    testWidgets('tokens made earlier stay listed as not working, with a way to remove them and none to replace them', (tester) async {
+      final api = FakeMcpTokensApi([fakeToken('Old agent'), fakeToken('Ended', status: McpTokenStatus.expired)])..available = false;
+      await open(tester, api: api);
+
+      expect(find.byKey(const Key('mcp-not-in-plan')), findsOneWidget);
+      expect(find.text('Your tokens'), findsOneWidget);
+      expect(find.text('Old agent'), findsOneWidget);
+      expect(find.text('Not working: your plan does not include MCP access.'), findsNWidgets(2));
+      expect(find.text('Create replacement'), findsNothing);
+      expect(find.byKey(const Key('create-token')), findsNothing);
+      expect(find.byKey(const Key('expired-banner')), findsNothing);
+
+      await tester.tap(find.text('Delete'));
+      await settle(tester);
+      expect(api.revoked, ['ended']);
+    });
+
+    testWidgets('a plan that includes it shows no notice', (tester) async {
+      await open(tester, api: FakeMcpTokensApi());
+
+      expect(find.byKey(const Key('mcp-not-in-plan')), findsNothing);
+      expect(find.byKey(const Key('create-token')), findsOneWidget);
+    });
+  });
+
   group('MCP access, creating a token', () {
     Future<void> openCreate(WidgetTester tester, FakeMcpTokensApi api) async {
       await open(tester, api: api);

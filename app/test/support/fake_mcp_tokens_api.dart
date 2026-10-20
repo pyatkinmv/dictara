@@ -9,6 +9,9 @@ class FakeMcpTokensApi implements McpTokensApi {
 
   List<McpToken> tokens;
 
+  /// Whether the user's plan includes MCP access (what the gateway's list says).
+  bool available = true;
+
   /// Thrown by the next `create`, once (a refusal such as "too many tokens").
   Object? failCreateWith;
 
@@ -27,7 +30,7 @@ class FakeMcpTokensApi implements McpTokensApi {
   var _next = 100;
 
   @override
-  Future<List<McpToken>> list() async {
+  Future<McpTokenList> list() async {
     listCalls++;
     await listGate?.future;
     final fail = failListWith;
@@ -35,7 +38,7 @@ class FakeMcpTokensApi implements McpTokensApi {
       failListWith = null;
       throw fail;
     }
-    return List.unmodifiable(tokens);
+    return McpTokenList(tokens: List.unmodifiable(tokens), available: available);
   }
 
   @override

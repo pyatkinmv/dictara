@@ -36,7 +36,7 @@ void main() {
           ],
         }), seen);
 
-    final tokens = await api.list();
+    final tokens = (await api.list()).tokens;
 
     expect(seen.single.method, 'GET');
     expect(seen.single.url.path, '/api/mcp-tokens');
@@ -54,10 +54,16 @@ void main() {
           'tokens': [{...entry, 'status': 'something-new', 'access': 'admin'}],
         }));
 
-    final token = (await api.list()).single;
+    final token = (await api.list()).tokens.single;
 
     expect(token.status, McpTokenStatus.active);
     expect(token.access, McpAccess.read);
+  });
+
+  test('the list says whether the plan includes MCP access; an answer that does not say means it does', () async {
+    expect((await _api((_) async => _json({'tokens': [], 'mcp_available': false})).list()).available, isFalse);
+    expect((await _api((_) async => _json({'tokens': [], 'mcp_available': true})).list()).available, isTrue);
+    expect((await _api((_) async => _json({'tokens': []})).list()).available, isTrue);
   });
 
   test('an answer that is not a list of tokens is an error', () async {

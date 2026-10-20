@@ -29,7 +29,9 @@ abstract class AbstractMcpIntegrationTest : AbstractSharedContextIntegrationTest
 
     protected class Reply(val status: Int, val body: JsonNode?, val headers: HttpHeaders)
 
-    protected fun newUser(): UUID = UUID.randomUUID().also { jdbcTemplate.update("INSERT INTO users(id) VALUES (?)", it) }
+    /** A user on [plan]: Ultra (`unlimited`) by default, the plan that includes MCP access, so that tokens can be made. */
+    protected fun newUser(plan: String = "unlimited"): UUID =
+        UUID.randomUUID().also { jdbcTemplate.update("INSERT INTO users(id, plan) VALUES (?, ?)", it, plan) }
 
     /** A working token of [user] and its secret. */
     protected fun mint(user: UUID, access: McpAccess = McpAccess.READ, name: String = "test token") = tokens.create(user, name, access).secret

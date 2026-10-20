@@ -38,7 +38,8 @@ class McpTokenController(private val tokens: McpTokenService) {
         val token: String,
     )
 
-    data class ListResponse(val tokens: List<TokenView>)
+    /** [mcpAvailable]: whether the user's plan includes MCP access; when it does not, they cannot make tokens (and the ones they have do not work). */
+    data class ListResponse(val tokens: List<TokenView>, val mcpAvailable: Boolean)
 
     /** Body `{name, access}`, `access` being `read` (the default) or `write`. The lifetime is fixed, see [McpTokenService]. */
     @PostMapping
@@ -51,6 +52,8 @@ class McpTokenController(private val tokens: McpTokenService) {
             tokens.create(userId, body.name, access)
         } catch (e: InvalidTokenNameException) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, e.message)
+        } catch (e: McpNotInPlanException) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, e.message)
         } catch (e: TokenLimitReachedException) {
             throw ResponseStatusException(HttpStatus.CONFLICT, e.message)
         }
@@ -60,7 +63,10 @@ class McpTokenController(private val tokens: McpTokenService) {
 
     /** The user's tokens that are not revoked, ended ones included (the app shows them as expired). No secrets. */
     @GetMapping
-    fun list(request: HttpServletRequest) = ListResponse(tokens.list(userId(request)))
+    fun list(request: HttpServletRequest): ListResponse {
+        val userId = userId(request)
+        return ListResponse(tokens.list(userId), tokens.availableTo(userId))
+    }
 
     /** Revokes a token (or removes an ended one from the list). 404 for someone else's token and for one that is gone. */
     @DeleteMapping("/{id}")
