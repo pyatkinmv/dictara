@@ -26,6 +26,8 @@ data class McpProperties(
     val rateLimitPerMinute: Int = 120,
     /** The text of one tool result is cut at this many characters, with a note on how to ask for the rest. */
     val maxResultChars: Int = 60_000,
+    /** A request body bigger than this is refused (413) without being read to the end: arguments are small. */
+    val maxRequestBytes: Int = 262_144,
 )
 
 @Configuration

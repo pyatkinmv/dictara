@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dictara_web/data/mcp_tokens_api.dart';
 
 /// An in-memory [McpTokensApi] that behaves like the gateway: new tokens come first, a created one has a secret that is
@@ -13,6 +15,12 @@ class FakeMcpTokensApi implements McpTokensApi {
   /// Thrown by the next `list`, once.
   Object? failListWith;
 
+  /// When set, `list` waits for it: the page is still loading.
+  Completer<void>? listGate;
+
+  /// Thrown by the next `revoke`, once.
+  Object? failRevokeWith;
+
   int listCalls = 0;
   final created = <({String name, McpAccess access})>[];
   final revoked = <String>[];
@@ -21,6 +29,7 @@ class FakeMcpTokensApi implements McpTokensApi {
   @override
   Future<List<McpToken>> list() async {
     listCalls++;
+    await listGate?.future;
     final fail = failListWith;
     if (fail != null) {
       failListWith = null;
@@ -54,6 +63,11 @@ class FakeMcpTokensApi implements McpTokensApi {
 
   @override
   Future<void> revoke(String id) async {
+    final fail = failRevokeWith;
+    if (fail != null) {
+      failRevokeWith = null;
+      throw fail;
+    }
     revoked.add(id);
     tokens = [for (final t in tokens) if (t.id != id) t];
   }
