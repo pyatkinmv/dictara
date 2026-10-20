@@ -6,6 +6,7 @@ import 'package:dictara_web/data/mcp_tokens_api.dart';
 import 'package:dictara_web/data/profile_api.dart';
 import 'package:dictara_web/pages/settings/settings_page.dart';
 import 'package:dictara_web/shell/nav_destinations.dart';
+import 'package:dictara_web/shell/topbar.dart';
 import 'package:dictara_web/pages/settings/token_dialogs.dart';
 import 'package:dictara_web/state/auth_controller.dart';
 import 'package:dictara_web/state/mcp_tokens_controller.dart';
@@ -29,7 +30,7 @@ void main() {
   Future<void> open(
     WidgetTester tester, {
     FakeMcpTokensApi? api,
-    String location = '/settings',
+    String location = '/settings/mcp-access', // the tab most of these tests are about
     Size size = const Size(1280, 800),
   }) async {
     tester.view.physicalSize = size;
@@ -55,40 +56,79 @@ void main() {
   ];
 
   group('the tabs', () {
-    testWidgets('Settings opens MCP access, the first tab, and Profile is the second', (tester) async {
-      await open(tester);
+    testWidgets('Settings opens Profile, the first tab, and MCP access is the second', (tester) async {
+      await open(tester, location: '/settings');
 
       expect(find.text('Settings'), findsWidgets);
       expect(find.text('MCP access'), findsOneWidget);
       expect(find.text('Profile'), findsOneWidget);
-      expect(find.text('SERVER ADDRESS'), findsOneWidget); // the content of the first tab
+      expect(find.byKey(const Key('profile-name')), findsOneWidget); // the content of the first tab
+      expect(find.text('SERVER ADDRESS'), findsNothing);
       final order = [for (final s in settingsSections) s.label];
-      expect(order, ['MCP access', 'Profile']);
+      expect(order, ['Profile', 'MCP access']);
     });
 
-    testWidgets('clicking a tab goes to it, and a section that does not exist falls back to the first', (tester) async {
-      await open(tester);
+    testWidgets('clicking a tab goes to it', (tester) async {
+      await open(tester, location: '/settings');
+
+      await tester.tap(find.text('MCP access'));
+      await settle(tester);
+      expect(find.text('SERVER ADDRESS'), findsOneWidget);
+      expect(find.byKey(const Key('profile-name')), findsNothing);
 
       await tester.tap(find.text('Profile'));
       await settle(tester);
       expect(find.byKey(const Key('profile-name')), findsOneWidget);
       expect(find.text('SERVER ADDRESS'), findsNothing);
-
-      await tester.tap(find.text('MCP access'));
-      await settle(tester);
-      expect(find.text('SERVER ADDRESS'), findsOneWidget);
     });
 
-    testWidgets('an address of a section that does not exist shows the first one', (tester) async {
+    testWidgets('an address of a section that does not exist shows the first one, Profile', (tester) async {
       await open(tester, location: '/settings/nonsense');
 
-      expect(find.text('SERVER ADDRESS'), findsOneWidget);
+      expect(find.byKey(const Key('profile-name')), findsOneWidget);
     });
 
     testWidgets('each tab has its own address', (tester) async {
       await open(tester, location: '/settings/profile');
 
       expect(find.byKey(const Key('profile-name')), findsOneWidget);
+    });
+  });
+
+  group('the title in the topbar', () {
+    String topbarTitle(WidgetTester tester) => tester.widget<Topbar>(find.byType(Topbar)).title;
+
+    testWidgets('a transcription\'s title is shown on its page only: leaving it for Settings (or anywhere) shows the section', (tester) async {
+      await open(tester, location: '/transcriptions/0');
+      expect(topbarTitle(tester), 'Quarterly Review Meeting');
+
+      await tester.tap(find.text('Settings'));
+      await settle(tester);
+      expect(topbarTitle(tester), 'Settings');
+
+      await tester.tap(find.text('MCP access'));
+      await settle(tester);
+      expect(topbarTitle(tester), 'Settings'); // a tab is not a transcription either
+
+      await tester.tap(find.text('Tags').first);
+      await settle(tester);
+      expect(topbarTitle(tester), 'Tags');
+    });
+
+    testWidgets('and each address of Settings has Settings as its title, with or without a transcription opened before', (tester) async {
+      await open(tester, location: '/settings/profile');
+      expect(topbarTitle(tester), 'Settings');
+
+      await tester.tap(find.text('Transcriptions').first);
+      await settle(tester);
+      await tester.tap(find.text('Quarterly Review Meeting'));
+      await settle(tester);
+      expect(topbarTitle(tester), 'Quarterly Review Meeting');
+
+      await tester.tap(find.text('Settings'));
+      await settle(tester);
+      expect(topbarTitle(tester), 'Settings');
+      expect(find.text('Quarterly Review Meeting'), findsNothing); // not a word of it left on the page
     });
   });
 
@@ -273,7 +313,9 @@ void main() {
       api.tokens = [...api.tokens, fakeToken('Two')]; // made elsewhere (another device) meanwhile
       await tester.tap(find.text('Tags')); // leave Settings
       await settle(tester);
-      await tester.tap(find.text('Settings').last); // and come back
+      await tester.tap(find.text('Settings').last); // and come back (to Profile, the first tab)
+      await settle(tester);
+      await tester.tap(find.text('MCP access'));
       await settle(tester);
 
       expect(api.listCalls, 2);
@@ -285,6 +327,56 @@ void main() {
 
       expect(find.text('OpenCode on laptop'), findsOneWidget);
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('MCP access, a plan that does not include it', () {
+    testWidgets('says so instead of offering a token: no address, no Create button', (tester) async {
+      await open(tester, api: FakeMcpTokensApi()..available = false);
+
+      expect(find.byKey(const Key('mcp-not-in-plan')), findsOneWidget);
+      expect(find.text('MCP access comes with the Ultra plan'), findsOneWidget);
+      expect(find.byKey(const Key('create-token')), findsNothing);
+      expect(find.byKey(const Key('mcp-server-url')), findsNothing);
+      expect(find.byKey(const Key('no-tokens')), findsNothing);
+      expect(find.text('Your tokens'), findsNothing);
+    });
+
+    testWidgets('does not flash the notice while the list is loading', (tester) async {
+      final api = FakeMcpTokensApi()..listGate = Completer<void>();
+      await open(tester, api: api);
+
+      expect(find.byKey(const Key('mcp-not-in-plan')), findsNothing);
+      expect(find.byKey(const Key('create-token')), findsOneWidget);
+
+      api.available = false;
+      api.listGate!.complete();
+      await settle(tester);
+      expect(find.byKey(const Key('mcp-not-in-plan')), findsOneWidget);
+    });
+
+    testWidgets('tokens made earlier stay listed as not working, with a way to remove them and none to replace them', (tester) async {
+      final api = FakeMcpTokensApi([fakeToken('Old agent'), fakeToken('Ended', status: McpTokenStatus.expired)])..available = false;
+      await open(tester, api: api);
+
+      expect(find.byKey(const Key('mcp-not-in-plan')), findsOneWidget);
+      expect(find.text('Your tokens'), findsOneWidget);
+      expect(find.text('Old agent'), findsOneWidget);
+      expect(find.text('Not working: your plan does not include MCP access.'), findsNWidgets(2));
+      expect(find.text('Create replacement'), findsNothing);
+      expect(find.byKey(const Key('create-token')), findsNothing);
+      expect(find.byKey(const Key('expired-banner')), findsNothing);
+
+      await tester.tap(find.text('Delete'));
+      await settle(tester);
+      expect(api.revoked, ['ended']);
+    });
+
+    testWidgets('a plan that includes it shows no notice', (tester) async {
+      await open(tester, api: FakeMcpTokensApi());
+
+      expect(find.byKey(const Key('mcp-not-in-plan')), findsNothing);
+      expect(find.byKey(const Key('create-token')), findsOneWidget);
     });
   });
 

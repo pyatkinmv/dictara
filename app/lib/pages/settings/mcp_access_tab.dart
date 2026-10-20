@@ -18,6 +18,7 @@ class McpAccessTab extends StatelessWidget {
     final p = context.palette;
     final controller = context.watch<McpTokensController>();
     final tokens = controller.tokens;
+    final available = controller.available;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -27,25 +28,37 @@ class McpAccessTab extends StatelessWidget {
           style: TextStyle(fontSize: 13.5, height: 1.55, color: p.text2),
         ),
         const SizedBox(height: 18),
-        Text(
-          'SERVER ADDRESS',
-          style: TextStyle(fontSize: 11, height: 14 / 11, fontWeight: FontWeight.w700, letterSpacing: .77, color: p.text3),
-        ),
-        const SizedBox(height: 6),
-        CopyBlock(text: mcpServerUrl(), blockKey: const Key('mcp-server-url')),
-        const SizedBox(height: 22),
-        if (controller.expiredCount > 0) ...[
-          _ExpiredBanner(count: controller.expiredCount),
-          const SizedBox(height: 14),
-        ],
-        Row(
-          children: [
-            const Expanded(child: Text('Your tokens', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
-            _CreateButton(onTap: () => showCreateTokenDialog(context)),
+        if (!available) ...[
+          const _NotInPlanNotice(),
+          // Tokens made while the plan had it stay listed, so that they can be removed.
+          if (tokens.isNotEmpty) const SizedBox(height: 22),
+        ] else ...[
+          Text(
+            'SERVER ADDRESS',
+            style: TextStyle(fontSize: 11, height: 14 / 11, fontWeight: FontWeight.w700, letterSpacing: .77, color: p.text3),
+          ),
+          const SizedBox(height: 6),
+          CopyBlock(text: mcpServerUrl(), blockKey: const Key('mcp-server-url')),
+          const SizedBox(height: 22),
+          if (controller.expiredCount > 0) ...[
+            _ExpiredBanner(count: controller.expiredCount),
+            const SizedBox(height: 14),
           ],
-        ),
-        const SizedBox(height: 10),
-        if (!controller.loaded)
+          Row(
+            children: [
+              const Expanded(child: Text('Your tokens', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+              _CreateButton(onTap: () => showCreateTokenDialog(context)),
+            ],
+          ),
+          const SizedBox(height: 10),
+        ],
+        if (!available && tokens.isNotEmpty) ...[
+          const Text('Your tokens', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 10),
+        ],
+        if (!available && tokens.isEmpty)
+          const SizedBox.shrink()
+        else if (!controller.loaded)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 24),
             child: Text('Loading…', style: TextStyle(fontSize: 13, color: p.text3)),
@@ -54,10 +67,43 @@ class McpAccessTab extends StatelessWidget {
           const _EmptyState()
         else
           for (final token in tokens) ...[
-            _TokenCard(token: token),
+            _TokenCard(token: token, usable: available),
             const SizedBox(height: 10),
           ],
       ],
+    );
+  }
+}
+
+/// Shown instead of the address and the Create button when the user's plan does not include MCP access.
+class _NotInPlanNotice extends StatelessWidget {
+  const _NotInPlanNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Container(
+      key: const Key('mcp-not-in-plan'),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      decoration: BoxDecoration(
+        color: p.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: p.border),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.lock_outline_rounded, size: 28, color: p.text3),
+          const SizedBox(height: 10),
+          const Text('MCP access comes with the Ultra plan', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text(
+            'Your current plan does not include it, so tokens cannot be created. '
+            'Tokens made earlier do not work until your plan includes MCP access again.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, height: 1.5, color: p.text3),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -137,9 +183,12 @@ class _EmptyState extends StatelessWidget {
 /// One token. Working: plain. Ending within 14 days: amber, with the days left. Ended: red, said plainly, with a way to
 /// make a replacement and to remove it.
 class _TokenCard extends StatelessWidget {
-  const _TokenCard({required this.token});
+  const _TokenCard({required this.token, this.usable = true});
 
   final McpToken token;
+
+  /// False when the plan does not include MCP: the token is listed to be removed, not to be replaced.
+  final bool usable;
 
   @override
   Widget build(BuildContext context) {
@@ -186,7 +235,10 @@ class _TokenCard extends StatelessWidget {
           ].join(' · '),
           style: TextStyle(fontSize: 12, height: 1.5, color: p.text3),
         ),
-        if (expired) ...[
+        if (!usable) ...[
+          const SizedBox(height: 4),
+          Text('Not working: your plan does not include MCP access.', style: TextStyle(fontSize: 12.5, height: 1.5, color: p.text3)),
+        ] else if (expired) ...[
           const SizedBox(height: 4),
           Text(
             'Stopped working. Create a new token and put it in your agent\'s settings.',
@@ -200,7 +252,7 @@ class _TokenCard extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: [
-        if (expired)
+        if (expired && usable)
           _SmallButton(
             label: 'Create replacement',
             primary: true,

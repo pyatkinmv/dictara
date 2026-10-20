@@ -9,6 +9,16 @@ An agent (Claude Code, OpenCode) connects to `POST /api/mcp` (the gateway's `/mc
 - **The user comes from the token only.** A tool never takes a user id from its arguments, and tools and the facade cannot even see the HTTP request (ArchUnit checks that). Another user's transcription is "not found", exactly as in the app.
 - **Paid work is never available**, to any token. See below.
 
+## Who may use it: a capability of the plan
+
+MCP access is **a property of the plan**, not a check of its name: `"mcp_access": true` in `plans.constraints` (V43 gave it to `unlimited`, Ultra; `free` and the guest plan `anonymous` do not have it). `PlanService.mcpAccess(userId)` answers; nothing in the code says "Ultra". Giving MCP to another plan is one `UPDATE plans`, and a plan can be sold or renamed without touching the feature. Unlike the limits (no key = no limit), **no key = not included**: a capability has to be granted.
+
+It is asked in two places, so that a changed plan changes things at once:
+- **Making a token** (`POST /mcp-tokens`): `403 "MCP access is not included in your plan"`.
+- **Every call with a token** (`McpTokenService.authenticate`): `403 {"error": "mcp_not_in_plan"}`. The token is kept, not revoked: when the plan includes MCP again (an upgrade) it works again without a new one.
+
+`GET /mcp-tokens` carries `mcp_available` (the plan includes it), and lists the user's tokens either way, so that tokens made earlier can still be revoked. Tests: `McpPlanAccessIntegrationTest`.
+
 ## Tokens: how a user gets and loses one
 
 `/mcp-tokens` is for the signed-in app only (the session JWT); an MCP token is not accepted there, so a token can neither mint another token nor extend its own life.
@@ -17,7 +27,7 @@ An agent (Claude Code, OpenCode) connects to `POST /api/mcp` (the gateway's `/mc
 POST   /mcp-tokens            {"name": "OpenCode on laptop", "access": "read"}   (access: read, the default, or write)
 → 201 {"id": "…", "name": "…", "prefix": "dtr_Zk3p", "access": "read", "status": "active",
        "created_at": "…", "expires_at": "…", "token": "dtr_Zk3p…"}               (token: this one time)
-GET    /mcp-tokens            → {"tokens": [{id, name, prefix, access, status, created_at, expires_at, last_used_at?}]}
+GET    /mcp-tokens            → {"tokens": [{id, name, prefix, access, status, created_at, expires_at, last_used_at?}], "mcp_available": true}
 DELETE /mcp-tokens/{id}       → 204; 404 for someone else's token or one already gone
 ```
 
@@ -34,7 +44,7 @@ claude mcp add --transport http dictara https://dictary.app/api/mcp --header "Au
 
 ## Where the user manages tokens (the app)
 
-Settings → **MCP access** (the first tab; the second is Profile). Cards, one per token: name, access chip, prefix, when created, when it ends, when last used; **Revoke** (asks first). The server address is on top with a Copy button. **Create token** asks only for a name and read only / read and write (the 90 days are stated, not asked), then shows the token once with the ready command for Claude Code and the `opencode.json` entry for OpenCode; that window cannot be closed by a click outside. A token that has expired is red with a plain sentence, a banner, a red dot on the tab and "Create replacement"; one that ends within 14 days is amber with the days left. Details in `app/CLAUDE.md`.
+Settings → **MCP access** (the second tab; the first is Profile). Cards, one per token: name, access chip, prefix, when created, when it ends, when last used; **Revoke** (asks first). The server address is on top with a Copy button. **Create token** asks only for a name and read only / read and write (the 90 days are stated, not asked), then shows the token once with the ready command for Claude Code and the `opencode.json` entry for OpenCode; that window cannot be closed by a click outside. A token that has expired is red with a plain sentence, a banner, a red dot on the tab and "Create replacement"; one that ends within 14 days is amber with the days left. For a plan that does not include MCP the tab shows "MCP access comes with the Ultra plan" instead of the address and Create button; tokens made earlier stay listed as "Not working" with Revoke/Delete. Details in `app/CLAUDE.md`.
 
 ## Tools (stage 1: read)
 

@@ -43,6 +43,15 @@ class McpToken {
   final DateTime? lastUsedAt;
 }
 
+/// The user's tokens, and whether their plan includes MCP access at all (`mcp_available` of the gateway): without it
+/// they cannot make tokens, and the ones they have do not work.
+class McpTokenList {
+  const McpTokenList({required this.tokens, this.available = true});
+
+  final List<McpToken> tokens;
+  final bool available;
+}
+
 /// A token just created: the one time its secret is shown.
 class CreatedMcpToken {
   const CreatedMcpToken({required this.token, required this.secret});
@@ -53,7 +62,7 @@ class CreatedMcpToken {
 
 /// The user's MCP tokens (`/mcp-tokens` of the gateway, `docs/mcp.md`): list, create, revoke.
 abstract class McpTokensApi {
-  Future<List<McpToken>> list();
+  Future<McpTokenList> list();
 
   /// Throws a [GatewayException] with the gateway's own message for a refusal (no name, too many tokens).
   Future<CreatedMcpToken> create({required String name, required McpAccess access});
@@ -68,10 +77,14 @@ class HttpMcpTokensApi implements McpTokensApi {
   final GatewayClient _client;
 
   @override
-  Future<List<McpToken>> list() async {
+  Future<McpTokenList> list() async {
     final body = await _client.getJson('/mcp-tokens');
     if (body is! Map<String, dynamic> || body['tokens'] is! List) throw const GatewayException('Expected the list of tokens');
-    return [for (final entry in body['tokens'] as List<dynamic>) _tokenFromJson(entry as Map<String, dynamic>)];
+    return McpTokenList(
+      tokens: [for (final entry in body['tokens'] as List<dynamic>) _tokenFromJson(entry as Map<String, dynamic>)],
+      // A gateway that does not say (an older one) has no such rule.
+      available: body['mcp_available'] != false,
+    );
   }
 
   @override
@@ -101,7 +114,7 @@ class NoopMcpTokensApi implements McpTokensApi {
   const NoopMcpTokensApi();
 
   @override
-  Future<List<McpToken>> list() => Future.error(const GatewayException('No tokens API configured'));
+  Future<McpTokenList> list() => Future.error(const GatewayException('No tokens API configured'));
 
   @override
   Future<CreatedMcpToken> create({required String name, required McpAccess access}) =>

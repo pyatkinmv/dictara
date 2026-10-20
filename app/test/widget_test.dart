@@ -18,9 +18,10 @@ void main() {
 
     // Sidebar item + topbar title.
     expect(find.text('Transcriptions'), findsNWidgets(2));
-    for (final label in ['Threads', 'Tags', 'Speakers', 'Settings']) {
+    for (final label in ['Tags', 'Speakers', 'Settings']) {
       expect(find.text(label), findsOneWidget);
     }
+    expect(find.text('Threads'), findsNothing); // dropped for good
     expect(find.text('Upload'), findsOneWidget);
   });
 

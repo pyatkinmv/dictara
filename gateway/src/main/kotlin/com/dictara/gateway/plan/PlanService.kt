@@ -40,6 +40,15 @@ class PlanService(
         return plan.constraints["regenerations_per_transcription"]?.takeIf { it.isInt }?.asInt()
     }
 
+    /**
+     * Whether the user's plan includes MCP access (`mcp_access: true` in the plan's constraints). Unlike the limits, a
+     * plan without the key does not include it: a capability has to be granted, not left unrestricted.
+     */
+    fun mcpAccess(userId: UUID): Boolean {
+        val plan = planRepo.findByUserId(userId) ?: throw NoSuchElementException("No such user: $userId")
+        return plan.constraints["mcp_access"]?.asBoolean() == true
+    }
+
     private fun strategyFor(plan: PlanEntity): PlanStrategy {
         plan.constraints["lifetime_submissions"]?.asInt()?.let { return LifetimeSubmissionLimitStrategy(it, submissionRepo) }
         val limit = plan.constraints["monthly_submissions"]?.asInt() ?: return NoLimitStrategy(submissionRepo)
