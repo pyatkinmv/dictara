@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import 'pages/detail/transcription_detail_page.dart';
 import 'pages/placeholder_page.dart';
+import 'pages/settings/settings_page.dart';
 import 'pages/speakers_page.dart';
 import 'pages/tags_page.dart';
 import 'pages/transcriptions_page.dart';
@@ -37,7 +38,14 @@ GoRouter createRouter({String initialLocation = '/transcriptions'}) {
           ),
           GoRoute(path: '/tags', pageBuilder: (context, state) => page(state, const TagsPage())),
           GoRoute(path: '/speakers', pageBuilder: (context, state) => page(state, const SpeakersPage())),
-          for (final d in navDestinations.where((d) => d.path != '/transcriptions' && d.path != '/tags' && d.path != '/speakers'))
+          // `/settings` opens its first tab; a section that does not exist falls back to it.
+          GoRoute(path: '/settings', redirect: (context, state) => state.uri.path == '/settings' ? defaultSettingsPath : null, routes: [
+            GoRoute(
+              path: ':section',
+              pageBuilder: (context, state) => page(state, SettingsPage(section: state.pathParameters['section'])),
+            ),
+          ]),
+          for (final d in navDestinations.where((d) => !const ['/transcriptions', '/tags', '/speakers', '/settings'].contains(d.path)))
             GoRoute(
               path: d.path,
               pageBuilder: (context, state) => page(state, PlaceholderPage(label: d.label)),

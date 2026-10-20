@@ -32,6 +32,10 @@ Connecting Claude Code:
 claude mcp add --transport http dictara https://dictary.app/api/mcp --header "Authorization: Bearer dtr_…"
 ```
 
+## Where the user manages tokens (the app)
+
+Settings → **MCP access** (the first tab; the second is Profile). Cards, one per token: name, access chip, prefix, when created, when it ends, when last used; **Revoke** (asks first). The server address is on top with a Copy button. **Create token** asks only for a name and read only / read and write (the 90 days are stated, not asked), then shows the token once with the ready command for Claude Code and the `opencode.json` entry for OpenCode; that window cannot be closed by a click outside. A token that has expired is red with a plain sentence, a banner, a red dot on the tab and "Create replacement"; one that ends within 14 days is amber with the days left. Details in `app/CLAUDE.md`.
+
 ## Tools (stage 1: read)
 
 | Tool | What it does | Needs |

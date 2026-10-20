@@ -4,20 +4,11 @@ import 'package:provider/provider.dart';
 import '../state/auth_controller.dart';
 import '../state/profile_controller.dart';
 import '../theme/app_palette.dart';
+import '../util/format.dart';
 import '../widgets/popover.dart';
 
 /// The signed-in name, or a plain fallback for the instant between login and the session actually landing.
 String _nameOf(AuthController auth) => auth.displayName ?? 'Signed in';
-
-/// Up to two capitals for the avatar circle, the same rule as a library speaker's (`models/speaker.dart`).
-/// The fallback name the gateway gives someone with no first/last name on Telegram is `@username`; the `@`
-/// itself is not an initial.
-String _initialsOf(String name) {
-  final withoutAt = name.startsWith('@') ? name.substring(1) : name;
-  final letters = withoutAt.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).map((w) => w[0]);
-  final text = letters.join();
-  return (text.length > 2 ? text.substring(0, 2) : text).toUpperCase();
-}
 
 /// Profile row at the bottom of the sidebar. Clicking it opens a menu that
 /// floats above the row (`.profile-dd` in the design).
@@ -63,7 +54,7 @@ class _ProfileRow extends StatelessWidget {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(color: p.accent, shape: BoxShape.circle),
                 child: Text(
-                  _initialsOf(name),
+                  initialsOf(name),
                   style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
                 ),
               ),

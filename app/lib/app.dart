@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import 'data/mcp_tokens_api.dart';
 import 'data/profile_api.dart';
 import 'data/transcription_repository.dart';
 import 'pages/login/login_overlay.dart';
@@ -9,6 +10,7 @@ import 'router.dart';
 import 'services/file_chooser.dart';
 import 'services/text_saver.dart';
 import 'state/auth_controller.dart';
+import 'state/mcp_tokens_controller.dart';
 import 'state/profile_controller.dart';
 import 'state/speaker_library_controller.dart';
 import 'state/tag_library_controller.dart';
@@ -26,6 +28,7 @@ class DictaraApp extends StatefulWidget {
     required this.repository,
     required this.authController,
     this.profileController,
+    this.mcpTokensApi = const NoopMcpTokensApi(),
     this.fileChooser = const BrowserFileChooser(),
     this.textSaver = const BrowserTextSaver(),
     this.pollInterval,
@@ -44,6 +47,9 @@ class DictaraApp extends StatefulWidget {
   /// The sidebar's plan and usage. Left out (tests that are not about it) it never loads anything and the
   /// panel stays blank — production always gives it a real one built on the same [GatewayClient].
   final ProfileController? profileController;
+
+  /// The user's MCP tokens (Settings, "MCP access"). Left out (tests that are not about it) it never answers.
+  final McpTokensApi mcpTokensApi;
 
   /// How files are picked in the Upload dialog.
   final FileChooser fileChooser;
@@ -84,6 +90,7 @@ class _DictaraAppState extends State<DictaraApp> {
         Provider<TranscriptionRepository>.value(value: _repository),
         ChangeNotifierProvider<AuthController>.value(value: widget.authController),
         ChangeNotifierProvider<ProfileController>.value(value: _profile),
+        ChangeNotifierProvider(create: (context) => McpTokensController(widget.mcpTokensApi, widget.authController)),
         Provider<FileChooser>.value(value: widget.fileChooser),
         Provider<TextSaver>.value(value: widget.textSaver),
         Provider<ErrorReporter>.value(value: _errors),

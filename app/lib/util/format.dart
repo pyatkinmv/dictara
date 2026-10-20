@@ -15,6 +15,15 @@ String formatTimestamp(Duration d) {
   return '${d.inMinutes}:${two(seconds)}';
 }
 
+/// Up to two capitals for an avatar circle. The fallback name the gateway gives someone with no first/last name on
+/// Telegram is `@username`; the `@` itself is not an initial.
+String initialsOf(String name) {
+  final withoutAt = name.startsWith('@') ? name.substring(1) : name;
+  final letters = withoutAt.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).map((w) => w[0]);
+  final text = letters.join();
+  return (text.length > 2 ? text.substring(0, 2) : text).toUpperCase();
+}
+
 const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /// "22 Jun", and "22 Jun 2025" when the year is not the current one (recordings are often months or years

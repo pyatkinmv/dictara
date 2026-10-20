@@ -6,11 +6,12 @@ import '../theme/app_palette.dart';
 
 /// Shows [builder]'s content centered over a dimmed, blurred window
 /// (`.backdrop`: `rgba(0,0,0,.35)` + `blur(4px)`); clicking the backdrop or
-/// pressing Escape closes it. It covers the whole window, sidebar included.
-Future<T?> showAppModal<T>(BuildContext context, {required WidgetBuilder builder}) {
+/// pressing Escape closes it. It covers the whole window, sidebar included. With [dismissible] false neither does:
+/// for a window whose content would be lost (a token that is shown once).
+Future<T?> showAppModal<T>(BuildContext context, {required WidgetBuilder builder, bool dismissible = true}) {
   return showGeneralDialog<T>(
     context: context,
-    barrierDismissible: true,
+    barrierDismissible: dismissible,
     barrierLabel: 'Close',
     barrierColor: Colors.black.withValues(alpha: .35),
     transitionDuration: Duration.zero,
@@ -148,10 +149,12 @@ class ModalFooter extends StatelessWidget {
 /// Title on the left, close button on the right, 20 px above the content
 /// (`.modal-head`).
 class ModalHeader extends StatelessWidget {
-  const ModalHeader({super.key, required this.title, required this.onClose});
+  const ModalHeader({super.key, required this.title, this.onClose});
 
   final String title;
-  final VoidCallback onClose;
+
+  /// Null leaves out the close button: the window is closed by its own button.
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -161,7 +164,7 @@ class ModalHeader extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-          _CloseButton(onTap: onClose),
+          if (onClose != null) _CloseButton(onTap: onClose!),
         ],
       ),
     );
