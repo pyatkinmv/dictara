@@ -1,6 +1,8 @@
 plugins {
     kotlin("jvm") version "1.9.23"
     kotlin("plugin.spring") version "1.9.23"
+    // Classes marked @PaidOperation are opened too, so that Spring can proxy them (see guard/PaidOperationGuard.kt).
+    kotlin("plugin.allopen") version "1.9.23"
     id("org.springframework.boot") version "3.3.4"
     id("io.spring.dependency-management") version "1.1.6"
 }
@@ -31,6 +33,10 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    // The @PaidOperation guard is an aspect.
+    implementation("org.springframework.boot:spring-boot-starter-aop")
+    // Rules about how the code is arranged (the mcp package stays apart, paid operations are marked), run as tests.
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
     // Restarts the app when classes are rebuilt during `bootRun`; not part of the production jar.
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     implementation("io.micrometer:micrometer-registry-prometheus")
@@ -61,6 +67,10 @@ tasks.test {
                 }
         }
     }
+}
+
+allOpen {
+    annotation("com.dictara.gateway.guard.PaidOperation")
 }
 
 kotlin {

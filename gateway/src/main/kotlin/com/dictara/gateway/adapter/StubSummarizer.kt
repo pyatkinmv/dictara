@@ -1,5 +1,6 @@
 package com.dictara.gateway.adapter
 
+import com.dictara.gateway.guard.PaidOperation
 import com.dictara.gateway.config.DictaraProperties
 import com.dictara.gateway.model.SummaryMode
 import com.dictara.gateway.port.Analysis
@@ -26,6 +27,8 @@ class StubSummarizer(private val props: DictaraProperties) : SummarizerPort {
     private val introduction = Regex("(?:my name is|this is|i'm|i am|меня зовут)\\s+(\\p{Lu}\\p{L}+)", RegexOption.IGNORE_CASE)
 
     override fun isAvailable() = true
+
+    @PaidOperation
 
     override fun analyze(input: AnalysisInput): Analysis {
         Thread.sleep((props.local.stub.summarizeSeconds * 1000).toLong())

@@ -17,6 +17,7 @@ import org.springframework.boot.test.mock.mockito.MockBean
 import java.io.ByteArrayInputStream
 import java.time.LocalDate
 import java.util.concurrent.ConcurrentHashMap
+import java.util.UUID
 import java.util.zip.GZIPInputStream
 
 private fun <T> any(): T {
@@ -91,5 +92,24 @@ class DatabaseBackupIntegrationTest : AbstractSharedContextIntegrationTest() {
         assertThat(backedUp(today, "backup_probe_empty").size()).isZero()
         assertThat(uploaded.keys).noneMatch { it.contains("flyway_schema_history") }
         assertThat(uploaded.keys).contains("backups/$today/users.json.gz")
+    }
+
+    @Test
+    fun `the tables of the mcp schema are backed up too, named with their schema`() {
+        val today = LocalDate.now()
+        val user = UUID.randomUUID()
+        jdbcTemplate.update("INSERT INTO users(id) VALUES (?)", user)
+        jdbcTemplate.update(
+            "INSERT INTO mcp.access_tokens (id, user_id, name, token_hash, token_prefix, access, expires_at) VALUES (?, ?, 'backed up', ?, 'dtr_abcd', 'read', now() + interval '1 day')",
+            UUID.randomUUID(), user, "hash-of-backup-test".toByteArray(),
+        )
+
+        databaseBackupService.backupAll(today)
+
+        assertThat(uploaded.keys).contains("backups/$today/mcp.access_tokens.json.gz", "backups/$today/mcp.audit_log.json.gz")
+        assertThat(uploaded.keys).noneMatch { it.contains("flyway_schema_history") } // neither schema's history
+        val rows = backedUp(today, "mcp.access_tokens")
+        assertThat(rows.map { it["name"].asText() }).contains("backed up")
+        jdbcTemplate.update("DELETE FROM users WHERE id = ?", user)
     }
 }
