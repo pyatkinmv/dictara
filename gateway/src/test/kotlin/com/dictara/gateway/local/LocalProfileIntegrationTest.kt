@@ -92,6 +92,27 @@ class LocalProfileIntegrationTest {
     }
 
     @Test
+    fun `under the local profile a token still opens MCP and nothing else does, though requests without a token are the dev user`() {
+        // The convenience of this profile (no token means the seeded dev user) is for the app's own API, never for MCP.
+        val headers = HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON }
+        val ping = """{"jsonrpc":"2.0","id":1,"method":"ping"}"""
+        val none = rest.postForEntity("/mcp", HttpEntity(ping, headers), String::class.java)
+        assertThat(none.statusCode).isEqualTo(HttpStatus.UNAUTHORIZED)
+
+        val created = json.readTree(rest.postForEntity("/mcp-tokens", HttpEntity("""{"name":"local"}""", headers), String::class.java).body)
+        val secret = created["token"].asText()
+        val withToken = HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON; setBearerAuth(secret) }
+        val answer = rest.postForEntity("/mcp", HttpEntity(ping, withToken), String::class.java)
+        assertThat(answer.statusCode).isEqualTo(HttpStatus.OK)
+
+        val tools = json.readTree(
+            rest.postForEntity("/mcp", HttpEntity("""{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search_transcriptions","arguments":{"size":50}}}""", withToken), String::class.java).body,
+        )
+        val text = json.readTree(tools["result"]["content"][0]["text"].asText())
+        assertThat(text["items"].map { it["title"].asText() }).contains("Quarterly Review Meeting") // the seeded data of the dev user
+    }
+
+    @Test
     fun `the seed creates the dev user on the unlimited plan`() {
         val plan = jdbc.queryForObject(
             "SELECT plan FROM users WHERE id = '00000000-0000-4000-8000-000000000001'", String::class.java,

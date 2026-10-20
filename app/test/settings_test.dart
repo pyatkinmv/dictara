@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:dictara_web/app.dart';
 import 'package:dictara_web/data/gateway_client.dart';
 import 'package:dictara_web/data/mcp_tokens_api.dart';
 import 'package:dictara_web/data/profile_api.dart';
 import 'package:dictara_web/pages/settings/settings_page.dart';
+import 'package:dictara_web/shell/nav_destinations.dart';
 import 'package:dictara_web/pages/settings/token_dialogs.dart';
 import 'package:dictara_web/state/auth_controller.dart';
 import 'package:dictara_web/state/mcp_tokens_controller.dart';
@@ -117,6 +120,19 @@ void main() {
       expect(find.byType(LinearProgressIndicator), findsNothing);
     });
 
+    testWidgets('while the plan is not known yet it says so, and keeps the rest', (tester) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      auth = signedInAuthController();
+      await tester.pumpWidget(DictaraApp(authController: auth, initialLocation: '/settings/profile', repository: FakeTranscriptionRepository()));
+      await settle(tester);
+
+      expect(find.text('Loading…'), findsOneWidget); // no profile controller: it never answers
+      expect(find.byKey(const Key('profile-name')), findsOneWidget);
+      expect(find.byKey(const Key('profile-sign-out')), findsOneWidget);
+    });
+
     testWidgets('Sign out signs out', (tester) async {
       await open(tester, location: '/settings/profile');
       expect(auth.isLoggedIn, isTrue);
@@ -210,7 +226,61 @@ void main() {
       expect(find.byKey(const Key('settings-tab-dot')), findsOneWidget);
     });
 
-    testWidgets('all three states fit a 375 px screen', (tester) async {
+    testWidgets('says how soon an ending token ends: in days, tomorrow, today', (tester) async {
+      await open(tester, api: FakeMcpTokensApi([
+        fakeToken('Tomorrow', status: McpTokenStatus.expiring, expiresIn: const Duration(days: 1, hours: 2)),
+        fakeToken('Today', status: McpTokenStatus.expiring, expiresIn: const Duration(hours: 5)),
+        fakeToken('Later', status: McpTokenStatus.expiring, expiresIn: const Duration(days: 13, hours: 1)),
+      ]));
+
+      expect(find.text('Expires tomorrow'), findsOneWidget);
+      expect(find.text('Expires today'), findsOneWidget);
+      expect(find.text('Expires in 13 days'), findsOneWidget);
+    });
+
+    testWidgets('says when a token was last used: yesterday, days ago, then the date', (tester) async {
+      final now = DateTime.now();
+      await open(tester, api: FakeMcpTokensApi([
+        fakeToken('A', lastUsedAt: now.subtract(const Duration(days: 1))),
+        fakeToken('B', lastUsedAt: now.subtract(const Duration(days: 10))),
+        fakeToken('C', lastUsedAt: now.subtract(const Duration(days: 45))),
+      ]));
+
+      expect(find.textContaining('used yesterday'), findsOneWidget);
+      expect(find.textContaining('used 10 days ago'), findsOneWidget);
+      expect(find.textContaining('used 45 days ago'), findsNothing); // the old one is a date
+      expect(find.textContaining(RegExp(r'used \d{1,2} [A-Z][a-z]{2}')), findsOneWidget);
+    });
+
+    testWidgets('while the list is loading it says so, and does not claim there are no tokens', (tester) async {
+      final api = FakeMcpTokensApi()..listGate = Completer<void>();
+      await open(tester, api: api);
+
+      expect(find.text('Loading…'), findsOneWidget);
+      expect(find.byKey(const Key('no-tokens')), findsNothing);
+
+      api.listGate!.complete();
+      await settle(tester);
+      expect(find.text('Loading…'), findsNothing);
+      expect(find.byKey(const Key('no-tokens')), findsOneWidget);
+    });
+
+    testWidgets('the tokens are read again each time Settings opens', (tester) async {
+      final api = FakeMcpTokensApi([fakeToken('One')]);
+      await open(tester, api: api);
+      expect(api.listCalls, 1);
+
+      api.tokens = [...api.tokens, fakeToken('Two')]; // made elsewhere (another device) meanwhile
+      await tester.tap(find.text('Tags')); // leave Settings
+      await settle(tester);
+      await tester.tap(find.text('Settings').last); // and come back
+      await settle(tester);
+
+      expect(api.listCalls, 2);
+      expect(find.text('Two'), findsOneWidget);
+    });
+
+        testWidgets('all three states fit a 375 px screen', (tester) async {
       await open(tester, api: FakeMcpTokensApi(threeStates), size: const Size(375, 800));
 
       expect(find.text('OpenCode on laptop'), findsOneWidget);
@@ -283,6 +353,19 @@ void main() {
       await tester.tap(find.text('Copy command'));
       await tester.pump();
       expect(copied.last, claude);
+    });
+
+    testWidgets('the token itself can be copied', (tester) async {
+      final copied = captureClipboard(tester);
+      await openCreate(tester, FakeMcpTokensApi());
+      await tester.enterText(find.byKey(const Key('token-name')), 'Mine');
+      await tester.tap(find.text('Create token').last);
+      await settle(tester);
+
+      await tester.tap(find.text('Copy').last); // the dialog's, the page behind has its own
+      await tester.pump();
+
+      expect(copied, ['dtr_${'S' * 43}']);
     });
 
     testWidgets('the token is shown until the user says they saved it: a click outside does not close it', (tester) async {
@@ -408,6 +491,34 @@ void main() {
       expect(controller.tokens, isEmpty);
       expect(controller.loaded, isFalse);
       controller.dispose();
+    });
+
+    test('a failed revoke is thrown for the app to report, and the list stays as it was', () async {
+      final api = FakeMcpTokensApi([fakeToken('Mine')])..failRevokeWith = const GatewayException('Token not found', statusCode: 404);
+      final controller = McpTokensController(api, signedInAuthController());
+      await controller.load();
+
+      await expectLater(controller.revoke('mine'), throwsA(isA<GatewayException>()));
+
+      expect(controller.tokens.map((t) => t.name), ['Mine']);
+      controller.dispose();
+    });
+
+    test('a refused creation is thrown for the dialog to show, and nothing is added', () async {
+      final api = FakeMcpTokensApi()..failCreateWith = const GatewayException('A token needs a name', statusCode: 400);
+      final controller = McpTokensController(api, signedInAuthController());
+      await controller.load();
+
+      await expectLater(controller.create(name: '', access: McpAccess.read), throwsA(isA<GatewayException>()));
+
+      expect(controller.tokens, isEmpty);
+      controller.dispose();
+    });
+
+    test('every address under /settings belongs to the Settings item of the sidebar', () {
+      expect(destinationFor('/settings')?.label, 'Settings');
+      expect(destinationFor('/settings/profile')?.label, 'Settings');
+      expect(destinationFor('/settings/mcp-access')?.label, 'Settings');
     });
 
     test('what needs attention is an ended token or one that ends soon', () async {

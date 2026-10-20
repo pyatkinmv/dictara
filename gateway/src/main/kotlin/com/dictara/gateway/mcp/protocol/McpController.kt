@@ -25,7 +25,6 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
 
 /**
@@ -47,8 +46,8 @@ class McpController(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    @PostMapping("/mcp", consumes = [MediaType.APPLICATION_JSON_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE])
-    fun post(@RequestBody body: String, request: HttpServletRequest): ResponseEntity<Any> {
+    @PostMapping("/mcp", consumes = [MediaType.APPLICATION_JSON_VALUE], produces = [JSON_UTF8])
+    fun post(request: HttpServletRequest): ResponseEntity<Any> {
         val principal = when (val check = tokens.authenticate(bearer(request))) {
             is TokenCheck.Valid -> check.principal
             TokenCheck.Expired -> return unauthorized("token_expired", "This token has expired. Create a new one in Settings.")
@@ -59,8 +58,14 @@ class McpController(
                 .body(rpcError(null, TOO_MANY, "Too many requests; at most ${props.rateLimitPerMinute} a minute for one token."))
         }
 
+        // Read only up to the limit: a client cannot make the server hold a huge body in memory.
+        val bytes = request.inputStream.readNBytes(props.maxRequestBytes + 1)
+        if (bytes.size > props.maxRequestBytes) {
+            return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(rpcError(null, INVALID_REQUEST, "The request is larger than ${props.maxRequestBytes} bytes."))
+        }
         val message = try {
-            mapper.readTree(body)
+            mapper.readTree(bytes)
         } catch (e: Exception) {
             return ResponseEntity.badRequest().body(rpcError(null, PARSE_ERROR, "The body is not JSON."))
         }
@@ -187,6 +192,12 @@ class McpController(
     }
 
     companion object {
+        /**
+         * What every answer is declared as. JSON is UTF-8 by definition and needs no `charset`, but a client that guesses
+         * (Windows PowerShell 5.1 reads such an answer as Latin-1) then garbles every Russian title; naming it costs nothing.
+         */
+        const val JSON_UTF8 = "application/json;charset=UTF-8"
+
         /** The revisions of the protocol this server answers. The first is what a client that asks for none of them is told. */
         val SUPPORTED_VERSIONS = listOf("2025-11-25", "2025-06-18", "2025-03-26", "2026-07-28")
 

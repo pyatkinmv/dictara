@@ -37,6 +37,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-aop")
     // Rules about how the code is arranged (the mcp package stays apart, paid operations are marked), run as tests.
     testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
+    // The official MCP client, to check that our own implementation of the server side speaks to a real one.
+    testImplementation("io.modelcontextprotocol.sdk:mcp-core:2.1.0")
+    testImplementation("io.modelcontextprotocol.sdk:mcp-json-jackson2:2.1.0")
     // Restarts the app when classes are rebuilt during `bootRun`; not part of the production jar.
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     implementation("io.micrometer:micrometer-registry-prometheus")
