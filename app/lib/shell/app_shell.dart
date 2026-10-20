@@ -38,11 +38,13 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // On a detail page the topbar shows the transcription's own title.
+    // On a transcription's own page (`/transcriptions/<id>`, and nowhere else) the topbar shows its title. Not any
+    // address longer than its section's: `/settings/profile` is longer than `/settings` and is not a transcription,
+    // and the detail controller keeps the last transcription it opened after the user has left it.
     final openTitle = context.select<TranscriptionDetailController, String?>((c) => c.current?.item.title);
     final destination = destinationFor(location);
-    final isDetail = destination != null && location != destination.path;
-    final title = (isDetail ? openTitle : null) ?? destination?.label ?? 'Dictara';
+    final isTranscription = location.startsWith('/transcriptions/');
+    final title = (isTranscription ? openTitle : null) ?? destination?.label ?? 'Dictara';
 
     final page = Column(
       children: [

@@ -21,8 +21,8 @@ class SettingsSection {
 
 /// In tab order. The first is the one `/settings` opens.
 final settingsSections = <SettingsSection>[
-  SettingsSection(path: 'mcp-access', label: 'MCP access', builder: (_) => const McpAccessTab()),
   SettingsSection(path: 'profile', label: 'Profile', builder: (_) => const ProfileTab()),
+  SettingsSection(path: 'mcp-access', label: 'MCP access', builder: (_) => const McpAccessTab()),
 ];
 
 String get defaultSettingsPath => '/settings/${settingsSections.first.path}';

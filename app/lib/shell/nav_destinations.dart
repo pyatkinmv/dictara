@@ -12,7 +12,6 @@ class NavDestination {
 /// last item (Settings).
 const navDestinations = <NavDestination>[
   NavDestination('/transcriptions', 'Transcriptions', Icons.description_rounded),
-  NavDestination('/threads', 'Threads', Icons.forum_rounded),
   NavDestination('/tags', 'Tags', Icons.sell_rounded),
   NavDestination('/speakers', 'Speakers', Icons.record_voice_over_rounded),
   NavDestination('/settings', 'Settings', Icons.settings_rounded),

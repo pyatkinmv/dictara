@@ -54,7 +54,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    for (final location in ['/transcriptions', '/transcriptions/0', '/tags', '/speakers', '/threads', '/settings', '/settings/mcp-access', '/settings/profile']) {
+    for (final location in ['/transcriptions', '/transcriptions/0', '/tags', '/speakers', '/settings', '/settings/mcp-access', '/settings/profile']) {
       testWidgets('$location fits a 375 px screen without overflowing', (tester) async {
         await open(tester, location);
         expect(tester.takeException(), isNull);

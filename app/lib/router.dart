@@ -2,13 +2,11 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import 'pages/detail/transcription_detail_page.dart';
-import 'pages/placeholder_page.dart';
 import 'pages/settings/settings_page.dart';
 import 'pages/speakers_page.dart';
 import 'pages/tags_page.dart';
 import 'pages/transcriptions_page.dart';
 import 'shell/app_shell.dart';
-import 'shell/nav_destinations.dart';
 
 GoRouter createRouter({String initialLocation = '/transcriptions'}) {
   // Switching sections is instant in the design, no slide animation.
@@ -45,11 +43,6 @@ GoRouter createRouter({String initialLocation = '/transcriptions'}) {
               pageBuilder: (context, state) => page(state, SettingsPage(section: state.pathParameters['section'])),
             ),
           ]),
-          for (final d in navDestinations.where((d) => !const ['/transcriptions', '/tags', '/speakers', '/settings'].contains(d.path)))
-            GoRoute(
-              path: d.path,
-              pageBuilder: (context, state) => page(state, PlaceholderPage(label: d.label)),
-            ),
         ],
       ),
     ],

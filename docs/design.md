@@ -351,16 +351,18 @@ Same card-grid pattern as Tags.
 
 | Element | Description |
 |---------|-------------|
-| **Nav** | Transcriptions, Threads, Tags, Speakers, Settings |
+| **Nav** | Transcriptions, Tags, Speakers, Settings (Threads was dropped, see Future) |
 | **Usage bar** | Minutes used / plan limit; Upgrade link |
 | **Profile dropdown** | Opens upward from sidebar bottom: name + email, Manage plan (with tier badge), Give feedback, Support, Sign out (red) |
-| **Topbar** | Shows current page title or open item title; always has the Upload button |
+| **Topbar** | Shows the page's title, or the open transcription's own title on its page only (never on another section's page); always has the Upload button |
 
 ---
 
 ## Future / TBD
 
-### Threads
+### Threads (dropped)
+
+**Decided in October 2026 not to build this**: the nav item and its placeholder page are gone. What it was meant for (asking questions across many transcripts) is covered by giving an AI agent access through MCP (`docs/mcp.md`). Kept below only as history.
 
 Multi-file AI chat sessions. A Thread links to one or more Jobs and lets the user ask questions across them.
 
