@@ -103,6 +103,10 @@ docker compose up -d transcriber
 
 CI runs this automatically on every deploy. Without it, `docker-compose.yml` falls back to hardcoded defaults.
 
+## MCP for AI agents
+
+The gateway also serves `POST /api/mcp` (Model Context Protocol) for agents like Claude Code and OpenCode, with personal tokens limited to one user; read tools first, write tools later, and never anything that costs money. See [docs/mcp.md](docs/mcp.md).
+
 ## Production: access and checks
 
 Read-only access to prod is set up (`gcloud`, `gh`, SSH key `~/.ssh/google_compute_engine`, Grafana via `scripts\grafana.ps1`). How to read logs and metrics, check what is deployed, take a pre-release snapshot and roll back: [docs/ops/runbook.md](docs/ops/runbook.md). Prod is one 2 GB VM; look before any restart or deploy, never edit the VM's `ssh-keys` metadata by hand.

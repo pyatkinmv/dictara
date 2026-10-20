@@ -1,5 +1,6 @@
 package com.dictara.gateway.service
 
+import com.dictara.gateway.guard.PaidOperation
 import com.dictara.gateway.entity.AudioMetaEntity
 import com.dictara.gateway.entity.SubmissionEntity
 import com.dictara.gateway.entity.TagEntity
@@ -103,6 +104,7 @@ class SubmissionService(
     )
 
     @Transactional
+    @PaidOperation
     fun createSubmission(
         userId: UUID,
         audioId: UUID,

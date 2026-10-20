@@ -1,5 +1,6 @@
 package com.dictara.gateway.storage
 
+import com.dictara.gateway.guard.PaidOperation
 import com.dictara.gateway.config.DictaraProperties
 import com.google.cloud.storage.BlobId
 import com.google.cloud.storage.BlobInfo
@@ -42,6 +43,7 @@ class GcsAudioStorage(
     /** Uploads [inputStream] to `gs://{bucket}/audio/{audioMetaId}/{fileName}`.
      *  Computes SHA-256 hash of the content in a single streaming pass alongside the upload
      *  (no buffering in memory). Returns [UploadResult] with the gs:// URI and hex hash. */
+    @PaidOperation
     override fun upload(audioMetaId: UUID, fileName: String, inputStream: InputStream, sizeBytes: Long, contentType: String): UploadResult {
         val digest = MessageDigest.getInstance("SHA-256")
         val digestStream = DigestInputStream(inputStream, digest)
@@ -84,6 +86,8 @@ class GcsAudioStorage(
         val deleted = storage.delete(BlobId.of(bucket, objectName))
         if (!deleted) log.warn("GCS object not found for deletion: {}", ref.uri)
     }
+
+    @PaidOperation
 
     override fun uploadBytes(objectName: String, bytes: ByteArray) {
         val blobInfo = BlobInfo.newBuilder(BlobId.of(bucket, objectName))

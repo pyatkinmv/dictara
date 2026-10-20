@@ -1,5 +1,6 @@
 package com.dictara.gateway.service
 
+import com.dictara.gateway.guard.PaidOperation
 import com.dictara.gateway.config.DictaraProperties
 import com.dictara.gateway.job.JobTracker
 import com.dictara.gateway.port.SummarizerPort
@@ -111,6 +112,7 @@ class BacklogReanalysisService(
     }
 
     /** Starts the batch of the eligible ids of [ids] in the background; 409 when one is already running or Gemini is not set up. */
+    @PaidOperation
     fun start(userId: UUID, ids: List<String>, force: Boolean): Plan {
         if (!summarizer.isAvailable()) throw ResponseStatusException(HttpStatus.CONFLICT, "The summary service is not available")
         synchronized(this) {

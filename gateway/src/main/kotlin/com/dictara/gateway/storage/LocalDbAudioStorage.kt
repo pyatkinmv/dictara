@@ -1,5 +1,6 @@
 package com.dictara.gateway.storage
 
+import com.dictara.gateway.guard.PaidOperation
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Profile
 import org.springframework.jdbc.core.JdbcTemplate
@@ -23,6 +24,8 @@ import java.util.UUID
 class LocalDbAudioStorage(private val jdbc: JdbcTemplate) : AudioStorage {
 
     private val log = LoggerFactory.getLogger(javaClass)
+
+    @PaidOperation
 
     override fun upload(
         audioMetaId: UUID, fileName: String, inputStream: InputStream, sizeBytes: Long, contentType: String,
@@ -50,6 +53,8 @@ class LocalDbAudioStorage(private val jdbc: JdbcTemplate) : AudioStorage {
     override fun delete(ref: AudioRef) {
         jdbc.update("DELETE FROM local_audio_objects WHERE uri = ?", ref.uri)
     }
+
+    @PaidOperation
 
     override fun uploadBytes(objectName: String, bytes: ByteArray) = put("db://$objectName", bytes)
 

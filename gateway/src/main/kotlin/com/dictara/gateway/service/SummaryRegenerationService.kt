@@ -1,5 +1,6 @@
 package com.dictara.gateway.service
 
+import com.dictara.gateway.guard.PaidOperation
 import com.dictara.gateway.config.DictaraProperties
 import com.dictara.gateway.entity.SummaryEntity
 import com.dictara.gateway.model.SummaryMode
@@ -77,6 +78,7 @@ class SummaryRegenerationService(
     }
 
     /** Starts the regeneration of [userId]'s transcription in the background; 404 / 409 when it cannot be done. */
+    @PaidOperation
     fun start(userId: UUID, submissionId: UUID) {
         val submission = submissionRepo.findById(submissionId).orElse(null)?.takeIf { it.userId == userId }
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Transcription not found")

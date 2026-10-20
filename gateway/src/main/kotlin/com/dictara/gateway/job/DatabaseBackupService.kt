@@ -37,12 +37,15 @@ class DatabaseBackupService(
     fun backup() = jobTracker.tracked("daily_db_backup") { backupAll(LocalDate.now()) }
 
     internal fun backupAll(date: LocalDate): Int {
-        val tables = jdbcTemplate.queryForList(
-            """SELECT table_name FROM information_schema.tables
-               WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-               ORDER BY table_name""",
-            String::class.java
-        ).filter { it != "flyway_schema_history" }
+        // The main schema and the `mcp` schema (the MCP tokens and their audit log). A table of the main schema is
+        // named as it is, one of another schema as `schema.table`, which is also its file name.
+        val tables = jdbcTemplate.query(
+            """SELECT table_schema, table_name FROM information_schema.tables
+               WHERE table_schema IN ('public', 'mcp') AND table_type = 'BASE TABLE'
+               ORDER BY table_schema, table_name"""
+        ) { rs, _ -> rs.getString("table_schema") to rs.getString("table_name") }
+            .filter { (_, name) -> name != "flyway_schema_history" }
+            .map { (schema, name) -> if (schema == "public") name else "$schema.$name" }
 
         log.info("DB backup: backing up {} tables for {}", tables.size, date)
         var totalRows = 0
@@ -66,7 +69,7 @@ class DatabaseBackupService(
                 objectMapper.createGenerator(gzip).use { json ->
                     json.writeStartArray()
                     jdbcTemplate.query(
-                        PreparedStatementCreator { con -> con.prepareStatement("""SELECT * FROM "$table"""").apply { fetchSize = FETCH_SIZE } },
+                        PreparedStatementCreator { con -> con.prepareStatement("SELECT * FROM ${quoted(table)}").apply { fetchSize = FETCH_SIZE } },
                         RowCallbackHandler { rs -> rowWriter.writeValue(json, rowMapper.mapRow(rs, rows++)) },
                     )
                     json.writeEndArray()
@@ -75,6 +78,9 @@ class DatabaseBackupService(
         }
         return out.toByteArray() to rows
     }
+
+    /** `users` is `"users"`, `mcp.access_tokens` is `"mcp"."access_tokens"`. The names come from the catalog, not from a client. */
+    private fun quoted(table: String) = table.split('.').joinToString(".") { "\"$it\"" }
 
     private companion object {
         const val FETCH_SIZE = 1000

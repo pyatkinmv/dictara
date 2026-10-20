@@ -1,5 +1,6 @@
 package com.dictara.gateway.adapter
 
+import com.dictara.gateway.guard.PaidOperation
 import com.dictara.gateway.model.SummaryMode
 import com.dictara.gateway.port.Analysis
 import com.dictara.gateway.port.AnalysisInput
@@ -23,7 +24,7 @@ import java.util.concurrent.TimeUnit
  * (Gemini's structured output), see [RESPONSE_SCHEMA]. Nothing in it is trusted beyond the summary:
  * [com.dictara.gateway.service.SuggestionService] checks the proposals before keeping them.
  */
-class GeminiSummarizer(
+open class GeminiSummarizer(
     private val apiKey: String,
     private val model: String,
 ) : SummarizerPort {
@@ -36,6 +37,8 @@ class GeminiSummarizer(
     private val log = org.slf4j.LoggerFactory.getLogger(javaClass)
 
     override fun isAvailable() = apiKey.isNotBlank()
+
+    @PaidOperation
 
     override fun analyze(input: AnalysisInput): Analysis {
         if (input.mode == SummaryMode.OFF) return Analysis(summary = "")

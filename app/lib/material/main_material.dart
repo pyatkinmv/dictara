@@ -7,6 +7,7 @@ import '../app.dart';
 import '../data/auth_api.dart';
 import '../data/gateway_client.dart';
 import '../data/http_transcription_repository.dart';
+import '../data/mcp_tokens_api.dart';
 import '../data/profile_api.dart';
 import '../services/token_store.dart';
 import '../state/auth_controller.dart';
@@ -34,6 +35,7 @@ void main() {
       repository: HttpTranscriptionRepository(client),
       authController: auth,
       profileController: profile,
+      mcpTokensApi: HttpMcpTokensApi(client),
       // The list follows the progress of files that are still being transcribed.
       pollInterval: const Duration(seconds: 3),
       errorReporter: errors,

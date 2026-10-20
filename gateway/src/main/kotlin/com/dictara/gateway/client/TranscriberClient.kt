@@ -1,5 +1,6 @@
 package com.dictara.gateway.client
 
+import com.dictara.gateway.guard.PaidOperation
 import com.dictara.gateway.config.DictaraProperties
 import com.dictara.gateway.port.TranscribeParams
 import com.dictara.gateway.port.TranscriberJobSnapshot
@@ -61,6 +62,7 @@ class TranscriberClient(private val props: DictaraProperties) : TranscriberPort 
     /** Submits a job by streaming the raw file bytes — the local-dev fallback path used
      *  when no GCS bucket is configured (`dictara.storage.gcs.bucket` empty). On Cloud Run
      *  this hits a hard 32 MiB request body limit; see [submitByReference] for the GCS path. */
+    @PaidOperation
     fun submit(fileBytes: ByteArray, fileName: String, params: TranscribeParams): String {
         val modelName = MODEL_ALIASES[params.model] ?: params.model
         val url = buildString {
@@ -86,6 +88,7 @@ class TranscriberClient(private val props: DictaraProperties) : TranscriberPort 
      *  from GCS via [storageUri], so the request body stays empty regardless of file size.
      *  See [submit] for the legacy multipart path used as a local-dev fallback when no
      *  GCS bucket is configured. */
+    @PaidOperation
     override fun submitByReference(storageUri: String, params: TranscribeParams): String {
         val modelName = MODEL_ALIASES[params.model] ?: params.model
         val url = buildString {

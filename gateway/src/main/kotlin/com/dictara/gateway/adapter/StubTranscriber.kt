@@ -1,5 +1,6 @@
 package com.dictara.gateway.adapter
 
+import com.dictara.gateway.guard.PaidOperation
 import com.dictara.gateway.config.DictaraProperties
 import com.dictara.gateway.dto.ProgressInfo
 import com.dictara.gateway.model.Segment
@@ -58,6 +59,8 @@ class StubTranscriber internal constructor(
         "channels" to 2,
         "tags" to mapOf("creation_time" to "2026-06-22T14:41:00.000000Z"),
     ))
+
+    @PaidOperation
 
     override fun submitByReference(storageUri: String, params: TranscribeParams): String {
         val id = UUID.randomUUID().toString()
