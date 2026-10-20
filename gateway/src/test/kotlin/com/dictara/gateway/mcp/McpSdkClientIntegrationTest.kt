@@ -71,6 +71,22 @@ class McpSdkClientIntegrationTest : AbstractMcpIntegrationTest() {
     }
 
     @Test
+    fun `Russian text and emoji survive the trip through a real client, both ways`() {
+        val user = newUser()
+        val title = "Разговор о ночных сменах 🌙"
+        val id = seed(user, title, listOf(Phrase(0.0, 2.0, null, "Всё хорошо, спасибо.")))
+
+        client(mint(user)).use { client ->
+            client.initialize()
+
+            val found = client.callTool(McpSchema.CallToolRequest("search_transcriptions", mapOf("query" to "ночных")))
+            assertThat(found.text()).contains(title).contains(id.toString())
+            val transcript = client.callTool(McpSchema.CallToolRequest("get_transcript", mapOf("id" to id.toString())))
+            assertThat(transcript.text()).contains("Всё хорошо, спасибо.")
+        }
+    }
+
+    @Test
     fun `a tool error reaches a real client as an error result, not as a broken connection`() {
         val user = newUser()
 

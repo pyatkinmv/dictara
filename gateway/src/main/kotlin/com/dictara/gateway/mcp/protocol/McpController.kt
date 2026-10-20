@@ -46,7 +46,7 @@ class McpController(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    @PostMapping("/mcp", consumes = [MediaType.APPLICATION_JSON_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE])
+    @PostMapping("/mcp", consumes = [MediaType.APPLICATION_JSON_VALUE], produces = [JSON_UTF8])
     fun post(request: HttpServletRequest): ResponseEntity<Any> {
         val principal = when (val check = tokens.authenticate(bearer(request))) {
             is TokenCheck.Valid -> check.principal
@@ -192,6 +192,12 @@ class McpController(
     }
 
     companion object {
+        /**
+         * What every answer is declared as. JSON is UTF-8 by definition and needs no `charset`, but a client that guesses
+         * (Windows PowerShell 5.1 reads such an answer as Latin-1) then garbles every Russian title; naming it costs nothing.
+         */
+        const val JSON_UTF8 = "application/json;charset=UTF-8"
+
         /** The revisions of the protocol this server answers. The first is what a client that asks for none of them is told. */
         val SUPPORTED_VERSIONS = listOf("2025-11-25", "2025-06-18", "2025-03-26", "2026-07-28")
 

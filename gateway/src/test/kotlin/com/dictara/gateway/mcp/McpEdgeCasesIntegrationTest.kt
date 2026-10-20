@@ -67,6 +67,29 @@ class McpEdgeCasesIntegrationTest : AbstractMcpIntegrationTest() {
         assertThat(raw("Bearer $token", """{"jsonrpc":"2.0","id":1,"method":"ping"}""", MediaType.parseMediaType("application/json; charset=utf-8")).status).isEqualTo(200)
     }
 
+    // -- text that is not English ---------------------------------------------------------------------------
+
+    @Test
+    fun `Russian and other text goes out as UTF-8, and says so, so that a client that guesses does not garble it`() {
+        val user = newUser()
+        val title = "Созвон с Арсеном: Харбин, ИИ для математики 🎓"
+        val id = seed(user, title, listOf(Phrase(0.0, 3.0, "SPEAKER_00", "Привет, как дела? Это проверка.")))
+        tag(user, "встреча", "Регулярные встречи")
+        speaker(user, "Мария Чен")
+        val token = mint(user)
+
+        val search = http(HttpMethod.POST, "/mcp", token, """{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search_transcriptions","arguments":{"query":"Харбин"}}}""")
+
+        assertThat(search.headers.contentType.toString()).contains("charset=UTF-8")
+        val items = json.readTree(search.body!!["result"]["content"][0]["text"].asText())["items"]
+        assertThat(items.map { it["title"].asText() }).containsExactly(title) // found by Cyrillic text, and back unharmed
+        val phrases = call(token, "get_transcript", """{"id":"$id"}""").data["phrases"]
+        assertThat(phrases[0]["text"].asText()).isEqualTo("Привет, как дела? Это проверка.")
+        assertThat(call(token, "list_tags").data[0]["label"].asText()).isEqualTo("встреча")
+        assertThat(call(token, "list_speakers").data[0]["name"].asText()).isEqualTo("Мария Чен")
+        assertThat(rpc("dtr_" + "A".repeat(43), "ping").headers.contentType.toString()).contains("charset=UTF-8") // refusals too
+    }
+
     // -- the token in the header ----------------------------------------------------------------------------
 
     @Test
