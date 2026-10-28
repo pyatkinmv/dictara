@@ -115,6 +115,7 @@ GPU (e.g. Cloud Run L4) is 10–20x faster overall.
 
 - `pyannote.audio>=2.1,<4.0` — v4.x pulls in `torchcodec` which requires system ffmpeg shared libs (we only have the static binary). v3.x works fine.
 - `torch==2.3.1` + `torchaudio==2.3.1` — pyannote 3.x uses `torchaudio.AudioMetaData` removed in torchaudio 2.4+.
+- `av>=11,<19` — faster-whisper 1.2.x calls `av.open(..., metadata_errors="ignore")`; PyAV 19 removed that argument. The image was rebuilt on 2026-10-18 with av 19.0.1 and from then on every transcription failed with `open() got an unexpected keyword argument 'metadata_errors'` (nobody transcribed in between, so it showed up only on 2026-10-28). `test_av_compat.py` makes the same call with the av that CI installs from this pin. Only `torch`, `torchaudio` and `pyannote.audio` are pinned otherwise: **every rebuild takes the newest of everything else**, so a failure right after a transcriber deploy is first a dependency change.
 - `huggingface_hub` 1.x removed `use_auth_token` kwarg that pyannote 3.x still passes. Fixed via monkey-patch in `transcriber.py:_patch_hf_hub_compat()`.
 
 ## Diarization setup

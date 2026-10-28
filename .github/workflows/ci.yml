@@ -31,6 +31,7 @@ jobs:
         working-directory: transcriber
         run: |
           pip install fastapi httpx pytest python-multipart prometheus-fastapi-instrumentator prometheus_client
+          pip install "$(grep -E '^av' requirements.txt)"   # the av that production gets, for test_av_compat.py
           pytest -v
       - uses: subosito/flutter-action@v2
         with:
