@@ -1,5 +1,9 @@
 prometheus-fastapi-instrumentator
 faster-whisper
+# faster-whisper 1.2.x opens audio with av.open(..., metadata_errors="ignore"); PyAV 19 removed that argument, so every
+# transcription failed with a TypeError after the image was rebuilt on 2026-10-18 (see test_av_compat.py). Raise the bound only
+# after faster-whisper stops passing it.
+av>=11,<19
 pyannote.audio>=2.1,<4.0
 torch==2.3.1
 torchaudio==2.3.1
