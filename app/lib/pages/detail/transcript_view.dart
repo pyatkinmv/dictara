@@ -10,6 +10,7 @@ import '../../theme/app_palette.dart';
 import '../../util/format.dart';
 import '../../widgets/popover.dart';
 import 'audio_player_bar.dart';
+import 'phrase_text.dart';
 import 'speaker_picker.dart';
 
 /// Where playback is, as the phrases need it: which one is being spoken, and whether a phrase can be played from.
@@ -370,8 +371,10 @@ class _PhraseRowState extends State<_PhraseRow> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    segment.text,
+                  child: PhraseText(
+                    index: widget.index,
+                    text: segment.text,
+                    rowHovered: _rowHover,
                     style: TextStyle(
                       fontSize: _phraseFontSize,
                       height: _phraseLineHeight,

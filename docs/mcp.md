@@ -46,7 +46,7 @@ claude mcp add --transport http dictara https://dictary.app/api/mcp --header "Au
 
 Settings → **MCP access** (the second tab; the first is Profile). Cards, one per token: name, access chip, prefix, when created, when it ends, when last used; **Revoke** (asks first). The server address is on top with a Copy button. **Create token** asks only for a name and read only / read and write (the 90 days are stated, not asked), then shows the token once with the ready command for Claude Code and the `opencode.json` entry for OpenCode; that window cannot be closed by a click outside. A token that has expired is red with a plain sentence, a banner, a red dot on the tab and "Create replacement"; one that ends within 14 days is amber with the days left. For a plan that does not include MCP the tab shows "MCP access comes with the Ultra plan" instead of the address and Create button; tokens made earlier stay listed as "Not working" with Revoke/Delete. Details in `app/CLAUDE.md`.
 
-Deleting a transcription (`DELETE /transcriptions/{id}`) is for the signed-in app only: there is no MCP tool for it, and the endpoint takes the session JWT, not an MCP token. A deleted transcription is simply "not found" to the tools.
+Editing the text of a phrase (`PUT /transcriptions/{id}/segments/{index}`) and deleting a transcription (`DELETE /transcriptions/{id}`) are for the signed-in app only, and `get_transcript` shows the corrected text. There is no MCP tool for either, and the endpoints take the session JWT, not an MCP token. A deleted transcription is simply "not found" to the tools.
 
 ## Tools (stage 1: read)
 

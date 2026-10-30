@@ -283,6 +283,13 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
   }
 
   @override
+  Future<String> editPhrase(String id, int index, String text) async {
+    final body = await _client.putJson('/transcriptions/${Uri.encodeComponent(id)}/segments/$index', {'text': text});
+    if (body is! Map<String, dynamic> || body['text'] is! String) throw const GatewayException('Expected the saved text');
+    return body['text'] as String;
+  }
+
+  @override
   Future<void> delete(String id) => _client.deleteJson('/transcriptions/${Uri.encodeComponent(id)}');
 
   @override

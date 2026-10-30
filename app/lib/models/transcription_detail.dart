@@ -180,13 +180,15 @@ class TranscriptionDetail {
 
   TranscriptionDetail copyWith({
     Transcription? item,
+    List<Segment>? segments,
+    int? wordCount,
     Map<int, Speaker>? segmentSpeakers,
     SummaryRegeneration? regeneration,
     bool clearRegenerationError = false,
   }) {
     return TranscriptionDetail(
       item: item ?? this.item,
-      segments: segments,
+      segments: segments ?? this.segments,
       speakers: speakers,
       segmentSpeakers: segmentSpeakers ?? this.segmentSpeakers,
       suggestions: suggestions,
@@ -194,7 +196,7 @@ class TranscriptionDetail {
       originalFilename: originalFilename,
       fileSizeBytes: fileSizeBytes,
       language: language,
-      wordCount: wordCount,
+      wordCount: wordCount ?? this.wordCount,
       regeneration: regeneration ?? this.regeneration,
       regeneratedAt: regeneratedAt,
       regenerationsUsed: regenerationsUsed,
