@@ -11,7 +11,9 @@ import '../../shell/breakpoints.dart';
 import '../../state/transcription_detail_controller.dart';
 import '../../theme/app_palette.dart';
 import '../../util/format.dart';
+import '../../widgets/error_reporter.dart';
 import '../../widgets/status_badge.dart';
+import 'delete_transcription_dialog.dart';
 import 'speakers_row.dart';
 import 'suggestions_banner.dart';
 import 'tags_row.dart';
@@ -63,6 +65,8 @@ class DetailHeader extends StatelessWidget {
           doneLabel: 'Copied',
           onTap: () => _copy(context),
         ),
+        const SizedBox(width: 7),
+        _DeleteButton(onTap: () => _delete(context)),
       ],
     );
     return Container(
@@ -102,6 +106,22 @@ class DetailHeader extends StatelessWidget {
     final text = await controller.transcriptText();
     if (text == null) throw StateError('There is no transcript');
     await saver.save(transcriptFileName(title), text);
+  }
+
+  /// Asks first, then deletes the transcription for good and goes back to the list. A refusal (it is being
+  /// processed) is shown in the snack bar with the gateway's words.
+  static Future<void> _delete(BuildContext context) async {
+    final controller = context.read<TranscriptionDetailController>();
+    final errors = context.read<ErrorReporter>();
+    final router = GoRouter.of(context);
+    final title = controller.current?.item.title ?? 'this transcription';
+    if (!await showDeleteTranscriptionDialog(context, title: title)) return;
+    try {
+      await controller.deleteOpen();
+      router.go('/transcriptions');
+    } on Object catch (error, stack) {
+      errors.report(error, stack);
+    }
   }
 
   static Future<void> _copy(BuildContext context) async {
@@ -412,6 +432,49 @@ class _MetaRow extends StatelessWidget {
           entry(Icons.mic_none_rounded, formatDay(item.recordedAt!), tooltip: 'Recorded ${formatDayTime(item.recordedAt!)}'),
         StatusBadge(item.status),
       ],
+    );
+  }
+}
+
+/// The quiet "delete" of the header: only a trash can, grey like the other buttons, red when the pointer is on it.
+/// It does nothing by itself; the dialog it opens asks first.
+class _DeleteButton extends StatefulWidget {
+  const _DeleteButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  State<_DeleteButton> createState() => _DeleteButtonState();
+}
+
+class _DeleteButtonState extends State<_DeleteButton> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Tooltip(
+      message: 'Delete',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: GestureDetector(
+          key: const Key('delete-transcription'),
+          onTap: widget.onTap,
+          behavior: HitTestBehavior.opaque,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+            decoration: BoxDecoration(
+              color: _hover ? p.dangerBg : p.surface,
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(color: _hover ? p.danger : p.border),
+            ),
+            child: Icon(Icons.delete_outline_rounded, size: 15, color: _hover ? p.danger : p.text3),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -1092,6 +1092,24 @@ void main() {
       );
     });
 
+    test("deleting is a DELETE to the transcription's own address, and a refusal comes through with its words", () async {
+      final seen = <http.Request>[];
+      await _repo(MockClient((request) async {
+        seen.add(request);
+        return http.Response('', 204);
+      })).delete('t 1');
+
+      expect(seen.single.method, 'DELETE');
+      expect(seen.single.url.path, '/api/transcriptions/t%201');
+
+      await expectLater(
+        _repo(MockClient((_) async => _json({'message': 'This transcription is still being processed. Try again when it is done.'}, status: 409))).delete('t1'),
+        throwsA(isA<GatewayException>()
+            .having((e) => e.statusCode, 'statusCode', 409)
+            .having((e) => e.message, 'message', contains('still being processed'))),
+      );
+    });
+
     test('the detail tells the state, and the day it was used', () async {
       Future<TranscriptionDetail> read(Object? regeneration) async =>
           (await _repo(MockClient((_) async => _json(detailWith(regeneration)))).get('t1'))!;

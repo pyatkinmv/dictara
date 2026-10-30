@@ -283,6 +283,9 @@ class HttpTranscriptionRepository implements TranscriptionRepository {
   }
 
   @override
+  Future<void> delete(String id) => _client.deleteJson('/transcriptions/${Uri.encodeComponent(id)}');
+
+  @override
   Future<void> regenerateSummary(String id) async {
     await _client.postJson('/transcriptions/${Uri.encodeComponent(id)}/regenerate-summary', const <String, Object>{});
   }
