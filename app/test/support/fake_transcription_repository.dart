@@ -745,6 +745,24 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   final int? regenerationLimit;
   final Map<String, String> _summaries = {};
 
+  /// The ids [delete] was called with.
+  final List<String> deleteCalls = [];
+
+  /// Thrown by the next [delete], once (the gateway refusing: still being processed...).
+  Object? deleteError;
+
+  @override
+  Future<void> delete(String id) async {
+    await _wait();
+    deleteCalls.add(id);
+    final error = deleteError;
+    if (error != null) {
+      deleteError = null;
+      throw error;
+    }
+    _items.removeWhere((i) => i.id == id);
+  }
+
   /// The ids [regenerateSummary] was called with.
   final List<String> regenerateCalls = [];
 

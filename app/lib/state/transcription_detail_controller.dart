@@ -123,6 +123,16 @@ class TranscriptionDetailController extends ChangeNotifier {
     });
   }
 
+  /// Deletes the open transcription for good (the audio file too) and tells the list. The caller leaves the page;
+  /// a refusal is thrown as it came, for the caller to show.
+  Future<void> deleteOpen() async {
+    final current = _current;
+    if (current == null) return;
+    await _repository.delete(current.item.id);
+    if (_disposed) return;
+    _onChanged?.call();
+  }
+
   /// The open transcription's transcript as plain text; null when there is none.
   Future<String?> transcriptText() {
     final current = _current;

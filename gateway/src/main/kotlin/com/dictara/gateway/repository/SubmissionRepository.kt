@@ -62,11 +62,16 @@ interface SubmissionRepository : CrudRepository<SubmissionEntity, UUID> {
         summaryMode: String,
     ): SubmissionEntity?
 
+    /** This month's submissions that count against the plan, including the ones the user has deleted since
+     *  (`deleted_submissions`): deleting does not give the allowance back. */
     @Query("""
-        SELECT COUNT(*) FROM submissions
-        WHERE user_id = :userId
-          AND created_at >= date_trunc('month', NOW() AT TIME ZONE 'UTC')
-          AND status <> 'failed'
+        SELECT (SELECT COUNT(*) FROM submissions
+                WHERE user_id = :userId
+                  AND created_at >= date_trunc('month', NOW() AT TIME ZONE 'UTC')
+                  AND status <> 'failed')
+             + (SELECT COUNT(*) FROM deleted_submissions
+                WHERE user_id = :userId
+                  AND created_at >= date_trunc('month', NOW() AT TIME ZONE 'UTC'))
     """)
     fun countCurrentMonthSubmissions(userId: UUID): Long
 
@@ -76,6 +81,9 @@ interface SubmissionRepository : CrudRepository<SubmissionEntity, UUID> {
 
     /** Submissions ever, not scoped to the current month — for a plan with a lifetime cap instead of a
      *  recurring monthly one (the anonymous "try it" plan). */
-    @Query("SELECT COUNT(*) FROM submissions WHERE user_id = :userId AND status <> 'failed'")
+    @Query("""
+        SELECT (SELECT COUNT(*) FROM submissions WHERE user_id = :userId AND status <> 'failed')
+             + (SELECT COUNT(*) FROM deleted_submissions WHERE user_id = :userId)
+    """)
     fun countAllSubmissions(userId: UUID): Long
 }

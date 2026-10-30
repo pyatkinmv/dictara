@@ -169,6 +169,11 @@ abstract class TranscriptionRepository {
   /// it runs in the background, so read [get] for the state (`TranscriptionDetail.regeneration`).
   Future<void> regenerateSummary(String id);
 
+  /// Deletes the transcription for good, with its transcript, summary, tags, speaker marks and audio file
+  /// (`DELETE /transcriptions/{id}`). Throws a [GatewayException] with the gateway's words when it refuses (still
+  /// being processed).
+  Future<void> delete(String id);
+
   /// Accepts everything that is left: the new title, every tag, every speaker.
   Future<void> acceptAllSuggestions(String id);
 
