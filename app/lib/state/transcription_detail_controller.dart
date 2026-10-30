@@ -123,6 +123,29 @@ class TranscriptionDetailController extends ChangeNotifier {
     });
   }
 
+  /// Corrects the text of phrase [index] of the open transcription. Only the text: the phrase keeps its time and
+  /// its speaker, and the summary, title and tags are not touched. A refusal is thrown as it came, for the editor to show.
+  Future<void> editPhrase(int index, String text) async {
+    final current = _current;
+    final trimmed = text.trim();
+    if (current == null || trimmed.isEmpty || index < 0 || index >= current.segments.length) return;
+    final id = current.item.id;
+
+    final stored = await _repository.editPhrase(id, index, trimmed);
+    // The user moved on to another transcription meanwhile.
+    final open = _current;
+    if (_disposed || open == null || open.item.id != id || index >= open.segments.length) return;
+    final old = open.segments[index];
+    if (old.text == stored) return;
+    final segments = [...open.segments];
+    segments[index] = Segment(start: old.start, speakerSlot: old.speakerSlot, text: stored);
+    // The same count as the gateway's: pieces between white space.
+    int words(String s) => s.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+    final count = open.wordCount;
+    _current = open.copyWith(segments: segments, wordCount: count == null ? null : count - words(old.text) + words(stored));
+    notifyListeners();
+  }
+
   /// Deletes the open transcription for good (the audio file too) and tells the list. The caller leaves the page;
   /// a refusal is thrown as it came, for the caller to show.
   Future<void> deleteOpen() async {

@@ -10,6 +10,7 @@ import 'package:dictara_web/models/transcription_detail.dart';
 import 'package:dictara_web/models/transcription_link.dart';
 import 'package:dictara_web/models/upload.dart';
 import 'package:dictara_web/util/format.dart';
+import 'package:dictara_web/data/gateway_client.dart';
 import 'package:dictara_web/data/transcription_repository.dart';
 
 // Mock data copied from `designs/1.9/cards-teal.html`.
@@ -404,7 +405,7 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
     if (index < 0 || _items[index].status != TranscriptionStatus.done) return null;
     return TranscriptionDetail(
       item: _items[index],
-      segments: _transcript,
+      segments: _segmentsOf(id),
       speakers: Map.unmodifiable(_slotsOf(id)),
       segmentSpeakers: Map.unmodifiable(_segmentSpeakers[id] ?? const {}),
       suggestions: _suggestions[id],
@@ -744,6 +745,39 @@ class FakeTranscriptionRepository implements TranscriptionRepository {
   /// How many times a transcription may be regenerated, as the user's plan says (null: no limit).
   final int? regenerationLimit;
   final Map<String, String> _summaries = {};
+
+  /// The calls of [editPhrase], in order.
+  final List<({String id, int index, String text})> editCalls = [];
+
+  /// Thrown by the next [editPhrase], once (the gateway refusing, or no connection).
+  Object? editError;
+
+  /// Edited phrases by transcription id and index.
+  final Map<String, Map<int, String>> _editedPhrases = {};
+
+  @override
+  Future<String> editPhrase(String id, int index, String text) async {
+    await _wait();
+    editCalls.add((id: id, index: index, text: text));
+    final error = editError;
+    if (error != null) {
+      editError = null;
+      throw error;
+    }
+    final stored = text.trim();
+    if (stored.isEmpty) throw const GatewayException("A phrase can't be empty", statusCode: 400);
+    (_editedPhrases[id] ??= {})[index] = stored;
+    return stored;
+  }
+
+  List<Segment> _segmentsOf(String id) {
+    final edits = _editedPhrases[id];
+    if (edits == null) return _transcript;
+    return [
+      for (var i = 0; i < _transcript.length; i++)
+        edits.containsKey(i) ? Segment(start: _transcript[i].start, speakerSlot: _transcript[i].speakerSlot, text: edits[i]!) : _transcript[i],
+    ];
+  }
 
   /// The ids [delete] was called with.
   final List<String> deleteCalls = [];
