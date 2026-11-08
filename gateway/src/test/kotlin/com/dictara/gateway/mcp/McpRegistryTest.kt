@@ -1,9 +1,9 @@
 package com.dictara.gateway.mcp
 
+import com.dictara.gateway.mcp.facade.McpReadFacade
+import com.dictara.gateway.mcp.facade.McpWriteFacade
 import com.dictara.gateway.mcp.token.McpAccess
-import com.dictara.gateway.mcp.tools.McpTool
-import com.dictara.gateway.mcp.tools.ToolContext
-import com.dictara.gateway.mcp.tools.ToolRegistry
+import com.dictara.gateway.mcp.tools.*
 import com.fasterxml.jackson.databind.JsonNode
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -69,21 +69,42 @@ class McpRegistryTest {
     }
 
     @Test
-    fun `the real tools are all read tools for now, each with a clear name`() {
-        // The write tools come with the next stage; until then nothing may be able to change anything.
+    fun `the real tools are the read tools and the write tools, each with a clear name and the right access`() {
+        val read = stubReadFacade()
+        val write = stubWriteFacade()
         val real = ToolRegistry(
             listOf(
-                com.dictara.gateway.mcp.tools.WhoAmITool(stubFacade()), com.dictara.gateway.mcp.tools.ListTagsTool(stubFacade()),
-                com.dictara.gateway.mcp.tools.ListSpeakersTool(stubFacade()), com.dictara.gateway.mcp.tools.SearchTranscriptionsTool(stubFacade()),
-                com.dictara.gateway.mcp.tools.GetTranscriptionTool(stubFacade()), com.dictara.gateway.mcp.tools.GetTranscriptTool(stubFacade()),
+                WhoAmITool(read), ListTagsTool(read), ListSpeakersTool(read), SearchTranscriptionsTool(read),
+                GetTranscriptionTool(read), GetTranscriptTool(read),
+                CreateTagTool(write), UpdateTagTool(write), DeleteTagTool(write),
+                CreateSpeakerTool(write), UpdateSpeakerTool(write), DeleteSpeakerTool(write),
+                AddTagToTranscriptionTool(write), RemoveTagFromTranscriptionTool(write),
+                RenameTranscriptionTool(write), SetSummaryTool(write), EditPhrasesTool(write),
+                SetVoiceSpeakerTool(write), SetPhraseSpeakerTool(write),
+                AcceptSuggestionTool(write), RejectSuggestionTool(write), AcceptAllSuggestionsTool(write), DismissAllSuggestionsTool(write),
             ),
         )
 
-        assertThat(real.all.map { it.access }.toSet()).containsExactly(McpAccess.READ)
-        assertThat(real.all.map { it.name }).containsExactly(
+        assertThat(real.availableTo(McpAccess.READ).map { it.name }).containsExactly(
             "get_transcript", "get_transcription", "list_speakers", "list_tags", "search_transcriptions", "whoami",
         )
+        assertThat(real.all.filter { it.access == McpAccess.WRITE }.map { it.name }).containsExactly(
+            "accept_all_suggestions", "accept_suggestion", "add_tag_to_transcription", "create_speaker", "create_tag",
+            "delete_speaker", "delete_tag", "dismiss_all_suggestions", "edit_phrases", "reject_suggestion",
+            "remove_tag_from_transcription", "rename_transcription", "set_phrase_speaker", "set_summary", "set_voice_speaker",
+            "update_speaker", "update_tag",
+        )
+        // Only the tools that remove something for good say so.
+        assertThat(real.all.filter { it.destructive }.map { it.name }).containsExactly("delete_speaker", "delete_tag")
+        // Every tool that takes a transcription asks for its id, and every required argument is one it declares.
+        real.all.forEach { tool ->
+            val properties: Set<String> = (tool.inputSchema["properties"] as? Map<*, *>)?.keys?.map { it.toString() }?.toSet() ?: emptySet()
+            @Suppress("UNCHECKED_CAST")
+            val required = tool.inputSchema["required"] as? List<String> ?: emptyList()
+            assertThat(properties.containsAll(required)).`as`("${tool.name} requires only what it declares").isTrue()
+        }
     }
 
-    private fun stubFacade() = org.mockito.Mockito.mock(com.dictara.gateway.mcp.facade.McpReadFacade::class.java)
+    private fun stubReadFacade() = org.mockito.Mockito.mock(McpReadFacade::class.java)
+    private fun stubWriteFacade() = org.mockito.Mockito.mock(McpWriteFacade::class.java)
 }

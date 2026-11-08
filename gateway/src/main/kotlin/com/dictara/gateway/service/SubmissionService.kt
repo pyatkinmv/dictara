@@ -235,6 +235,11 @@ class SubmissionService(
         }
     }
 
+    /** Whether the submission exists and is [userId]'s: a cheap check for callers that must answer "not found" for both cases. */
+    @Transactional(readOnly = true)
+    fun owns(userId: UUID, submissionId: UUID): Boolean =
+        submissionRepo.findById(submissionId).orElse(null)?.userId == userId
+
     /** One transcription of [userId] with its text, or null when there is none with this id (also someone else's). */
     @Transactional(readOnly = true)
     fun getDetail(userId: UUID, submissionId: UUID): TranscriptionDetail? {
