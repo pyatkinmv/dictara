@@ -54,12 +54,14 @@ class McpToolContractIntegrationTest : AbstractMcpIntegrationTest() {
 
     @Test
     fun `no tool, called as MCP with any arguments, reaches the summarizer, the transcriber or a storage write`() {
-        val user = newUser()
-        val submission = seed(user, "Contract", listOf(Phrase(0.0, 5.0, "SPEAKER_00", "Hello.")))
-        val token = mint(user, McpAccess.WRITE)
         assertThat(registry.all).isNotEmpty()
 
         for (tool in registry.all) {
+            // A user, a transcription and a token of their own per tool: the rate limit is per token and a user may hold
+            // only ten working tokens, and a tool that changes things should not change what the next one is tried on.
+            val user = newUser()
+            val submission = seed(user, "Contract", listOf(Phrase(0.0, 5.0, "SPEAKER_00", "Hello.")))
+            val token = mint(user, McpAccess.WRITE)
             val sets = argumentSets + """{"id":"$submission"}""" + """{"id":"$submission","title":"T","summary":"S","label":"c","name":"N","tag":"c","kind":"title","voice":"SPEAKER_00","speaker":"N","phrases":[0],"edits":[{"index":0,"text":"t"}]}"""
             for (args in sets) {
                 // Through the real endpoint, as an agent would, and straight at the tool as MCP.
