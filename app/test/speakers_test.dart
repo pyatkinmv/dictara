@@ -236,6 +236,12 @@ void main() {
       await settle(tester);
     }
 
+    /// The picker opens on "All segments by X"; a test about a single phrase asks for "This segment only".
+    Future<void> segmentOnly(WidgetTester tester) async {
+      await tester.tap(inPicker(find.text('This segment only')));
+      await settle(tester);
+    }
+
     testWidgets('clicking a speaker name opens the library with initials and scope', (tester) async {
       await openDetail(tester);
       expect(find.byKey(_picker), findsNothing);
@@ -250,6 +256,21 @@ void main() {
       expect(inPicker(find.text('APPLY TO')), findsOneWidget);
       expect(inPicker(find.text('This segment only')), findsOneWidget);
       expect(inPicker(find.textContaining('All segments by Maria Chen')), findsOneWidget);
+      // "All segments by" comes first and is the one selected; "This segment only" is the option below it.
+      expect(tester.getTopLeft(inPicker(find.textContaining('All segments by'))).dy,
+          lessThan(tester.getTopLeft(inPicker(find.text('This segment only'))).dy));
+    });
+
+    testWidgets('it opens with "All segments by" selected: picking a speaker changes every phrase of the current speaker',
+        (tester) async {
+      await openDetail(tester);
+      expect(find.text('ALEXEI SOROKIN'), findsNWidgets(3));
+
+      await openPicker(tester, 'ALEXEI SOROKIN');
+      await tester.tap(inPicker(find.text('James Wright'))); // no scope chosen
+      await settle(tester);
+
+      expect(find.text('ALEXEI SOROKIN'), findsNothing);
     });
 
     testWidgets('"This segment only" reassigns just the first segment of the block', (tester) async {
@@ -257,6 +278,7 @@ void main() {
       expect(find.text('ALEXEI SOROKIN'), findsNWidgets(3));
 
       await openPicker(tester, 'ALEXEI SOROKIN'); // block of segment 0
+      await segmentOnly(tester);
       await tester.tap(inPicker(find.text('James Wright')));
       await settle(tester);
 
@@ -306,6 +328,7 @@ void main() {
       expect(find.text('James Wright'), findsOneWidget);
 
       await openPicker(tester, 'MARIA CHEN'); // block of segment 1, Maria's first of four
+      await segmentOnly(tester);
       await tester.enterText(find.byType(TextField), 'Dana Whitfield');
       await settle(tester);
       await tester.tap(find.text('Create "Dana Whitfield"'));
@@ -323,6 +346,7 @@ void main() {
 
       // Phrase 1 (Maria's) goes to Alexei: it joins the block of phrase 0, which now has two phrases.
       await openPicker(tester, 'MARIA CHEN');
+      await segmentOnly(tester);
       await tester.tap(inPicker(find.text('Alexei Sorokin')));
       await settle(tester);
       expect(find.text('MARIA CHEN'), findsNWidgets(3)); // was 4 blocks
@@ -332,6 +356,7 @@ void main() {
       await tester.tap(find.byTooltip('Change speaker of this phrase').at(1));
       await settle(tester);
       expect(find.byKey(_picker), findsOneWidget);
+      await segmentOnly(tester);
       await tester.tap(inPicker(find.text('James Wright')));
       await settle(tester);
 
@@ -418,7 +443,7 @@ void main() {
       await settle(tester);
 
       expect(find.byKey(_picker), findsNothing);
-      expect(find.text('DANA WHITFIELD'), findsOneWidget); // the block header
+      expect(find.text('DANA WHITFIELD'), findsWidgets); // the block headers: all of James's blocks are Dana's now
 
       // The new speaker is in the library now, with its initials.
       await openPicker(tester, 'MARIA CHEN');
@@ -430,6 +455,7 @@ void main() {
       await openDetail(tester);
 
       await openPicker(tester, 'JAMES WRIGHT');
+      await segmentOnly(tester);
       await tester.enterText(find.byType(TextField), 'alexei sorokin');
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await settle(tester);
@@ -440,6 +466,7 @@ void main() {
       expect(find.text('ALEXEI SOROKIN'), findsNWidgets(3));
 
       await openPicker(tester, 'MARIA CHEN');
+      await segmentOnly(tester);
       await tester.enterText(find.byType(TextField), 'Pat Lee');
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await settle(tester);
@@ -460,12 +487,11 @@ void main() {
       expect(find.byKey(_picker), findsNothing);
     });
 
-    testWidgets('it opens with an empty search and "This segment only" selected', (tester) async {
+    testWidgets('it opens with an empty search and "All segments by" selected, whatever was chosen the time before', (tester) async {
       await openDetail(tester);
       await openPicker(tester, 'MARIA CHEN');
       await tester.enterText(find.byType(TextField), 'zzz');
-      await tester.tap(inPicker(find.textContaining('All segments by')));
-      await settle(tester);
+      await segmentOnly(tester);
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await settle(tester);
 
@@ -473,8 +499,8 @@ void main() {
       expect(tester.widget<TextField>(find.byType(TextField)).controller!.text, isEmpty);
       await tester.tap(inPicker(find.text('James Wright')));
       await settle(tester);
-      // Only one segment moved, so the other Maria blocks are still there.
-      expect(find.text('MARIA CHEN'), findsWidgets);
+      // Everything Maria said moved, so no Maria block is left.
+      expect(find.text('MARIA CHEN'), findsNothing);
       expect(find.text('JAMES WRIGHT'), findsWidgets);
     });
 
@@ -501,6 +527,7 @@ void main() {
     testWidgets('assignments survive leaving and reopening the transcription', (tester) async {
       await openDetail(tester);
       await openPicker(tester, 'ALEXEI SOROKIN');
+      await segmentOnly(tester);
       await tester.tap(inPicker(find.text('James Wright')));
       await settle(tester);
       expect(find.text('ALEXEI SOROKIN'), findsNWidgets(2));

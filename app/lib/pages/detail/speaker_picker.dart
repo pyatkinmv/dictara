@@ -12,7 +12,7 @@ enum PickerScope { segment, allBySpeaker }
 
 /// Floating panel for reassigning a speaker block (`.spk-picker`): search the
 /// speaker library, pick a speaker or create a new one, and choose whether it
-/// applies to this segment only or to everything the current speaker says.
+/// applies to everything the current speaker says (the default) or to this segment only.
 class SpeakerPicker extends StatefulWidget {
   const SpeakerPicker({
     super.key,
@@ -41,7 +41,7 @@ class SpeakerPicker extends StatefulWidget {
 
 class _SpeakerPickerState extends State<SpeakerPicker> {
   final _input = TextEditingController();
-  PickerScope _scope = PickerScope.segment;
+  PickerScope _scope = PickerScope.allBySpeaker;
 
   @override
   void dispose() {
@@ -303,12 +303,6 @@ class _ScopeChooser extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           _ScopeOption(
-            selected: scope == PickerScope.segment,
-            onTap: () => onChanged(PickerScope.segment),
-            child: const Text('This segment only'),
-          ),
-          const SizedBox(height: 2),
-          _ScopeOption(
             selected: scope == PickerScope.allBySpeaker,
             onTap: () => onChanged(PickerScope.allBySpeaker),
             child: Text.rich(
@@ -319,6 +313,12 @@ class _ScopeChooser extends StatelessWidget {
                 ],
               ),
             ),
+          ),
+          const SizedBox(height: 2),
+          _ScopeOption(
+            selected: scope == PickerScope.segment,
+            onTap: () => onChanged(PickerScope.segment),
+            child: const Text('This segment only'),
           ),
         ],
       ),
