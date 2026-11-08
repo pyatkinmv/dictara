@@ -20,6 +20,9 @@ interface McpTool {
     /** The right a token must have to use the tool: [McpAccess.READ] for tools that only look, [McpAccess.WRITE] for tools that change. */
     val access: McpAccess
 
+    /** True for a tool that deletes something that cannot be brought back; clients are told (`destructiveHint`) and may ask first. */
+    val destructive: Boolean get() = false
+
     /** JSON Schema of the arguments (an `object`). */
     val inputSchema: Map<String, Any?>
 

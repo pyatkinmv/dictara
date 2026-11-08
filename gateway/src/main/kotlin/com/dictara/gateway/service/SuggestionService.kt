@@ -197,6 +197,24 @@ class SuggestionService(
         return pending(transcriptId)
     }
 
+    /** Renames the transcription as proposed and settles the proposal. 404 when no title is proposed. */
+    @Transactional
+    fun acceptTitle(userId: UUID, submissionId: UUID): Suggestions? {
+        val transcriptId = ownTranscriptId(userId, submissionId)
+        val title = queries.pendingTitle(transcriptId) ?: throw noSuchSuggestion()
+        transcriptRepo.updateTitle(transcriptId, title)
+        queries.resolveTitle(transcriptId, ACCEPTED)
+        return pending(transcriptId)
+    }
+
+    /** Turns the proposed title down (it is not proposed again); the title stays as it is. 404 when none is proposed. */
+    @Transactional
+    fun rejectTitle(userId: UUID, submissionId: UUID): Suggestions? {
+        val transcriptId = ownTranscriptId(userId, submissionId)
+        if (!queries.resolveTitle(transcriptId, REJECTED)) throw noSuchSuggestion()
+        return pending(transcriptId)
+    }
+
     /** Accepts everything that is still proposed: the title, every tag and every speaker. */
     @Transactional
     fun acceptAll(userId: UUID, submissionId: UUID): Suggestions? {

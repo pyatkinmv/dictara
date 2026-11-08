@@ -105,7 +105,7 @@ CI runs this automatically on every deploy. Without it, `docker-compose.yml` fal
 
 ## MCP for AI agents
 
-The gateway also serves `POST /api/mcp` (Model Context Protocol) for agents like Claude Code and OpenCode, with personal tokens limited to one user; read tools first, write tools later, and never anything that costs money. See [docs/mcp.md](docs/mcp.md).
+The gateway also serves `POST /api/mcp` (Model Context Protocol) for agents like Claude Code and OpenCode, with personal tokens limited to one user; read tools for everyone, write tools (tags, speakers, titles, summaries, phrase text, the AI's proposals) for `write` tokens, and never anything that costs money. See [docs/mcp.md](docs/mcp.md).
 
 ## Production: access and checks
 

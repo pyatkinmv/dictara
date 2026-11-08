@@ -60,7 +60,7 @@ class McpToolContractIntegrationTest : AbstractMcpIntegrationTest() {
         assertThat(registry.all).isNotEmpty()
 
         for (tool in registry.all) {
-            val sets = argumentSets + """{"id":"$submission"}"""
+            val sets = argumentSets + """{"id":"$submission"}""" + """{"id":"$submission","title":"T","summary":"S","label":"c","name":"N","tag":"c","kind":"title","voice":"SPEAKER_00","speaker":"N","phrases":[0],"edits":[{"index":0,"text":"t"}]}"""
             for (args in sets) {
                 // Through the real endpoint, as an agent would, and straight at the tool as MCP.
                 call(token, tool.name, args)

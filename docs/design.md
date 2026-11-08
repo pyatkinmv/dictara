@@ -238,9 +238,9 @@ The transcript is rendered as **speaker runs**: consecutive segments by the same
 - Search input filters the global Speaker library
 - Click a speaker to assign them
 - Type a name not in the library → **Create "[name]"** option appears
-- **Scope radio** before confirming:
+- **Scope radio** before confirming (the picker always opens on the first option):
+  - *All segments by [current name]* (the default) — overrides every segment currently attributed to the same speaker in this transcript
   - *This segment only* — overrides just the clicked segment
-  - *All segments by [current name]* — overrides every segment currently attributed to the same speaker in this transcript
 - Creating a new speaker adds them to the library with a color from the cycling palette
 
 ---

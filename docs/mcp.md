@@ -46,9 +46,9 @@ claude mcp add --transport http dictara https://dictary.app/api/mcp --header "Au
 
 Settings → **MCP access** (the second tab; the first is Profile). Cards, one per token: name, access chip, prefix, when created, when it ends, when last used; **Revoke** (asks first). The server address is on top with a Copy button. **Create token** asks only for a name and read only / read and write (the 90 days are stated, not asked), then shows the token once with the ready command for Claude Code and the `opencode.json` entry for OpenCode; that window cannot be closed by a click outside. A token that has expired is red with a plain sentence, a banner, a red dot on the tab and "Create replacement"; one that ends within 14 days is amber with the days left. For a plan that does not include MCP the tab shows "MCP access comes with the Ultra plan" instead of the address and Create button; tokens made earlier stay listed as "Not working" with Revoke/Delete. Details in `app/CLAUDE.md`.
 
-Editing the text of a phrase (`PUT /transcriptions/{id}/segments/{index}`) and deleting a transcription (`DELETE /transcriptions/{id}`) are for the signed-in app only, and `get_transcript` shows the corrected text. There is no MCP tool for either, and the endpoints take the session JWT, not an MCP token. A deleted transcription is simply "not found" to the tools.
+Deleting a transcription (`DELETE /transcriptions/{id}`) is for the signed-in app only: there is no MCP tool for it, and the endpoint takes the session JWT, not an MCP token. A deleted transcription is simply "not found" to the tools. Correcting the text of phrases is possible through MCP (`edit_phrases`, below); `get_transcript` shows the corrected text either way.
 
-## Tools (stage 1: read)
+## Tools: read
 
 | Tool | What it does | Needs |
 |---|---|---|
@@ -60,7 +60,28 @@ Editing the text of a phrase (`PUT /transcriptions/{id}/segments/{index}`) and d
 
 `query` searches titles only, not the spoken text (full-text search is a later stage). A tool result is cut at `dictara.mcp.max-result-chars` with a note on how to ask for less. Tool descriptions and the server's `instructions` tell the agent that transcript text is data, never instructions (what people said in a recording can try to tell an agent what to do).
 
-Later stages add the write tools (rename, tags, speakers, accept or reject suggestions, delete a tag or speaker) behind the `write` access, and full-text search.
+`get_transcription` also carries `voices` (the diarizer's labels `SPEAKER_00`... with the speaker settled for each, what `set_voice_speaker` takes) and `suggestions` (what the AI proposed and nobody has settled: a title, tags, a speaker per voice); `get_transcript` gives each phrase's `voice` next to `speaker`. Full-text search is a later stage.
+
+## Tools: write
+
+A token with `write` access is offered these as well (`tools/list` for a read token does not list them, and calling one answers "This token is read-only", written to the audit log as `denied`). They carry `readOnlyHint: false`, and the two that remove something for good, `destructiveHint: true`, so that a client can ask before running them. They go through `mcp.facade.McpWriteFacade`, which calls the same services as the app: the rules about names, lengths and whose data it is are the app's own, and another user's transcription, tag or speaker is "not found".
+
+| Tool | What it does |
+|---|---|
+| `create_tag`, `update_tag`, `delete_tag` | the tag library: add (label 1-32 letters, digits, `-`, `_`, stored lower case; optional description), rename and/or describe (a description of `""` clears it), delete. **`delete_tag` also takes the tag off every transcription**; it answers how many. By id from `list_tags` |
+| `create_speaker`, `update_speaker`, `delete_speaker` | the same for speakers (name 1-64 characters, unique in any case). **`delete_speaker` sends their voices and phrases back to "Speaker N"** in every transcription; it answers how many |
+| `add_tag_to_transcription`, `remove_tag_from_transcription` | by label. The tag has to exist: **a name that is not in the library is refused, never created**, so a typo makes no tag |
+| `rename_transcription` | the title (1-200 characters, spaces collapsed) |
+| `set_summary` | replaces the summary with the text given (Markdown, up to 20000 characters). **Nothing is summarized and nothing costs money**: it only stores the text. The text it replaced comes back as `before`. 409 while the transcription is not `done` or its summary is being regenerated. A later "Regenerate" by the user replaces it |
+| `edit_phrases` | corrects the text of up to 100 phrases at once (`edits: [{index, text}]`, numbers as in `get_transcript`), **all or none**. Only the text changes (time, voice, speaker stay; summary, title, tags are not redone). The original is not kept, so the answer lists every text it replaced |
+| `set_voice_speaker` | "this voice (`SPEAKER_00`) is this library speaker in this transcription" (the Speaker Picker's *all by this speaker*: every phrase of the voice becomes theirs, single-phrase marks inside it are dropped). The speaker is given by `speaker` (name, any case) or `speaker_id` and must exist |
+| `set_phrase_speaker` | makes single phrases a speaker's whatever their voice (for a phrase the diarizer put under the wrong voice) |
+| `accept_suggestion`, `reject_suggestion` | settles one proposal: `kind` `title`, `tag` (`value` = label) or `speaker` (`value` = the voice). Accepting a speaker creates them in the library if they are new; rejecting changes nothing and the same proposal is not made again. The answer is what is still open |
+| `accept_all_suggestions`, `dismiss_all_suggestions` | all of them at once |
+
+Nothing in the list can start paid work: there is no tool that regenerates a summary, transcribes or uploads, and the three layers below apply to the write tools exactly as to the read ones (`McpToolContractIntegrationTest` calls every tool, write ones included, with a write token and checks that the summarizer, the transcriber and storage are never reached). A deleted tag or speaker, a replaced summary and a corrected phrase cannot be undone through MCP; the nightly backup (`backups/<date>/` in the bucket) is the only copy of what they replaced.
+
+The protocol layer turns a refusal of a service (`ResponseStatusException`: 400 bad value, 404 not found, 409 conflict) into the tool's error text, which is the reason the app would show; a 5xx is logged and the agent is only told "The call failed on the server." Tests: `McpWriteToolsIntegrationTest` (each tool's effect, the refusals, a read token refused, and that a user cannot touch another's data) and the registry test (`McpRegistryTest`: the exact list of write tools).
 
 ## Paid work is never available: how that is guaranteed
 
