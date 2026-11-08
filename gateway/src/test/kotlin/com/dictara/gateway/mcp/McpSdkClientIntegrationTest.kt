@@ -102,12 +102,19 @@ class McpSdkClientIntegrationTest : AbstractMcpIntegrationTest() {
     }
 
     @Test
-    fun `a read token's client sees only the read tools, and a write token's sees the same here since there are none else yet`() {
+    fun `a read token's client sees only the read tools, and a write token's sees the write tools too`() {
         val user = newUser()
 
-        client(mint(user, McpAccess.WRITE)).use { client ->
+        client(mint(user, McpAccess.READ)).use { client ->
             client.initialize()
             assertThat(client.listTools().tools()).hasSize(6)
+        }
+        client(mint(user, McpAccess.WRITE)).use { client ->
+            client.initialize()
+            val tools = client.listTools().tools()
+            assertThat(tools).hasSize(23)
+            assertThat(tools.map { it.name() }).contains("set_summary", "edit_phrases", "delete_tag")
+            assertThat(tools.filter { it.annotations()?.readOnlyHint() == true }).hasSize(6)
         }
     }
 
