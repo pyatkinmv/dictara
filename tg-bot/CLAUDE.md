@@ -45,7 +45,9 @@ Without the gate the gateway ran out of memory (`OutOfMemoryError`, 10 in a few 
 
 The name and the extension of a recording come from `AudioNames`, not from the file's path on the Telegram server: the local telegram-bot-api keeps files as `voice/file_1`, `music/file_0` and, after it has crashed and restarted (it did, under a burst of files), without any extension, which gave copies called `….bin` that the gateway refused (29 of 31 recordings one evening). The extension is taken from the path when it has one, else from the name Telegram gave, else from the MIME type, else from what the kind of message always is (voice = `oga`, video note and video = `mp4`, audio = `mp3`).
 
-Tests: `UploadGateTest`, `UploadPipelineTest`, `AudioNamesTest`, `DictaraClientTest` (a stand-in gateway, `MockWebServer`) and `ForwardedChatTest` (80 recordings at once through the real gate, pipeline and client).
+The copies of recordings in the telegram-bot-api volume are removed by a job that runs every minute and deletes what is older than 10 minutes (`BotApiCleanup`). It may touch only finished downloads (`<token folder>/music|voice|documents|videos|...`): bot-api keeps its own state in the same tree (`td.binlog`, `tqueue.binlog`, partial downloads in `temp/`), and an age rule over the whole tree deleted it (found 2026-11-09: no `td.binlog` in the volume, bot-api had crashed seven times with `Failed to unlink old binlog`, signal 6). On the same day downloads of a user's recordings stalled with `GetFile: wrong file_id or the file is temporarily unavailable`, shown to the user as "Something went wrong"; the link between the two is likely, not proven. After such a stall restart `telegram-bot-api` (`docker compose restart telegram-bot-api`).
+
+Tests: `BotApiCleanupTest`, `UploadGateTest`, `UploadPipelineTest`, `AudioNamesTest`, `DictaraClientTest` (a stand-in gateway, `MockWebServer`) and `ForwardedChatTest` (80 recordings at once through the real gate, pipeline and client).
 
 ## Model aliases
 
