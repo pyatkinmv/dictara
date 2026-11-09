@@ -185,8 +185,8 @@ class DictaraBot(
                             ?.div(1000) ?: 0
                     )
 
-                    val tenMinutesAgo = System.currentTimeMillis() - 10 * 60 * 1000L
-                    val toDelete = allFiles.filter { it.lastModified() < tenMinutesAgo }
+                    // Only finished downloads: bot-api's own files (td.binlog, temp/) live in the same tree.
+                    val toDelete = BotApiCleanup.stale(root, System.currentTimeMillis(), 10 * 60 * 1000L)
                     toDelete.forEach { f ->
                         val size = f.length()
                         if (f.delete()) {
